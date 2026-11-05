@@ -10,3 +10,32 @@ const dateTime = new Intl.DateTimeFormat('en-PH', {
 export function formatDateTime(value: string | null | undefined): string {
     return value ? dateTime.format(new Date(value)) : '—';
 }
+
+const date = new Intl.DateTimeFormat('en-PH', {
+    timeZone: 'UTC',
+    dateStyle: 'medium',
+});
+
+/** A calendar date stored as YYYY-MM-DD (already a Manila business date). */
+export function formatDate(value: string | null | undefined): string {
+    return value ? date.format(new Date(`${value}T00:00:00Z`)) : '—';
+}
+
+const peso = new Intl.NumberFormat('en-PH', {
+    style: 'currency',
+    currency: 'PHP',
+});
+
+/**
+ * Display a decimal string from the server (e.g. "45.50"). Display only:
+ * amounts are never calculated in the browser (D-034).
+ */
+export function formatMoney(value: string | null | undefined): string {
+    return value === null || value === undefined || value === ''
+        ? '—'
+        : peso.format(Number(value));
+}
+
+/** Native <select> styling shared by admin forms and filters. */
+export const selectClass =
+    'h-9 rounded-md border border-input bg-card px-3 text-sm focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-50';

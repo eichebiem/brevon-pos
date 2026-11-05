@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { usePage } from '@inertiajs/vue3';
+import { computed } from 'vue';
 import type { HTMLAttributes } from 'vue';
 
 defineOptions({
@@ -10,12 +12,18 @@ type Props = {
 };
 
 defineProps<Props>();
+
+const page = usePage();
+
+// Logo uploaded in Store settings; otherwise the provisional logo (D-016).
+const src = computed(
+    () => page.props.store?.logo_url ?? '/images/brevon-logo.jpg',
+);
 </script>
 
 <template>
-    <!-- Provisional logo until official vector assets are supplied (D-016). -->
     <img
-        src="/images/brevon-logo.jpg"
+        :src="src"
         alt="Brevon Doughnuts & Coffee"
         :class="['rounded-full object-cover', className]"
         v-bind="$attrs"

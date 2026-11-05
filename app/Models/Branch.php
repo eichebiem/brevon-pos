@@ -81,6 +81,16 @@ class Branch extends Model
         return $this->hasMany(Terminal::class);
     }
 
+    /**
+     * Products enabled at this location (D-064).
+     *
+     * @return BelongsToMany<Product, $this>
+     */
+    public function products(): BelongsToMany
+    {
+        return $this->belongsToMany(Product::class, 'product_branch')->withPivot('is_available')->withTimestamps();
+    }
+
     public function isPermanent(): bool
     {
         return $this->location_type === LocationType::Permanent;
@@ -108,6 +118,23 @@ class Branch extends Model
         }
 
         return $this->operating_ends_on === null || $day <= $this->operating_ends_on->format('Y-m-d');
+    }
+
+    /**
+     * Display status on a Manila date: operating, scheduled (starts later),
+     * ended (period over) or inactive (deactivated).
+     */
+    public function operatingStatus(DateTimeInterface $manilaDate): string
+    {
+        $day = $manilaDate->format('Y-m-d');
+
+        return match (true) {
+            ! $this->is_active => 'inactive',
+            $this->isPermanent() => 'operating',
+            $this->operating_starts_on !== null && $day < $this->operating_starts_on->format('Y-m-d') => 'scheduled',
+            $this->operating_ends_on !== null && $day > $this->operating_ends_on->format('Y-m-d') => 'ended',
+            default => 'operating',
+        };
     }
 
     /**

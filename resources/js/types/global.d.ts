@@ -20,6 +20,7 @@ declare module '@inertiajs/core' {
             name: string;
             auth: Auth;
             location: LocationContext;
+            store: { name: string | null; logo_url: string | null };
             sidebarOpen: boolean;
             [key: string]: unknown;
         };

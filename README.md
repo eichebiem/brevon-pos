@@ -1,12 +1,12 @@
 # Brevon POS
 
 Point of Sale and Store Management System for **Brevon Doughnuts & Coffee**.
-Requirements: [`docs/BREVON-SRS.md`](docs/BREVON-SRS.md) (SRS v1.1, prepared by Harris).
+Requirements: [`docs/BREVON-SRS-v1.1.md`](docs/BREVON-SRS-v1.1.md) (SRS v1.1, prepared by Harris).
 Progress: [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md).
 
-> **Status:** Phase 2 (authentication and access control). Staff sign-in, users, roles/permissions, location
-> assignment and the audit log work. POS, preparation and dashboard screens are still clearly labelled shells.
-> No sales, stock or reporting features exist yet.
+> **Status:** Phase 3 (catalog, settings and operating locations). Staff sign-in, users, roles, audit log, products,
+> categories, options, prices, store settings, pop-up locations and terminals work. POS, preparation and dashboard
+> screens are still clearly labelled shells. No sales, stock or reporting features exist yet.
 > Receipts produced by this system are **not** BIR-accredited official receipts/invoices (SRS FR-087).
 
 ## Stack
@@ -46,9 +46,11 @@ In production Laravel's own `DB::prohibitDestructiveCommands()` also applies.
 
 ```bash
 php artisan migrate --seed
+php artisan storage:link   # needed for product images and the store logo
 ```
 
-Seeding creates the five roles, their permissions and the permanent location `BRV01` (name provisional).
+Seeding creates the five roles, their permissions, the permanent location `BRV01` (name provisional), units of
+measure and four starter categories (no products).
 **Local only:** when `APP_ENV=local`, seeding also creates the Owner account **Harris** — sign in with
 username `harris`, password `password` (D-084). It is never created in testing, staging or production.
 

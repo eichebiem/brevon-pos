@@ -2,8 +2,13 @@
 import { Link } from '@inertiajs/vue3';
 import {
     ChefHat,
+    Croissant,
+    FolderTree,
     LayoutGrid,
+    ListPlus,
+    MapPin,
     ScrollText,
+    Settings2,
     ShieldCheck,
     ShoppingCart,
     Users,
@@ -25,6 +30,11 @@ import {
 import { usePermissions } from '@/composables/usePermissions';
 import { dashboard, landing } from '@/routes';
 import { index as auditIndex } from '@/routes/admin/audit';
+import { index as categoriesIndex } from '@/routes/admin/categories';
+import { index as locationsIndex } from '@/routes/admin/locations';
+import { index as optionGroupsIndex } from '@/routes/admin/option-groups';
+import { index as productsIndex } from '@/routes/admin/products';
+import { edit as storeSettings } from '@/routes/admin/settings';
 import { index as rolesIndex } from '@/routes/admin/roles';
 import { index as usersIndex } from '@/routes/admin/users';
 import { index as pos } from '@/routes/pos';
@@ -61,8 +71,43 @@ const operations = computed(() =>
     ]),
 );
 
+const catalog = computed(() =>
+    visible([
+        {
+            title: 'Products',
+            href: productsIndex(),
+            icon: Croissant,
+            permission: 'products.view',
+        },
+        {
+            title: 'Categories',
+            href: categoriesIndex(),
+            icon: FolderTree,
+            permission: 'products.view',
+        },
+        {
+            title: 'Options & add-ons',
+            href: optionGroupsIndex(),
+            icon: ListPlus,
+            permission: 'products.view',
+        },
+    ]),
+);
+
 const administration = computed(() =>
     visible([
+        {
+            title: 'Locations',
+            href: locationsIndex(),
+            icon: MapPin,
+            permission: 'locations.manage',
+        },
+        {
+            title: 'Store settings',
+            href: storeSettings(),
+            icon: Settings2,
+            permission: 'settings.manage',
+        },
         {
             title: 'Users',
             href: usersIndex(),
@@ -106,6 +151,7 @@ const administration = computed(() =>
                 label="Operations"
                 :items="operations"
             />
+            <NavMain v-if="catalog.length" label="Catalog" :items="catalog" />
             <NavMain
                 v-if="administration.length"
                 label="Administration"

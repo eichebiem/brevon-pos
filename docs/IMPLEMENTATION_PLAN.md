@@ -1,6 +1,6 @@
 # Brevon POS — Implementation Plan
 
-Baseline: `docs/BREVON-SRS.md` (**v1.1** revised draft, 05-Nov-2026; v1.0 archived). Build prompt: `CLAUDE_CODE_PROMPT_BREVON_POS_v1.1.md` (prompt version 1.3, which names the SRS "v1.2" — see DECISIONS N-01). Decisions: `docs/DECISIONS.md`. Schema: `docs/ERD.md`. Tests: `docs/TEST_PLAN.md`.
+Baseline: `docs/BREVON-SRS-v1.1.md` (**v1.1** revised draft, 05-Nov-2026; v1.0 archived). Build prompt: `CLAUDE_CODE_PROMPT_BREVON_POS_v1.1.md` (prompt version 1.3, which names the SRS "v1.2" — see DECISIONS N-01). Decisions: `docs/DECISIONS.md`. Schema: `docs/ERD.md`. Tests: `docs/TEST_PLAN.md`.
 
 Rule: one phase at a time; each phase ends with migrations + tests + Pint + Larastan + type check + build passing, docs updated, and a phase report. **Stop for user approval at every phase boundary.**
 

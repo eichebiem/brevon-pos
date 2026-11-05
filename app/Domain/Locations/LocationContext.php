@@ -2,6 +2,7 @@
 
 namespace App\Domain\Locations;
 
+use App\Domain\Shared\BusinessClock;
 use App\Models\Branch;
 use App\Models\User;
 use Illuminate\Contracts\Session\Session;
@@ -9,7 +10,7 @@ use Illuminate\Support\Collection;
 
 /**
  * The operating location the signed-in user is working at in admin screens
- * (D-023). Only active locations assigned through user_branch qualify.
+ * (D-023). Only assigned locations that can operate today qualify.
  * POS/shift work will derive the location from the open shift instead (D-060).
  */
 class LocationContext
@@ -23,12 +24,18 @@ class LocationContext
      */
     public function available(User $user): Collection
     {
+        $today = BusinessClock::today();
+
+        // Only locations that can operate today (D-023, D-059): closed or
+        // out-of-period pop-ups stay available as report filters instead.
         return $user->branches()
             ->where('branches.is_active', true)
             ->orderByDesc('user_branch.is_default')
             ->orderBy('branches.location_type')
             ->orderBy('branches.name')
-            ->get();
+            ->get()
+            ->filter(fn (Branch $branch) => $branch->acceptsNewOperationsOn($today))
+            ->values();
     }
 
     public function current(User $user): ?Branch

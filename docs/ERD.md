@@ -1,6 +1,6 @@
 # Brevon POS — Entity Relationship Design
 
-Source of truth for field definitions: `docs/BREVON-SRS.md` §8 (SRS **v1.1**). This document records the relationships, the additions/changes proposed in `docs/DECISIONS.md`, migration order, and the phase in which each table is created. Migrations must match this document; update it first when the schema changes.
+Source of truth for field definitions: `docs/BREVON-SRS-v1.1.md` §8 (SRS **v1.1**). This document records the relationships, the additions/changes proposed in `docs/DECISIONS.md`, migration order, and the phase in which each table is created. Migrations must match this document; update it first when the schema changes.
 
 Conventions: BIGINT unsigned PKs; money `DECIMAL(12,2)`; unit cost `DECIMAL(14,4)`; quantity `DECIMAL(14,3)`; timestamps UTC; FKs `RESTRICT` on delete unless stated; `(+)` = addition to SRS schema.
 
@@ -93,7 +93,7 @@ erDiagram
       bigint created_by FK }
 ```
 
-Rules: current price = latest row with `effective_from ≤ now < coalesce(effective_until, ∞)`, preferring branch-specific over global and variant over product. New price closes the previous row (`effective_until`) — rows are never updated otherwise. UNIQUE `product_branch(product_id, branch_id)`, `product_option_group(product_id, option_group_id)`.
+Rules: current price = latest row with `effective_from ≤ now < coalesce(effective_until, ∞)`, in the order variant + location → variant → location → base (D-087). New price closes the previous row (`effective_until`) — rows are never updated otherwise. UNIQUE `product_branch(product_id, branch_id)`, `product_option_group(product_id, option_group_id)`. **Built in Phase 3:** generated columns `product_prices.scope_key` / `open_guard` (UNIQUE: one open price per scope), `product_variants.default_guard` (one default variant per product), `settings.branch_scope` (UNIQUE with `key`); CHECKs `products_stock_link_check` (finished_stock ⇒ stock item, D-085/D-089), price ≥ 0, `effective_until > effective_from`, option `price_delta ≥ 0`, single-choice groups max 1.
 
 ## 3. Orders, payments, refunds, discounts, tax
 
@@ -235,7 +235,7 @@ UNIQUE `recipes(product_id, version)`. Posting a batch: one transaction, status 
 
 1. Framework: users (base), password_reset_tokens, sessions, cache, jobs — Phase 1
 2. branches (with location columns, D-057/D-058/D-062 — `deactivated_by` FK added after users exist; users table already exists from step 1), employees, alter users (+employee_id, username, is_active, last_login_at, soft deletes), user_branch, terminals, spatie permission tables, login_events, audit_logs — **Phase 2 (done)**; `settings` → Phase 3, `number_sequences` → Phase 4, `notifications` → when first needed (D-083). Pop-up management UI and operating-date rules in Phase 3
-3. categories, units_of_measure, inventory_items, products (+inventory_item_id), product_variants, product_prices, product_branch, option_groups, product_option_group, product_options — Phase 3 (units/inventory_items stubs needed for the product link; full inventory UI in Phase 7)
+3. settings, categories, units_of_measure, inventory_items, products (+inventory_item_id), product_variants, product_prices, product_branch, option_groups, product_option_group, product_options — **Phase 3 (done)** (units/inventory_items stubs needed for the product link; full inventory UI in Phase 7)
 4. branch_inventory, inventory_movements — Phase 4 (ledger core, D-051)
 5. payment_methods, cashier_shifts, orders, order_items, order_item_options, order_status_histories, payments — Phase 4
 6. cash_movements — Phase 6

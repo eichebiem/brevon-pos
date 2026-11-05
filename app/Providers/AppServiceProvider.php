@@ -4,7 +4,14 @@ namespace App\Providers;
 
 use App\Models\AuditLog;
 use App\Models\Branch;
+use App\Models\Category;
 use App\Models\Employee;
+use App\Models\InventoryItem;
+use App\Models\OptionGroup;
+use App\Models\Product;
+use App\Models\ProductPrice;
+use App\Models\ProductVariant;
+use App\Models\Setting;
 use App\Models\Terminal;
 use App\Models\User;
 use App\Support\Database\DestructiveCommandGuard;
@@ -56,6 +63,13 @@ class AppServiceProvider extends ServiceProvider
             'role' => Role::class,
             'permission' => Permission::class,
             'audit_log' => AuditLog::class,
+            'setting' => Setting::class,
+            'category' => Category::class,
+            'inventory_item' => InventoryItem::class,
+            'product' => Product::class,
+            'product_variant' => ProductVariant::class,
+            'product_price' => ProductPrice::class,
+            'option_group' => OptionGroup::class,
         ]);
 
         DB::prohibitDestructiveCommands(

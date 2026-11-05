@@ -48,10 +48,13 @@ ID format `T-<area>-<n>`; each maps to SRS requirements.
 - T-PRD-1 product create/update/archive; duplicate SKU rejected (FR-016, FR-017, UC-002 A1)
 - T-PRD-2 negative/malformed price rejected (UC-002 A2)
 - T-PRD-3 price change creates new history row with effective dates and user; old row closed (FR-019)
-- T-PRD-4 price resolver precedence: branch+variant > branch > global variant > global
+- T-PRD-4 price resolver precedence: variant + location > variant > location > base (D-087)
 - T-PRD-5 archived product hidden from POS but kept in history (FR-020, FR-021, BR-014)
 - T-PRD-6 product/price changes audited (FR-098)
 - T-SET-1 settings update requires `settings.manage`, audited
+
+**Phase 3 implementation map:** `tests/Feature/Catalog/ProductManagementTest.php` (T-PRD-1, T-PRD-5, T-PRD-6, D-085 matrix, auto-linked stock item, variants, pop-up assortment, `CatalogQuery`), `PricingTest.php` (T-PRD-2..4, append-only rows, DB guards), `CategoryAndOptionsTest.php` (T-CAT-1, two-level limit, option groups), `StoreSettingsTest.php` (T-SET-1, logo upload/removal), `tests/Feature/Locations/PopUpManagementTest.php` (T-LOC-4..7, T-LOC-9, shared location prop regression), `TerminalManagementTest.php` (T-LOC-8 without the open-shift check), `RouteAuthorizationTest.php` (new routes in the role matrix). The open-shift parts of T-LOC-5/T-LOC-8 and the sale-date part of T-LOC-7 move to Phase 4a with shifts and sales.
+
 - T-LOC-3 second permanent location rejected by service **and** by DB unique `permanent_guard`; `location_type` cannot be changed (FR-103, D-058)
 - T-LOC-4 pop-up create/schedule requires `locations.manage`; dates optional but end ≥ start when both set; unique code format (FR-104, D-057, D-065)
 - T-LOC-5 pop-up activate/deactivate/reactivate audited with before/after; deactivation needs a reason and is blocked while a shift is open there (FR-104, D-062)

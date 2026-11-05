@@ -15,15 +15,20 @@ class RouteAuthorizationTest extends TestCase
     use InteractsWithStaff;
     use RefreshDatabase;
 
-    private const ROUTES = ['/admin/dashboard', '/pos', '/staff/preparation', '/admin/users', '/admin/users/create', '/admin/roles', '/admin/roles/create', '/admin/audit-logs', '/admin/audit-logs/logins'];
+    private const ROUTES = [
+        '/admin/dashboard', '/pos', '/staff/preparation',
+        '/admin/users', '/admin/users/create', '/admin/roles', '/admin/roles/create', '/admin/audit-logs', '/admin/audit-logs/logins',
+        '/admin/locations', '/admin/locations/create', '/admin/settings',
+        '/admin/products', '/admin/products/create', '/admin/categories', '/admin/categories/create', '/admin/option-groups', '/admin/option-groups/create',
+    ];
 
     /** Expected access per seeded role, in ROUTES order. */
     private const MATRIX = [
-        PermissionCatalog::OWNER => [1, 1, 1, 1, 1, 1, 1, 1, 1],
-        PermissionCatalog::ADMIN => [1, 1, 1, 1, 1, 0, 0, 1, 1],
-        PermissionCatalog::MANAGER => [1, 1, 1, 0, 0, 0, 0, 0, 0],
-        PermissionCatalog::CASHIER => [0, 1, 0, 0, 0, 0, 0, 0, 0],
-        PermissionCatalog::PREPARATION_STAFF => [0, 0, 1, 0, 0, 0, 0, 0, 0],
+        PermissionCatalog::OWNER => [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        PermissionCatalog::ADMIN => [1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        PermissionCatalog::MANAGER => [1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0],
+        PermissionCatalog::CASHIER => [0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0],
+        PermissionCatalog::PREPARATION_STAFF => [0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0],
     ];
 
     /**
@@ -41,7 +46,8 @@ class RouteAuthorizationTest extends TestCase
         $user = $this->staff($role);
 
         foreach (self::ROUTES as $i => $uri) {
-            $this->actingAs($user)->get($uri)->assertStatus(self::MATRIX[$role][$i] ? 200 : 403);
+            $status = $this->actingAs($user)->get($uri)->getStatusCode();
+            $this->assertSame(self::MATRIX[$role][$i] ? 200 : 403, $status, "{$role} → {$uri}");
         }
     }
 

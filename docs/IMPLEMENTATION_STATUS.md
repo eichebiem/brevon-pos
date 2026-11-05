@@ -1,13 +1,13 @@
 # Brevon POS — Implementation Status
 
-Last updated: 2026-11-05 · Baseline: SRS **v1.1** (`docs/BREVON-SRS.md`) · Prompt: `CLAUDE_CODE_PROMPT_BREVON_POS_v1.1.md` (v1.3)
+Last updated: 2026-11-05 · Baseline: SRS **v1.1** (`docs/BREVON-SRS-v1.1.md`) · Prompt: `CLAUDE_CODE_PROMPT_BREVON_POS_v1.1.md` (v1.3)
 
 | Phase                                                | Status                                          | Notes                                                                     |
 | ---------------------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------- |
 | 0 — Discovery and technical plan                     | ✅ Passed (docs only), re-baselined to SRS v1.1 | Approved 2026-11-05                                                       |
 | 1 — Project foundation                               | ✅ Passed                                       | Approved; committed by user as "Initial Commit"                           |
-| 2 — Authentication and access control                | ✅ Passed — awaiting user review                | Not committed                                                             |
-| 3 — Catalog, settings and operating locations        | ⏳ Not started                                  | Pop-up activation, terminals, optional operating dates                    |
+| 2 — Authentication and access control                | ✅ Passed                                       | Approved; committed by user ("Done Phase 2")                              |
+| 3 — Catalog, settings and operating locations        | ✅ Passed — awaiting user review                | Not committed                                                             |
 | 4a/4b/4c — Ledger core, checkout backend, cashier UI | ⏳ Not started                                  | Sale at main + active pop-up                                              |
 | 5 — Orders and preparation                           | ⏳ Not started                                  |                                                                           |
 | 6 — Cashier shifts and cash control                  | ⏳ Not started                                  |                                                                           |
@@ -30,7 +30,7 @@ Last updated: 2026-11-05 · Baseline: SRS **v1.1** (`docs/BREVON-SRS.md`) · Pro
 **Commands run (read-only):** PHP/Composer/Node/npm/MySQL/Laravel-installer version checks, `mysqladmin ping`, Packagist lookups for laravel/framework, spatie/laravel-permission, inertia-laravel, fortify, larastan. Results unchanged (PHP 8.5.4, Composer 2.9.5, Node 22.20.0, MySQL 8.4.8 alive, Laravel v13.40.0, spatie 8.3.2, inertia-laravel 3.7.0, fortify 1.41.0, larastan 3.14.0). No new blockers.
 **Files changed:**
 
-- `docs/BREVON-SRS.md` ← replaced with SRS v1.1; v1.0 moved to `docs/archive/BREVON-SRS-v1.0.md`
+- `docs/BREVON-SRS.md` ← replaced with SRS v1.1; v1.0 moved to `docs/archive/BREVON-SRS-v1.0.md` (file later renamed `docs/BREVON-SRS-v1.1.md`)
 - `DECISIONS.md` — amended D-023, D-033, D-054; D-053 superseded; new sections L (locations, D-057–D-066), M (customer data, D-067–D-069), N (SRS v1.1 discrepancies N-01–N-12); new open items OI-016, OI-017
 - `ERD.md` — location columns and guards on `branches`; `customers` removed; terminal open-shift guard; transfer types reserved; migration order updated
 - `IMPLEMENTATION_PLAN.md` — v1.1 delta table, `Locations` domain module, FR-103–FR-108 mapped to phases 2/3/4/10, risks R-09–R-11
@@ -133,3 +133,44 @@ Last updated: 2026-11-05 · Baseline: SRS **v1.1** (`docs/BREVON-SRS.md`) · Pro
 - Low: logo still the provisional JPEG (D-016); CI not yet run on GitHub (D-075).
 
 **Next step:** Phase 3 — Catalog, settings and operating locations, after user review.
+
+## Phase 3 log — Catalog, settings and operating locations (2026-11-05)
+
+**Objective:** everything the POS needs to know before it can sell: what is sold, at which location, at what price, plus store settings and pop-up/terminal management.
+**SRS IDs:** FR-011, FR-015–FR-022 (catalog, variants, options, availability, price history, archive), FR-101 (business settings; payment methods come with Phase 4b), FR-103, FR-104, FR-106, FR-107 (location switcher; shift/sale enforcement in Phase 4a/4b), FR-108 (no deletes), BR-014, FR-098 (audit).
+
+**Implemented**
+
+- Schema (6 migrations): `settings`; `categories`; `units_of_measure` + `inventory_items` (minimal, for the product link); `products`, `product_variants`; `product_prices` (append-only, generated `scope_key`/`open_guard` UNIQUE), `product_branch`; `option_groups`, `product_options`, `product_option_group`. CHECK constraints listed in ERD §2.
+- Seed: units pc/box/g/kg/ml/l and categories Doughnuts, Coffee, Cold Drinks, Other. No products.
+- Domain: `StoreSettings` (cached, audited), `LocationService` (create/edit/deactivate/reactivate pop-ups, copy main-branch doughnuts), `TerminalService` (create, rename, activate, reassign), `CategoryService`, `ProductService` (D-085 matrix, auto-linked stock item D-089, variants, option groups, location availability), `OptionGroupService`, `PriceService` + `PriceResolver` (D-087), `CatalogQuery::sellableAt()` for the Phase 4 POS, `BusinessClock` (Manila "today").
+- UI: Locations (list with operating status, pop-up form with optional dates, deactivate with reason, reactivate, terminals, copy availability), Store settings (name, logo, receipt footer; currency/TZ read-only; logo shown in the sidebar), Categories, Options & add-ons, Products (filters by name/SKU, category, status, location; form with type/tracking, variants, options, locations, image), Prices (current prices, set new, remove special price, full history).
+- Permissions: routes guarded by `locations.manage`, `settings.manage`, `products.view/create/update/archive/manage-prices`.
+- Docs: DECISIONS §R (D-085–D-091), ERD, TEST_PLAN map, README (`storage:link`), SRS file references updated to `docs/BREVON-SRS-v1.1.md`.
+
+**Verification (all run 2026-11-05)**
+
+| Command                                                                                                        | Result                                   |
+| -------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| `php artisan migrate` on `brevon_pos` and `brevon_pos_test`; `migrate:fresh --seed` on `brevon_pos` afterwards | pass                                     |
+| `composer check` → build, `vp check`, `vue-tsc`, Pint, Larastan L7                                             | all pass, 0 errors                       |
+| → `php artisan test` (MySQL)                                                                                   | **163 passed, 795 assertions** (was 122) |
+
+**Manual checks (browser, built assets, signed in as `harris`):** created product "Classic Glazed" (DN-GLAZED, ₱45, finished stock) — stock item linked automatically; created pop-up "Test Pop-up" (POP-TEST1) with "copy availability" → product list shows "BRV01, POP-TEST1"; added terminal POS-1; set a ₱55 POP-TEST1 price then removed it — history shows both rows with times and user; store settings, categories and new option group screens render. No console errors besides the expected Inertia asset-version reload (409) after a rebuild. Afterwards `brevon_pos` was re-created with `migrate:fresh --seed` (only `harris` and reference data remain).
+
+**Issues found and fixed during the phase**
+
+- The location edit page passed a prop named `location`, which silently replaced the shared location-context prop, so the sidebar said "No location assigned". Renamed to `site`; regression test added.
+- Terminal rows on the location page were cramped; the location dropdown on the Prices page overflowed its card at ~1024 px. Both layouts fixed.
+- TEST_PLAN T-PRD-4 listed the wrong price precedence; corrected (D-087).
+
+**Known issues / deferred**
+
+- Phase 4a: deactivating a location or moving a terminal is not yet blocked by an open shift; operating dates are not yet checked against existing sales (no shifts/sales exist). Hooks are marked in the services (D-090).
+- Info: payment-method settings (FR-101) arrive with checkout in Phase 4b; stock quantities, units UI and dispatch in Phase 7.
+- Low: no scheduled (future-dated) prices in V1 (D-087). Product images and the logo need `php artisan storage:link` on each install.
+- Low: wide tables (Products, Users) scroll horizontally on screens around 800 px wide.
+
+**Changes requested after the report (D-092):** creating a product now returns to the product list with the success notice. The category list briefly became alphabetical and was reverted at the user's request, so the sort order still controls the POS tab order.
+
+**Next step:** Phase 4a — ledger core and shift open, after user review.

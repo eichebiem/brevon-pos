@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Domain\Locations\LocationContext;
+use App\Domain\Settings\StoreSettings;
 use App\Models\Branch;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -43,6 +44,10 @@ class HandleInertiaRequests extends Middleware
             'name' => config('app.name'),
             'auth' => fn () => $this->authProps($request),
             'location' => fn () => $this->locationProps($request),
+            'store' => fn () => [
+                'name' => app(StoreSettings::class)->get('store.name'),
+                'logo_url' => app(StoreSettings::class)->logoUrl(),
+            ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
         ];
     }
