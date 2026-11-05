@@ -23,7 +23,7 @@ class DatabaseSeeder extends Seeder
             LocationSeeder::class,
             CatalogReferenceSeeder::class,
             PaymentMethodSeeder::class,
-            LocalOwnerSeeder::class,
+            LocalUsersSeeder::class,
         ]);
     }
 }

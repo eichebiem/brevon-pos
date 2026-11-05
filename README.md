@@ -51,8 +51,15 @@ php artisan storage:link   # needed for product images and the store logo
 
 Seeding creates the five roles, their permissions, the permanent location `BRV01` (name provisional), units of
 measure and four starter categories (no products).
-**Local only:** when `APP_ENV=local`, seeding also creates the Owner account **Harris** — sign in with
-username `harris`, password `password` (D-084). It is never created in testing, staging or production.
+**Local only:** when `APP_ENV=local`, seeding also creates two accounts at `BRV01` (D-084, D-100). They are never
+created in testing, staging or production, and re-seeding never resets an existing account's password.
+
+| Name      | Username   | Password   | Role    |
+| --------- | ---------- | ---------- | ------- |
+| Harris    | `harris`   | `password` | Owner   |
+| Cashier 1 | `cashier1` | `password` | Cashier |
+
+To add only the missing local accounts to an existing database: `php artisan db:seed --class=LocalUsersSeeder`.
 
 In any other environment no accounts are seeded. Create the first Owner with:
 
