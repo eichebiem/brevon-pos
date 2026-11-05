@@ -35,10 +35,12 @@ ID format `T-<area>-<n>`; each maps to SRS requirements.
 - T-ACL-1 each role → allowed/denied route matrix returns 200/403 (FR-007, NFR-003)
 - T-ACL-2 user cannot grant a permission they lack; non-owner cannot assign Owner (FR-010)
 - T-ACL-3 last active owner cannot be deactivated
-- T-ACL-4 branch scoping: user cannot read another branch's records (FR-012, NFR-016)
+- T-ACL-4 branch scoping: user cannot read another branch's records (FR-012, NFR-016) — **deferred to Phase 3/4** (no branch-owned records exist yet, D-083)
 - T-AUD-1 role/permission change writes audit log; audit records not updatable/deletable (FR-098–FR-100)
 - T-LOC-1 seeders create **exactly one** location, of type `permanent`, and no pop-ups (FR-103, prompt §13)
 - T-LOC-2 users can only select locations assigned via `user_branch`; `locations.manage` cannot be granted by someone lacking it (FR-010, D-061)
+
+**Phase 2 implementation map:** `tests/Feature/Access/LoginTest.php` (T-AUTH-1..4, 7, 8), `RouteAuthorizationTest.php` (T-ACL-1, home routing), `UserAdministrationTest.php` (T-ACL-2, T-ACL-3, audit of user changes), `RoleAdministrationTest.php` (role matrix, T-ACL-2 for roles, T-AUD-1), `AuditLogTest.php` (T-AUD-1, viewer filters by Manila day), `tests/Feature/Locations/LocationAccessTest.php` (T-LOC-1, T-LOC-2, DB constraints, no-delete), `CreateOwnerCommandTest.php`. Starter-kit `Auth/*` tests cover T-AUTH-5/6.
 
 ### Catalog (Phase 3)
 
@@ -133,6 +135,9 @@ ID format `T-<area>-<n>`; each maps to SRS requirements.
 - T-RFD-4 cash refund hits shift drawer; return-to-stock creates return_in movement
 - T-DSC-1 fixed/percentage discount math and caps; approval threshold (FR-083, FR-044)
 - T-TAX-1 inclusive/exclusive tax framework math (disabled by default)
+- T-SCD-1 SC/PWD discount = configured rate (default 12%) of the beneficiary's lines, no VAT computation; requires full name, card number, address (D-068)
+- T-SCD-2 beneficiary details stored only on the order-discount row; no customer table, no lookup/reuse endpoint; masked for users without the view permission
+- T-PRIV-1 (amended) the only personal-data columns allowed are the SC/PWD beneficiary fields on `order_discount_beneficiaries` (D-068)
 
 ### Reports (Phase 10)
 

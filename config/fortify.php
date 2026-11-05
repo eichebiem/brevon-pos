@@ -45,7 +45,8 @@ return [
     |
     */
 
-    'username' => 'email',
+    // Brevon: one field accepting email OR username (FR-001, D-018).
+    'username' => 'login',
 
     'email' => 'email',
 
@@ -73,7 +74,7 @@ return [
     |
     */
 
-    'home' => '/admin/dashboard',
+    'home' => '/home',
 
     /*
     |--------------------------------------------------------------------------

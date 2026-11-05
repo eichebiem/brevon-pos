@@ -2,16 +2,19 @@
 
 namespace Tests\Feature\System;
 
+use App\Domain\Access\PermissionCatalog;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Route;
 use Inertia\Testing\AssertableInertia as Assert;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\Concerns\InteractsWithStaff;
 use Tests\TestCase;
 
 /** Phase 1 foundation checks (T-SYS-1 and configuration decisions). */
 class FoundationTest extends TestCase
 {
+    use InteractsWithStaff;
     use RefreshDatabase;
 
     public function test_health_check_responds(): void
@@ -76,11 +79,15 @@ class FoundationTest extends TestCase
     }
 
     #[DataProvider('shells')]
-    public function test_area_shells_require_authentication(string $uri, string $component): void
+    public function test_area_shells_require_authentication_and_permission(string $uri, string $component): void
     {
         $this->get($uri)->assertRedirect('/login');
 
-        $this->actingAs(User::factory()->create())
+        $this->seedAccess();
+
+        $this->actingAs(User::factory()->create())->get($uri)->assertForbidden();
+
+        $this->actingAs($this->staff(PermissionCatalog::OWNER))
             ->get($uri)
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page->component($component));

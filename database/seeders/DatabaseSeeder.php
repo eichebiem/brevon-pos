@@ -12,14 +12,16 @@ class DatabaseSeeder extends Seeder
     /**
      * Seed the application's database.
      *
-     * Phase 1 seeds nothing. No user accounts are ever seeded with a known
-     * password (prompt §5, D-022): the local owner account is created in
-     * Phase 2 by `php artisan brevon:create-owner`. Roles, permissions, the
-     * single permanent location, payment methods and categories are added
-     * by the phases that introduce those tables (D-054).
+     * Seeds reference data, plus a known-password Owner ("harris") that is
+     * created ONLY when APP_ENV=local (D-084). Other environments get no
+     * accounts; use `php artisan brevon:create-owner` or the Users screen.
      */
     public function run(): void
     {
-        //
+        $this->call([
+            RolesAndPermissionsSeeder::class,
+            LocationSeeder::class,
+            LocalOwnerSeeder::class,
+        ]);
     }
 }

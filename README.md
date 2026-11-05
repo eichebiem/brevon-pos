@@ -4,8 +4,9 @@ Point of Sale and Store Management System for **Brevon Doughnuts & Coffee**.
 Requirements: [`docs/BREVON-SRS.md`](docs/BREVON-SRS.md) (SRS v1.1, prepared by Harris).
 Progress: [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md).
 
-> **Status:** Phase 1 (project foundation) only. Login works; the admin, POS and preparation screens are
-> clearly labelled shells. No sales, stock or reporting features exist yet.
+> **Status:** Phase 2 (authentication and access control). Staff sign-in, users, roles/permissions, location
+> assignment and the audit log work. POS, preparation and dashboard screens are still clearly labelled shells.
+> No sales, stock or reporting features exist yet.
 > Receipts produced by this system are **not** BIR-accredited official receipts/invoices (SRS FR-087).
 
 ## Stack
@@ -47,7 +48,19 @@ In production Laravel's own `DB::prohibitDestructiveCommands()` also applies.
 php artisan migrate --seed
 ```
 
-No user accounts are seeded. A local-only owner-account command (`brevon:create-owner`) arrives in Phase 2.
+Seeding creates the five roles, their permissions and the permanent location `BRV01` (name provisional).
+**Local only:** when `APP_ENV=local`, seeding also creates the Owner account **Harris** — sign in with
+username `harris`, password `password` (D-084). It is never created in testing, staging or production.
+
+In any other environment no accounts are seeded. Create the first Owner with:
+
+```bash
+php artisan brevon:create-owner --name="Your Name" --username=yourname
+```
+
+It asks for the email and a password of at least 12 characters (or reads `BREVON_DEV_OWNER_EMAIL` /
+`BREVON_DEV_OWNER_PASSWORD` from `.env`), refuses to run in production, and is recorded in the audit log.
+Further accounts are created in **Administration → Users**. Staff sign in with their email or username.
 
 ## Run
 

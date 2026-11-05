@@ -25,6 +25,13 @@ return [
     // FR-062 / BR-013 / D-047: negative stock is blocked by default.
     'allow_negative_stock' => (bool) env('BREVON_ALLOW_NEGATIVE_STOCK', false),
 
+    // Local-only owner bootstrap for `php artisan brevon:create-owner` (D-022).
+    // Leave empty outside local development.
+    'dev_owner' => [
+        'email' => env('BREVON_DEV_OWNER_EMAIL'),
+        'password' => env('BREVON_DEV_OWNER_PASSWORD'),
+    ],
+
     /*
     |--------------------------------------------------------------------------
     | Destructive database command guard (D-012)

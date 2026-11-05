@@ -3,6 +3,8 @@
 namespace App\Providers;
 
 use App\Actions\Fortify\ResetUserPassword;
+use App\Domain\Access\AuthenticateStaff;
+use Illuminate\Auth\Events\Lockout;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -39,6 +41,7 @@ class FortifyServiceProvider extends ServiceProvider
     private function configureActions(): void
     {
         Fortify::resetUserPasswordsUsing(ResetUserPassword::class);
+        Fortify::authenticateUsing(app(AuthenticateStaff::class));
     }
 
     /**
@@ -78,7 +81,15 @@ class FortifyServiceProvider extends ServiceProvider
         RateLimiter::for('login', function (Request $request) {
             $throttleKey = Str::transliterate(Str::lower($request->input(Fortify::username())).'|'.$request->ip());
 
-            return Limit::perMinute(5)->by($throttleKey);
+            // Record the throttled attempt (FR-009) and show it on the form
+            // like any other sign-in error instead of a bare 429 page.
+            return Limit::perMinute(5)->by($throttleKey)->response(function (Request $request, array $headers) {
+                event(new Lockout($request));
+
+                return back()
+                    ->withInput($request->only(Fortify::username()))
+                    ->withErrors([Fortify::username() => __('auth.throttle', ['seconds' => $headers['Retry-After'] ?? 60])]);
+            });
         });
     }
 }

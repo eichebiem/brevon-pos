@@ -2,20 +2,20 @@
 
 Last updated: 2026-11-05 · Baseline: SRS **v1.1** (`docs/BREVON-SRS.md`) · Prompt: `CLAUDE_CODE_PROMPT_BREVON_POS_v1.1.md` (v1.3)
 
-| Phase                                                | Status                                          | Notes                                                                  |
-| ---------------------------------------------------- | ----------------------------------------------- | ---------------------------------------------------------------------- |
-| 0 — Discovery and technical plan                     | ✅ Passed (docs only), re-baselined to SRS v1.1 | Approved 2026-11-05                                                    |
-| 1 — Project foundation                               | ✅ Passed                                       | Awaiting user review before Phase 2                                    |
-| 2 — Authentication and access control                | ⏳ Not started                                  | Includes location columns on `branches` + location assignment          |
-| 3 — Catalog, settings and operating locations        | ⏳ Not started                                  | Pop-up activation, terminals, optional operating dates                 |
-| 4a/4b/4c — Ledger core, checkout backend, cashier UI | ⏳ Not started                                  | Sale at main + active pop-up                                           |
-| 5 — Orders and preparation                           | ⏳ Not started                                  |                                                                        |
-| 6 — Cashier shifts and cash control                  | ⏳ Not started                                  |                                                                        |
-| 7 — Inventory and purchasing                         | ⏳ Not started                                  | Includes main → pop-up doughnut dispatch (D-063); confirm OI-018 first |
-| 8 — Recipes and production                           | ⏳ Not started                                  | Production at the permanent branch only                                |
-| 9 — Refunds, discounts, tax configuration            | ⏳ Not started                                  | SC/PWD in scope; ID-data + VAT decision needed first (D-068)           |
-| 10 — Dashboards and reports                          | ⏳ Not started                                  | Location filters incl. closed pop-ups                                  |
-| 11 — Hardening and release readiness                 | ⏳ Not started                                  |                                                                        |
+| Phase                                                | Status                                          | Notes                                                                     |
+| ---------------------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------- |
+| 0 — Discovery and technical plan                     | ✅ Passed (docs only), re-baselined to SRS v1.1 | Approved 2026-11-05                                                       |
+| 1 — Project foundation                               | ✅ Passed                                       | Approved; committed by user as "Initial Commit"                           |
+| 2 — Authentication and access control                | ✅ Passed — awaiting user review                | Not committed                                                             |
+| 3 — Catalog, settings and operating locations        | ⏳ Not started                                  | Pop-up activation, terminals, optional operating dates                    |
+| 4a/4b/4c — Ledger core, checkout backend, cashier UI | ⏳ Not started                                  | Sale at main + active pop-up                                              |
+| 5 — Orders and preparation                           | ⏳ Not started                                  |                                                                           |
+| 6 — Cashier shifts and cash control                  | ⏳ Not started                                  |                                                                           |
+| 7 — Inventory and purchasing                         | ⏳ Not started                                  | Includes main → pop-up doughnut dispatch (D-063); OI-018 deferred (FE-01) |
+| 8 — Recipes and production                           | ⏳ Not started                                  | Production at the permanent branch only                                   |
+| 9 — Refunds, discounts, tax configuration            | ⏳ Not started                                  | SC/PWD: name, card no., address; 12%, VAT disregarded (D-068)             |
+| 10 — Dashboards and reports                          | ⏳ Not started                                  | Location filters incl. closed pop-ups                                     |
+| 11 — Hardening and release readiness                 | ⏳ Not started                                  |                                                                           |
 
 ## Phase 0 log
 
@@ -92,3 +92,44 @@ Last updated: 2026-11-05 · Baseline: SRS **v1.1** (`docs/BREVON-SRS.md`) · Pro
 - Info: optional `fontaine` package not installed (font fallback metrics); cosmetic.
 
 **Next step:** Phase 2 — Authentication and access control (see IMPLEMENTATION_PLAN §4), after user review.
+
+## Phase 2 log — Authentication and access control (2026-11-05)
+
+**Objective:** staff sign-in by email or username, account administration, roles and permissions with privilege-escalation guards, operating-location assignment, and an append-only audit trail.
+**SRS IDs:** FR-001–FR-010, FR-011 (location data), FR-098–FR-100, FR-103 (seed), FR-104–FR-106 (location rules, partial), NFR-003, NFR-004.
+**User decisions recorded first:** OI-018 deferred as FE-01 (D-063); SC/PWD stores beneficiary full name, card number and address, 12 % of the beneficiary's bill, VAT disregarded (D-068, flagged against RA 9994/10754); CI branch is `master`.
+
+**Implemented**
+
+- Schema: Spatie permission tables; `branches` (permanent/pop-up, generated `permanent_guard` UNIQUE so only one permanent location can exist, CHECKs on type and operating period, never deleted); `employees`; users + `username`, `employee_id`, `is_active`, `last_login_at`, soft deletes; `user_branch` (with default); `terminals`; append-only `audit_logs` and `login_events`. Enforced morph map.
+- Seeders: 42 permissions, 5 roles (D-076), location `BRV01` (provisional name) + terminal `POS-1`. Idempotent. No accounts.
+- Auth: email-or-username login (D-078), generic errors, inactive message only after a correct password, throttling recorded (D-079), immediate session end on deactivation (D-080), `last_login_at`.
+- Access: `AccessGuard` (D-077), `UserService`/`RoleService` with audited diffs, permission middleware on every protected route, `/home` landing per role, admin location switcher (D-081).
+- `brevon:create-owner` (D-082). Local-only seeded Owner `harris` (D-084, added at user request after the phase report).
+- UI: Users (list with search/role/status/location filters, create/edit with roles, locations + default, optional employee profile, activate/deactivate with confirmation), Roles (list, grouped permission editor; ungrantable boxes disabled; Owner read-only), Audit log (filters, before/after values) and Login history. Sidebar shows only permitted areas.
+
+**Verification (all run 2026-11-05)**
+
+| Command                                                                  | Result                                             |
+| ------------------------------------------------------------------------ | -------------------------------------------------- |
+| `php artisan migrate:fresh --seed` on `brevon_pos` and `brevon_pos_test` | pass; 1 location, 5 roles, 42 permissions, 0 users |
+| `composer check` → build, `vp check`, `vue-tsc`, Pint, Larastan L7       | all pass, 0 errors                                 |
+| → `php artisan test` (MySQL)                                             | **122 passed, 498 assertions** (was 67)            |
+
+**Manual checks (browser, built assets):** created a temporary Owner with `brevon:create-owner` and a generated password; signed in by username → dashboard; created a Cashier through the Users form → toast, list updated, `user.created` audit entry with diff; Roles list and Manager permission grid; Audit log; signed in as the cashier → landed on `/pos`, `/admin/users` → 403. No console errors. Afterwards `brevon_pos` was re-created with `migrate:fresh --seed` (0 users) and the temporary password file deleted.
+
+**Issues found and fixed during the phase**
+
+- Login listeners were registered twice (manual `Event::listen` + Laravel auto-discovery), so every login event was written twice. Manual registration removed; `event:list` shows one listener each.
+- Throttled attempts were never recorded (Fortify's route limiter skips the `Lockout` event). Fixed via the limiter's response (D-079).
+- Two location tests initially passed for the wrong reason (wrong column name; duplicate code). Both now assert the specific constraint name (`branches_permanent_guard_unique`, `branches_operating_period_check`).
+- Usernames with dots were rejected; rule now allows `.` (D-078).
+
+**Known issues / deferred**
+
+- Info: `settings`, `number_sequences`, `notifications` tables deferred to their first use; branch-scoped record tests (T-ACL-4) deferred to Phase 3/4 (D-083).
+- Info: locations can't be created or edited in the UI yet — pop-up management is Phase 3. Only `BRV01` exists.
+- Low: on screens ≈800 px wide the Users table scrolls horizontally to reach the Edit button.
+- Low: logo still the provisional JPEG (D-016); CI not yet run on GitHub (D-075).
+
+**Next step:** Phase 3 — Catalog, settings and operating locations, after user review.
