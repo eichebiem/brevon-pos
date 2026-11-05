@@ -1,13 +1,20 @@
 <script setup lang="ts">
 import { Link, router, usePage } from '@inertiajs/vue3';
-import { LogOut } from '@lucide/vue';
+import { LayoutDashboard, LogOut, Timer } from '@lucide/vue';
 import { computed } from 'vue';
 import AppLogoIcon from '@/components/AppLogoIcon.vue';
 import { Toaster } from '@/components/ui/sonner';
-import { logout } from '@/routes';
+import { usePermissions } from '@/composables/usePermissions';
+import { landing, logout } from '@/routes';
+import { shift as shiftPage } from '@/routes/staff';
 
 const page = usePage();
 const user = computed(() => page.props.auth.user);
+const activeShift = computed(() => page.props.activeShift);
+const { can } = usePermissions();
+
+const linkClass =
+    'inline-flex min-h-11 shrink-0 items-center gap-2 rounded-lg whitespace-nowrap border border-brevon-gold/50 px-4 text-sm font-medium hover:bg-brevon-navy-dark';
 </script>
 
 <template>
@@ -17,27 +24,54 @@ const user = computed(() => page.props.auth.user);
             class="flex h-16 shrink-0 items-center gap-4 bg-brevon-navy px-4 text-brevon-cream"
         >
             <AppLogoIcon class="size-10 ring-1 ring-brevon-gold/60" alt="" />
-            <div class="leading-tight">
+            <div class="min-w-0 flex-1 leading-tight">
                 <p class="font-display text-xl">Brevon POS</p>
-                <p class="text-xs text-brevon-gold-light">
-                    Location and terminal: assigned from Phase 3
+                <p
+                    class="truncate text-xs text-brevon-gold-light"
+                    data-test="pos-shift-context"
+                >
+                    <template v-if="activeShift">
+                        {{ activeShift.location_code }} ·
+                        {{ activeShift.location }} ·
+                        {{ activeShift.terminal }} · Shift
+                        {{ activeShift.number }}
+                    </template>
+                    <template v-else>No open shift</template>
                 </p>
             </div>
-            <div class="ml-auto flex items-center gap-3">
-                <span class="hidden text-sm sm:inline">{{ user.name }}</span>
+            <nav class="flex shrink-0 items-center gap-2" aria-label="POS">
+                <Link
+                    v-if="can('shifts.open') || can('shifts.close')"
+                    :href="shiftPage()"
+                    :class="linkClass"
+                >
+                    <Timer class="size-4" aria-hidden="true" />
+                    <span class="hidden md:inline">Shift</span>
+                </Link>
+                <Link
+                    v-if="can('dashboard.view')"
+                    :href="landing()"
+                    :class="linkClass"
+                >
+                    <LayoutDashboard class="size-4" aria-hidden="true" />
+                    <span class="hidden md:inline">Back office</span>
+                </Link>
+                <span class="hidden px-2 text-sm whitespace-nowrap lg:inline">{{
+                    user.name
+                }}</span>
                 <Link
                     :href="logout()"
                     as="button"
-                    class="inline-flex min-h-11 items-center gap-2 rounded-lg border border-brevon-gold/50 px-4 text-sm font-medium hover:bg-brevon-navy-dark"
+                    :class="linkClass"
                     @click="router.flushAll()"
                     data-test="pos-logout-button"
                 >
                     <LogOut class="size-4" aria-hidden="true" />
-                    Log out
+                    <span class="hidden md:inline">Log out</span>
                 </Link>
-            </div>
+            </nav>
         </header>
-        <main class="flex min-h-0 flex-1 flex-col">
+        <main class="flex min-h-0 flex-1 flex-col overflow-y-auto">
             <slot />
         </main>
         <Toaster />

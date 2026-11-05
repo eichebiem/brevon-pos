@@ -165,7 +165,7 @@ erDiagram
       tinyint open_guard "(+) 1 while open, NULL when closed" }
 ```
 
-Constraints: UNIQUE `cashier_shifts(branch_id, user_id, open_guard)` (at most one open shift per cashier per location); UNIQUE `cashier_shifts(terminal_id, open_guard)` (at most one open shift per terminal, D-060); `terminal_id` required for new shifts and `branch_id` copied from the terminal; UNIQUE `cashier_shifts(branch_id, shift_number)`; INDEX `(branch_id, user_id, status)`.
+Constraints (as built, D-094): UNIQUE `cashier_shifts(user_id, open_guard)` (at most one open shift per cashier anywhere); `business_date` DATE (Manila) added; UNIQUE `cashier_shifts(terminal_id, open_guard)` (at most one open shift per terminal, D-060); `terminal_id` required for new shifts and `branch_id` copied from the terminal; UNIQUE `cashier_shifts(branch_id, shift_number)`; INDEX `(branch_id, user_id, status)`.
 
 ## 5. Inventory, purchasing
 
@@ -236,8 +236,8 @@ UNIQUE `recipes(product_id, version)`. Posting a batch: one transaction, status 
 1. Framework: users (base), password_reset_tokens, sessions, cache, jobs — Phase 1
 2. branches (with location columns, D-057/D-058/D-062 — `deactivated_by` FK added after users exist; users table already exists from step 1), employees, alter users (+employee_id, username, is_active, last_login_at, soft deletes), user_branch, terminals, spatie permission tables, login_events, audit_logs — **Phase 2 (done)**; `settings` → Phase 3, `number_sequences` → Phase 4, `notifications` → when first needed (D-083). Pop-up management UI and operating-date rules in Phase 3
 3. settings, categories, units_of_measure, inventory_items, products (+inventory_item_id), product_variants, product_prices, product_branch, option_groups, product_option_group, product_options — **Phase 3 (done)** (units/inventory_items stubs needed for the product link; full inventory UI in Phase 7)
-4. branch_inventory, inventory_movements — Phase 4 (ledger core, D-051)
-5. payment_methods, cashier_shifts, orders, order_items, order_item_options, order_status_histories, payments — Phase 4
+4. number_sequences, branch_inventory, inventory_movements (no `inventory_lot_id` until Phase 7) — **Phase 4a (done)**, D-051/D-096
+5. payment_methods, cashier_shifts — **Phase 4a (done)**; orders, order_items, order_item_options, order_status_histories, payments — Phase 4
 6. cash_movements — Phase 6
 7. suppliers, inventory_lots, stock_adjustments(+items), purchase_orders(+items), goods_receipts(+items) — Phase 7
 8. recipes, recipe_items, production_batches, production_batch_items, waste_records — Phase 8

@@ -2,20 +2,21 @@
 
 Last updated: 2026-11-05 · Baseline: SRS **v1.1** (`docs/BREVON-SRS-v1.1.md`) · Prompt: `CLAUDE_CODE_PROMPT_BREVON_POS_v1.1.md` (v1.3)
 
-| Phase                                                | Status                                          | Notes                                                                     |
-| ---------------------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------- |
-| 0 — Discovery and technical plan                     | ✅ Passed (docs only), re-baselined to SRS v1.1 | Approved 2026-11-05                                                       |
-| 1 — Project foundation                               | ✅ Passed                                       | Approved; committed by user as "Initial Commit"                           |
-| 2 — Authentication and access control                | ✅ Passed                                       | Approved; committed by user ("Done Phase 2")                              |
-| 3 — Catalog, settings and operating locations        | ✅ Passed — awaiting user review                | Not committed                                                             |
-| 4a/4b/4c — Ledger core, checkout backend, cashier UI | ⏳ Not started                                  | Sale at main + active pop-up                                              |
-| 5 — Orders and preparation                           | ⏳ Not started                                  |                                                                           |
-| 6 — Cashier shifts and cash control                  | ⏳ Not started                                  |                                                                           |
-| 7 — Inventory and purchasing                         | ⏳ Not started                                  | Includes main → pop-up doughnut dispatch (D-063); OI-018 deferred (FE-01) |
-| 8 — Recipes and production                           | ⏳ Not started                                  | Production at the permanent branch only                                   |
-| 9 — Refunds, discounts, tax configuration            | ⏳ Not started                                  | SC/PWD: name, card no., address; 12%, VAT disregarded (D-068)             |
-| 10 — Dashboards and reports                          | ⏳ Not started                                  | Location filters incl. closed pop-ups                                     |
-| 11 — Hardening and release readiness                 | ⏳ Not started                                  |                                                                           |
+| Phase                                         | Status                                          | Notes                                                                     |
+| --------------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------- |
+| 0 — Discovery and technical plan              | ✅ Passed (docs only), re-baselined to SRS v1.1 | Approved 2026-11-05                                                       |
+| 1 — Project foundation                        | ✅ Passed                                       | Approved; committed by user as "Initial Commit"                           |
+| 2 — Authentication and access control         | ✅ Passed                                       | Approved; committed by user ("Done Phase 2")                              |
+| 3 — Catalog, settings and operating locations | ✅ Passed                                       | Approved; committed by user ("Done Phase 3")                              |
+| 4a — Ledger core and shift open               | ✅ Passed — awaiting user review                | Not committed                                                             |
+| 4b/4c — Checkout backend, cashier UI          | ⏳ Not started                                  | Sale at main + active pop-up                                              |
+| 5 — Orders and preparation                    | ⏳ Not started                                  |                                                                           |
+| 6 — Cashier shifts and cash control           | ⏳ Not started                                  |                                                                           |
+| 7 — Inventory and purchasing                  | ⏳ Not started                                  | Includes main → pop-up doughnut dispatch (D-063); OI-018 deferred (FE-01) |
+| 8 — Recipes and production                    | ⏳ Not started                                  | Production at the permanent branch only                                   |
+| 9 — Refunds, discounts, tax configuration     | ⏳ Not started                                  | SC/PWD: name, card no., address; 12%, VAT disregarded (D-068)             |
+| 10 — Dashboards and reports                   | ⏳ Not started                                  | Location filters incl. closed pop-ups                                     |
+| 11 — Hardening and release readiness          | ⏳ Not started                                  |                                                                           |
 
 ## Phase 0 log
 
@@ -174,3 +175,42 @@ Last updated: 2026-11-05 · Baseline: SRS **v1.1** (`docs/BREVON-SRS-v1.1.md`) �
 **Changes requested after the report (D-092):** creating a product now returns to the product list with the success notice. The category list briefly became alphabetical and was reverted at the user's request, so the sort order still controls the POS tab order.
 
 **Next step:** Phase 4a — ledger core and shift open, after user review.
+
+## Phase 4a log — Ledger core and shift open (2026-11-05)
+
+**Objective:** the foundations checkout needs: a per-location stock ledger that cannot oversell, opening stock, payment methods, and cashier shifts on terminals.
+**SRS IDs:** FR-053–FR-055, FR-062, FR-073, FR-074, FR-078, FR-079 (basic), FR-106, FR-107, BR-011, BR-013; prompt invariant 12. BR-017 (cash needs an open shift) is enforced at checkout in Phase 4b.
+
+**Implemented**
+
+- Schema (4 migrations): `number_sequences`, `payment_methods` (seeded Cash, GCash), `branch_inventory` + `inventory_movements` (CHECKs on type, non-zero delta, cost ≥ 0), `cashier_shifts` (generated `open_guard`; one open shift per cashier and per terminal; status/cash/closed-state CHECKs).
+- Domain: `InventoryLedger` (locking, negative-stock block, transfers rejected, weighted average, `reconcile()`), `OpeningStock`, `NumberSequence`, `ShiftService` (open/close), `ExpectedCash` (opening float until 4b/6). Open-shift guards on location deactivation and terminal deactivate/move (D-098). Command `brevon:inventory:reconcile`.
+- UI: Inventory → Stock on hand (low-stock badge), Stock movements (filters by item, type, Manila dates), Opening stock entry; My shift (open on a terminal, close with counted cash, recent shifts with difference); POS screen shows the shift state; the POS header shows location · terminal · shift, with Shift and Back-office links.
+- Docs: DECISIONS §S (D-093–D-098), ERD, TEST_PLAN map, README.
+
+**Verification (all run 2026-11-05)**
+
+| Command                                                            | Result                                                                                     |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
+| `php artisan migrate` on `brevon_pos` and `brevon_pos_test`        | pass                                                                                       |
+| `composer check` → build, `vp check`, `vue-tsc`, Pint, Larastan L7 | all pass, 0 errors                                                                         |
+| → `php artisan test` (MySQL)                                       | **195 passed, 1,037 assertions** (was 164), including the forked-process concurrency tests |
+
+**Manual checks (browser, built assets):** done on a scratch copy (`brevon_pos_test`, preview `brevon-pos-scratch` on port 8001) because the user's own `harris` password has changed and their local data must not be touched. Created a doughnut product; entered opening stock 36 pc at ₱12.50 (the stock screen shows 36 pc and ₱12.50 average; movements show +36 by Harris); POS showed "Open a shift to start selling"; opened shift BRV01-20261105-S01 with ₱1,000 (the header shows location, terminal and shift); closed it with ₱985.25 → expected ₱1,000.00, difference −₱14.75. No console errors.
+
+**Issues found and fixed during the phase**
+
+- **Deadlock under concurrency** in the ledger (shared lock from `INSERT IGNORE` on an existing row, then two processes upgrading). Found by the forked-process test; fixed by locking existing rows directly, plus deadlock retry (D-096).
+- POS header buttons wrapped onto two lines when the location name is long; the header now truncates the name instead.
+- After closing a shift, the terminal picker no longer pre-selected the only free terminal; fixed.
+
+**Known issues / deferred**
+
+- Owner to confirm (D-093): pop-up doughnuts entered as opening stock until dispatch exists; this does not reduce main-branch stock.
+- Phase 4b: cash sales in expected cash, BR-017 at checkout, payment-method settings screen. Phase 6: cash movements, shift review/approval, corrections, admin shift list.
+- Phase 7: adjustments (the only way to correct stock after opening), lots, audited negative-stock override.
+- Info: the operating-date check against existing sales (D-062) lands with sales in Phase 4b.
+
+**Change requested during review (D-099):** the login page asks for a username (email still accepted) and every account now requires a username.
+
+**Next step:** Phase 4b — checkout backend, after user review.

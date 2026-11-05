@@ -36,12 +36,26 @@ class CreateOwnerCommandTest extends TestCase
         $this->assertDatabaseHas('audit_logs', ['event' => 'user.created', 'auditable_id' => $user->id]);
     }
 
+    public function test_requires_a_username(): void
+    {
+        $this->seedAccess();
+        config(['brevon.dev_owner' => ['email' => 'owner@example.test', 'password' => 'Long-Enough-123']]);
+
+        $this->artisan('brevon:create-owner', ['--name' => 'Local Owner', '--no-interaction' => true])
+            ->expectsOutputToContain('username')
+            ->assertFailed();
+
+        $this->assertDatabaseMissing('users', ['email' => 'owner@example.test']);
+    }
+
     public function test_rejects_short_passwords(): void
     {
         $this->seedAccess();
         config(['brevon.dev_owner' => ['email' => 'owner@example.test', 'password' => 'short1']]);
 
-        $this->artisan('brevon:create-owner', ['--no-interaction' => true])->assertFailed();
+        $this->artisan('brevon:create-owner', ['--username' => 'owner', '--no-interaction' => true])
+            ->expectsOutputToContain('password')
+            ->assertFailed();
         $this->assertDatabaseCount('users', 0);
     }
 

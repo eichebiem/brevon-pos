@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\AuditLogController;
 use App\Http\Controllers\Admin\CategoryController;
+use App\Http\Controllers\Admin\Inventory\StockController;
 use App\Http\Controllers\Admin\LocationController;
 use App\Http\Controllers\Admin\OptionGroupController;
 use App\Http\Controllers\Admin\ProductController;
@@ -12,6 +13,8 @@ use App\Http\Controllers\Admin\TerminalController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\LocationSwitchController;
+use App\Http\Controllers\PosController;
+use App\Http\Controllers\Staff\ShiftController;
 use Illuminate\Support\Facades\Route;
 
 // Staff application only - there is no public website here (SRS §1.3).
@@ -27,8 +30,16 @@ Route::middleware(['auth'])->group(function () {
 
     Route::inertia('admin/dashboard', 'admin/Dashboard')
         ->middleware('permission:dashboard.view')->name('dashboard');
-    Route::inertia('pos', 'pos/Index')
+    Route::get('pos', [PosController::class, 'index'])
         ->middleware('permission:pos.access')->name('pos.index');
+
+    // The cashier's own shift (FR-073–FR-079). Location comes from the terminal (D-060).
+    Route::get('staff/shift', [ShiftController::class, 'show'])
+        ->middleware('permission:shifts.open|shifts.close')->name('staff.shift');
+    Route::post('staff/shift', [ShiftController::class, 'open'])
+        ->middleware('permission:shifts.open')->name('staff.shift.open');
+    Route::post('staff/shifts/{shift}/close', [ShiftController::class, 'close'])
+        ->middleware('permission:shifts.close|shifts.review')->name('staff.shift.close');
     Route::inertia('staff/preparation', 'staff/Preparation')
         ->middleware('permission:orders.update-status')->name('staff.preparation');
 
@@ -102,6 +113,16 @@ Route::middleware(['auth'])->group(function () {
         Route::middleware('permission:products.manage-prices')->group(function () {
             Route::post('products/{product}/prices', [ProductPriceController::class, 'store'])->name('products.prices.store');
             Route::post('product-prices/{price}/end', [ProductPriceController::class, 'end'])->name('product-prices.end');
+        });
+
+        // Inventory ledger (FR-054, FR-055). Opening stock counts as an adjustment (D-093).
+        Route::middleware('permission:inventory.view')->group(function () {
+            Route::get('inventory/stock', [StockController::class, 'index'])->name('inventory.stock');
+            Route::get('inventory/movements', [StockController::class, 'movements'])->name('inventory.movements');
+        });
+        Route::middleware('permission:inventory.adjust')->group(function () {
+            Route::get('inventory/opening-stock', [StockController::class, 'openingForm'])->name('inventory.opening');
+            Route::post('inventory/opening-stock', [StockController::class, 'storeOpening'])->name('inventory.opening.store');
         });
 
         Route::middleware('permission:audit.view')->group(function () {

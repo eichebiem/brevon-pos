@@ -25,7 +25,7 @@ class CreateOwnerCommand extends Command
     protected $signature = 'brevon:create-owner
         {--name= : Full name}
         {--email= : Email address (defaults to BREVON_DEV_OWNER_EMAIL)}
-        {--username= : Optional username}';
+        {--username= : Username used to sign in}';
 
     protected $description = 'Create the local development Owner account (not for production)';
 
@@ -47,7 +47,7 @@ class CreateOwnerCommand extends Command
 
         $email = (string) ($this->option('email') ?: config('brevon.dev_owner.email') ?: ($this->input->isInteractive() ? text('Email', required: true) : ''));
         $name = (string) ($this->option('name') ?: ($this->input->isInteractive() ? text('Full name', default: 'Brevon Owner', required: true) : 'Brevon Owner'));
-        $username = $this->option('username') ? strtolower((string) $this->option('username')) : null;
+        $username = strtolower(trim((string) ($this->option('username') ?: ($this->input->isInteractive() ? text('Username', required: true) : ''))));
         $plain = (string) (config('brevon.dev_owner.password') ?: ($this->input->isInteractive() ? password('Password (min 12 characters)', required: true) : ''));
 
         $validator = Validator::make(
@@ -55,7 +55,7 @@ class CreateOwnerCommand extends Command
             [
                 'name' => ['required', 'string', 'max:150'],
                 'email' => ['required', 'email', 'max:150', 'unique:users,email'],
-                'username' => ['nullable', 'regex:/^[a-z0-9][a-z0-9._-]*$/', 'max:80', 'unique:users,username'],
+                'username' => ['required', 'min:3', 'regex:/^[a-z0-9][a-z0-9._-]*$/', 'max:80', 'unique:users,username'],
                 'password' => ['required', Password::min(12)->letters()->numbers()],
             ],
         );

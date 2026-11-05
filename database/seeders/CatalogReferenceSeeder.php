@@ -15,21 +15,23 @@ class CatalogReferenceSeeder extends Seeder
 {
     public function run(): void
     {
-        foreach ([
-            ['pc', 'Piece', 0],
-            ['box', 'Box', 0],
-            ['g', 'Gram', 3],
-            ['kg', 'Kilogram', 3],
-            ['ml', 'Millilitre', 3],
-            ['l', 'Litre', 3],
-        ] as [$code, $name, $precision]) {
+        foreach (
+            [
+                ['pc', 'Piece', 0],
+                ['box', 'Box', 0],
+                ['g', 'Gram', 3],
+                ['kg', 'Kilogram', 3],
+                ['ml', 'Millilitre', 3],
+                ['l', 'Litre', 3],
+            ] as [$code, $name, $precision]
+        ) {
             UnitOfMeasure::query()->firstOrCreate(['code' => $code], ['name' => $name, 'precision' => $precision]);
         }
 
         foreach (['Doughnuts', 'Coffee', 'Cold Drinks', 'Other'] as $order => $name) {
             Category::query()->firstOrCreate(
                 ['slug' => str($name)->slug()->toString()],
-                ['name' => $name, 'sort_order' => ($order + 1) * 10, 'is_active' => true],
+                ['name' => $name, 'sort_order' => ($order + 1), 'is_active' => true],
             );
         }
     }

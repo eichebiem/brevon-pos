@@ -39,7 +39,10 @@ class TerminalService
 
     public function update(User $actor, Terminal $terminal, string $name, bool $active): Terminal
     {
-        // Phase 4a adds: refuse deactivation while a shift is open on the terminal.
+        if (! $active && $terminal->is_active && $terminal->hasOpenShift()) {
+            throw ValidationException::withMessages(['is_active' => __('Close the open shift on :code before deactivating it.', ['code' => $terminal->terminal_code])]);
+        }
+
         $old = ['name' => $terminal->name, 'is_active' => $terminal->is_active];
         $terminal->fill(['name' => $name, 'is_active' => $active]);
 
@@ -70,7 +73,10 @@ class TerminalService
 
         $this->assertCodeFree($destination, $terminal->terminal_code, 'branch_id');
 
-        // Phase 4a adds: refuse while a shift is open on this terminal (D-060).
+        // D-060: a terminal's sales must stay with the location its open shift started at.
+        if ($terminal->hasOpenShift()) {
+            throw ValidationException::withMessages(['branch_id' => __('Close the open shift on :code before moving it.', ['code' => $terminal->terminal_code])]);
+        }
 
         return DB::transaction(function () use ($actor, $terminal, $destination) {
             /** @var Branch $from */

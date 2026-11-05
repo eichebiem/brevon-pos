@@ -37,7 +37,7 @@ class UserRequest extends FormRequest
 
         return [
             'name' => ['required', 'string', 'max:150'],
-            'username' => ['nullable', 'string', 'min:3', 'max:80', 'regex:/^[a-z0-9][a-z0-9._-]*$/', Rule::unique('users', 'username')->ignore($user?->id)],
+            'username' => ['required', 'string', 'min:3', 'max:80', 'regex:/^[a-z0-9][a-z0-9._-]*$/', Rule::unique('users', 'username')->ignore($user?->id)],
             'email' => ['required', 'email', 'max:150', Rule::unique('users', 'email')->ignore($user?->id)],
             'password' => [$creating ? 'required' : 'nullable', 'string', 'confirmed', Password::default()],
             'is_active' => ['boolean'],

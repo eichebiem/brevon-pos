@@ -22,6 +22,7 @@ class DatabaseSeeder extends Seeder
             RolesAndPermissionsSeeder::class,
             LocationSeeder::class,
             CatalogReferenceSeeder::class,
+            PaymentMethodSeeder::class,
             LocalOwnerSeeder::class,
         ]);
     }

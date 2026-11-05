@@ -20,7 +20,10 @@ const user = computed(() => page.props.auth.user);
             <div class="leading-tight">
                 <p class="font-display text-xl">Preparation</p>
                 <p class="text-xs text-brevon-gold-light">
-                    Location and terminal: assigned from Phase 3
+                    {{
+                        page.props.location?.current?.name ??
+                        'No location assigned'
+                    }}
                 </p>
             </div>
             <div class="ml-auto flex items-center gap-3">

@@ -4,9 +4,9 @@ Point of Sale and Store Management System for **Brevon Doughnuts & Coffee**.
 Requirements: [`docs/BREVON-SRS-v1.1.md`](docs/BREVON-SRS-v1.1.md) (SRS v1.1, prepared by Harris).
 Progress: [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md).
 
-> **Status:** Phase 3 (catalog, settings and operating locations). Staff sign-in, users, roles, audit log, products,
-> categories, options, prices, store settings, pop-up locations and terminals work. POS, preparation and dashboard
-> screens are still clearly labelled shells. No sales, stock or reporting features exist yet.
+> **Status:** Phase 4a (stock ledger and shifts). Staff sign-in, users, roles, audit log, catalog and prices, store
+> settings, pop-up locations, terminals, opening stock, stock on hand/movements and cashier shifts work. Checkout,
+> preparation and dashboard screens are still clearly labelled shells. No sales or reporting features exist yet.
 > Receipts produced by this system are **not** BIR-accredited official receipts/invoices (SRS FR-087).
 
 ## Stack
@@ -60,9 +60,10 @@ In any other environment no accounts are seeded. Create the first Owner with:
 php artisan brevon:create-owner --name="Your Name" --username=yourname
 ```
 
-It asks for the email and a password of at least 12 characters (or reads `BREVON_DEV_OWNER_EMAIL` /
+It asks for the username (if `--username` is not given), the email and a password of at least 12 characters (or reads `BREVON_DEV_OWNER_EMAIL` /
 `BREVON_DEV_OWNER_PASSWORD` from `.env`), refuses to run in production, and is recorded in the audit log.
-Further accounts are created in **Administration → Users**. Staff sign in with their email or username.
+Further accounts are created in **Administration → Users**. Every account has a username, which staff use to sign in
+(their email address also works); the email is kept for password resets.
 
 ## Run
 
@@ -81,7 +82,8 @@ DECIMAL behaviour must be tested on the production engine.
 
 ```bash
 composer check   # build, lint/format, vue-tsc, Pint, Larastan, PHPUnit - the full phase gate
-php artisan test # PHPUnit only
+php artisan test # PHPUnit only (includes forked-process concurrency tests; needs the pcntl extension)
+php artisan brevon:inventory:reconcile  # check every stock balance against its movements
 composer lint    # fix PHP formatting
 npm run check:fix # fix JS/Vue lint + formatting
 ```

@@ -69,6 +69,21 @@ class UserAdministrationTest extends TestCase
         $this->assertStringNotContainsString('Correct-Horse-42', json_encode($log->new_values) ?: '');
     }
 
+    public function test_every_account_needs_a_username(): void
+    {
+        $admin = $this->staff(PermissionCatalog::ADMIN);
+
+        foreach (['', '   ', 'ab', 'Ana Cruz', '.ana'] as $bad) {
+            $this->actingAs($admin)->post('/admin/users', $this->payload(['username' => $bad]))->assertSessionHasErrors('username');
+        }
+
+        $existing = $this->staff(PermissionCatalog::CASHIER);
+        $this->actingAs($admin)->put("/admin/users/{$existing->id}", $this->payload(['email' => $existing->email, 'username' => '', 'password' => '', 'password_confirmation' => '', 'has_employee_profile' => false]))
+            ->assertSessionHasErrors('username');
+
+        $this->assertDatabaseMissing('users', ['email' => 'ana@example.test']);
+    }
+
     public function test_a_user_needs_at_least_one_role_and_one_location(): void
     {
         $admin = $this->staff(PermissionCatalog::ADMIN);
@@ -120,7 +135,7 @@ class UserAdministrationTest extends TestCase
     public function test_users_cannot_change_their_own_roles_or_deactivate_themselves(): void
     {
         $admin = $this->staff(PermissionCatalog::ADMIN, attributes: ['email' => 'me@example.test']);
-        $base = $this->payload(['email' => 'me@example.test', 'username' => null, 'password' => '', 'password_confirmation' => '', 'has_employee_profile' => false, 'roles' => [PermissionCatalog::ADMIN]]);
+        $base = $this->payload(['email' => 'me@example.test', 'username' => $admin->username, 'password' => '', 'password_confirmation' => '', 'has_employee_profile' => false, 'roles' => [PermissionCatalog::ADMIN]]);
 
         $this->actingAs($admin)->put("/admin/users/{$admin->id}", [...$base, 'roles' => [PermissionCatalog::MANAGER]])
             ->assertSessionHasErrors('roles');

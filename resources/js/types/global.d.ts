@@ -21,6 +21,12 @@ declare module '@inertiajs/core' {
             auth: Auth;
             location: LocationContext;
             store: { name: string | null; logo_url: string | null };
+            activeShift: {
+                number: string;
+                location: string | null;
+                location_code: string | null;
+                terminal: string | null;
+            } | null;
             sidebarOpen: boolean;
             [key: string]: unknown;
         };

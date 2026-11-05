@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use App\Domain\Locations\LocationContext;
 use App\Domain\Settings\StoreSettings;
 use App\Models\Branch;
+use App\Models\CashierShift;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -48,6 +49,8 @@ class HandleInertiaRequests extends Middleware
                 'name' => app(StoreSettings::class)->get('store.name'),
                 'logo_url' => app(StoreSettings::class)->logoUrl(),
             ],
+            // The signed-in cashier's open shift, shown in the POS header (D-060).
+            'activeShift' => fn () => $this->activeShiftProps($request),
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
         ];
     }
@@ -102,6 +105,28 @@ class HandleInertiaRequests extends Middleware
         return [
             'current' => $current ? $present($current) : null,
             'available' => $context->available($user)->map($present)->values()->all(),
+        ];
+    }
+
+    /**
+     * @return array{number: string, location: string|null, location_code: string|null, terminal: string|null}|null
+     */
+    private function activeShiftProps(Request $request): ?array
+    {
+        $user = $request->user();
+
+        if (! $user instanceof User) {
+            return null;
+        }
+
+        $shift = CashierShift::query()->open()->where('user_id', $user->id)
+            ->with(['branch:id,code,name', 'terminal:id,terminal_code'])->first();
+
+        return $shift === null ? null : [
+            'number' => $shift->shift_number,
+            'location' => $shift->branch?->name,
+            'location_code' => $shift->branch?->code,
+            'terminal' => $shift->terminal?->terminal_code,
         ];
     }
 }

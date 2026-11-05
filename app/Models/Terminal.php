@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use LogicException;
 
 /**
@@ -35,5 +36,18 @@ class Terminal extends Model
     public function branch(): BelongsTo
     {
         return $this->belongsTo(Branch::class);
+    }
+
+    /**
+     * @return HasMany<CashierShift, $this>
+     */
+    public function shifts(): HasMany
+    {
+        return $this->hasMany(CashierShift::class);
+    }
+
+    public function hasOpenShift(): bool
+    {
+        return $this->shifts()->open()->exists();
     }
 }

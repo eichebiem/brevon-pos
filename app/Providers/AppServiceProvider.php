@@ -4,10 +4,13 @@ namespace App\Providers;
 
 use App\Models\AuditLog;
 use App\Models\Branch;
+use App\Models\CashierShift;
 use App\Models\Category;
 use App\Models\Employee;
 use App\Models\InventoryItem;
+use App\Models\InventoryMovement;
 use App\Models\OptionGroup;
+use App\Models\PaymentMethod;
 use App\Models\Product;
 use App\Models\ProductPrice;
 use App\Models\ProductVariant;
@@ -70,6 +73,9 @@ class AppServiceProvider extends ServiceProvider
             'product_variant' => ProductVariant::class,
             'product_price' => ProductPrice::class,
             'option_group' => OptionGroup::class,
+            'payment_method' => PaymentMethod::class,
+            'inventory_movement' => InventoryMovement::class,
+            'cashier_shift' => CashierShift::class,
         ]);
 
         DB::prohibitDestructiveCommands(

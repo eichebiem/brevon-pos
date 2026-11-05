@@ -36,7 +36,7 @@ class UserService
         return DB::transaction(function () use ($actor, $data, $roles) {
             $user = User::query()->create([
                 'name' => $data['name'],
-                'username' => $data['username'] ?? null,
+                'username' => $data['username'],
                 'email' => $data['email'],
                 'password' => $data['password'],
                 'is_active' => (bool) $data['is_active'],
@@ -75,7 +75,7 @@ class UserService
 
             $user->fill([
                 'name' => $data['name'],
-                'username' => $data['username'] ?? null,
+                'username' => $data['username'],
                 'email' => $data['email'],
                 'is_active' => $active,
             ]);

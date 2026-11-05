@@ -39,3 +39,16 @@ export function formatMoney(value: string | null | undefined): string {
 /** Native <select> styling shared by admin forms and filters. */
 export const selectClass =
     'h-9 rounded-md border border-input bg-card px-3 text-sm focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-50';
+
+/** Display a DECIMAL(14,3) quantity without trailing zeros, e.g. "12.000" → "12". */
+export function formatQuantity(value: string | null | undefined): string {
+    if (value === null || value === undefined || value === '') {
+        return '—';
+    }
+
+    const [whole, fraction = ''] = value.split('.');
+    const trimmed = fraction.replace(/0+$/, '');
+    const grouped = Number(whole).toLocaleString('en-PH');
+
+    return trimmed ? `${grouped}.${trimmed}` : grouped;
+}

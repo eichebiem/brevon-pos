@@ -4,13 +4,16 @@ import {
     ChefHat,
     Croissant,
     FolderTree,
+    History,
     LayoutGrid,
     ListPlus,
     MapPin,
+    Package,
     ScrollText,
     Settings2,
     ShieldCheck,
     ShoppingCart,
+    Timer,
     Users,
 } from '@lucide/vue';
 import { computed } from 'vue';
@@ -31,6 +34,7 @@ import { usePermissions } from '@/composables/usePermissions';
 import { dashboard, landing } from '@/routes';
 import { index as auditIndex } from '@/routes/admin/audit';
 import { index as categoriesIndex } from '@/routes/admin/categories';
+import { movements, stock } from '@/routes/admin/inventory';
 import { index as locationsIndex } from '@/routes/admin/locations';
 import { index as optionGroupsIndex } from '@/routes/admin/option-groups';
 import { index as productsIndex } from '@/routes/admin/products';
@@ -38,7 +42,7 @@ import { edit as storeSettings } from '@/routes/admin/settings';
 import { index as rolesIndex } from '@/routes/admin/roles';
 import { index as usersIndex } from '@/routes/admin/users';
 import { index as pos } from '@/routes/pos';
-import { preparation } from '@/routes/staff';
+import { preparation, shift } from '@/routes/staff';
 import type { NavItem } from '@/types';
 
 const { can } = usePermissions();
@@ -61,6 +65,12 @@ const operations = computed(() =>
             href: pos(),
             icon: ShoppingCart,
             permission: 'pos.access',
+        },
+        {
+            title: 'My shift',
+            href: shift(),
+            icon: Timer,
+            permission: 'shifts.open',
         },
         {
             title: 'Preparation',
@@ -90,6 +100,23 @@ const catalog = computed(() =>
             href: optionGroupsIndex(),
             icon: ListPlus,
             permission: 'products.view',
+        },
+    ]),
+);
+
+const inventory = computed(() =>
+    visible([
+        {
+            title: 'Stock on hand',
+            href: stock(),
+            icon: Package,
+            permission: 'inventory.view',
+        },
+        {
+            title: 'Stock movements',
+            href: movements(),
+            icon: History,
+            permission: 'inventory.view',
         },
     ]),
 );
@@ -152,6 +179,11 @@ const administration = computed(() =>
                 :items="operations"
             />
             <NavMain v-if="catalog.length" label="Catalog" :items="catalog" />
+            <NavMain
+                v-if="inventory.length"
+                label="Inventory"
+                :items="inventory"
+            />
             <NavMain
                 v-if="administration.length"
                 label="Administration"

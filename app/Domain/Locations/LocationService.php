@@ -6,6 +6,7 @@ use App\Domain\Shared\AuditDiff;
 use App\Domain\Shared\AuditLogger;
 use App\Enums\LocationType;
 use App\Models\Branch;
+use App\Models\CashierShift;
 use App\Models\Product;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -91,7 +92,10 @@ class LocationService
             throw ValidationException::withMessages(['reason' => __('This location is already inactive.')]);
         }
 
-        // Phase 4a adds: refuse while the location has open cashier shifts (D-062).
+        // D-062: shifts must be closed first, so no sale is left without a drawer count.
+        if (CashierShift::query()->open()->where('branch_id', $location->id)->exists()) {
+            throw ValidationException::withMessages(['reason' => __('Close every open shift at this location before deactivating it.')]);
+        }
 
         return DB::transaction(function () use ($actor, $location, $reason) {
             $location->forceFill([

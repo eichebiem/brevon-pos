@@ -95,6 +95,8 @@ ID format `T-<area>-<n>`; each maps to SRS requirements.
 - T-PRIV-2 checkout succeeds with no customer input; unknown fields such as `customer_name`/`customer_phone` in the payload are ignored and never persisted (FR-050)
 - T-PRIV-3 advance pickup order saved with `pickup_at` and notes only, no contact fields (FR-049)
 
+**Phase 4a implementation map:** `tests/Feature/Inventory/InventoryLedgerTest.php` (T-INV-1, T-INV-2, T-INV-8, T-INV-9, append-only movements, weighted average, reconcile command), `InventoryConcurrencyTest.php` (T-INV-3 with two forked processes on separate MySQL connections, plus four processes creating the same balance row; `@group concurrency`, uses `DatabaseTruncation`), `OpeningStockTest.php` (D-093, stock and movement screens per location), `tests/Feature/Shifts/ShiftTest.php` (T-SHF-1, T-SHF-3, T-SHF-4, shift numbers, location taken from the terminal, close and variance, T-LOC-5/T-LOC-8 open-shift guards), `RouteAuthorizationTest.php` (new routes). T-SHF-2 and the T-POS-* items belong to Phase 4b.
+
 ### Orders & preparation (Phase 5)
 
 - T-ORD-1 allowed/forbidden transitions; history rows with actor (FR-046, FR-051)

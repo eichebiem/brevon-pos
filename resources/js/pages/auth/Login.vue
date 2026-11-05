@@ -14,7 +14,7 @@ import { request } from '@/routes/password';
 defineOptions({
     layout: {
         title: 'Log in to your account',
-        description: 'Enter your email or username and password to continue',
+        description: 'Enter your username and password to continue',
     },
 });
 
@@ -42,7 +42,7 @@ defineProps<{
     >
         <div class="grid gap-6">
             <div class="grid gap-2">
-                <Label for="login">Email or username</Label>
+                <Label for="login">Username</Label>
                 <Input
                     id="login"
                     type="text"
@@ -53,7 +53,6 @@ defineProps<{
                     autocomplete="username"
                     autocapitalize="none"
                     spellcheck="false"
-                    placeholder="you@example.com or username"
                 />
                 <InputError :message="errors.login" />
             </div>

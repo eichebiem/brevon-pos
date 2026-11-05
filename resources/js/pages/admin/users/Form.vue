@@ -172,18 +172,24 @@ const fieldError = (key: string): string | undefined =>
                 <InputError :message="form.errors.name" />
             </div>
             <div class="grid gap-2">
-                <Label for="username">Username (optional)</Label>
+                <Label for="username">Username</Label>
                 <Input
                     id="username"
                     v-model="form.username"
+                    required
                     autocomplete="off"
                     autocapitalize="none"
                     spellcheck="false"
+                    aria-describedby="username-hint"
                 />
+                <p id="username-hint" class="text-xs text-muted-foreground">
+                    Used to sign in. Lower-case letters, numbers, dots, dashes
+                    and underscores.
+                </p>
                 <InputError :message="form.errors.username" />
             </div>
             <div class="grid gap-2">
-                <Label for="email">Email</Label>
+                <Label for="email">Email (for password resets)</Label>
                 <Input
                     id="email"
                     v-model="form.email"
