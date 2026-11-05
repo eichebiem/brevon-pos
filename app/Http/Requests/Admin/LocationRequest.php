@@ -13,30 +13,19 @@ class LocationRequest extends FormRequest
         return true;
     }
 
-    protected function prepareForValidation(): void
-    {
-        if ($this->has('code')) {
-            $this->merge(['code' => strtoupper(trim((string) $this->input('code')))]);
-        }
-    }
-
     /**
      * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
-        $creating = $this->route('location') === null;
-
+        // The code is assigned by the app and never changes (D-121), so it is not accepted here.
         return [
-            'code' => $creating ? ['required', 'string', 'min:3', 'max:12', 'regex:/^[A-Z0-9][A-Z0-9-]*$/', 'unique:branches,code'] : ['prohibited'],
             'name' => ['required', 'string', 'max:150'],
             'address_line' => ['nullable', 'string', 'max:255'],
             'barangay' => ['nullable', 'string', 'max:100'],
             'city_municipality' => ['nullable', 'string', 'max:100'],
             'province' => ['nullable', 'string', 'max:100'],
             'postal_code' => ['nullable', 'string', 'max:20'],
-            'phone' => ['nullable', 'string', 'max:30'],
-            'email' => ['nullable', 'email', 'max:150'],
             'operating_starts_on' => ['nullable', 'date_format:Y-m-d'],
             'operating_ends_on' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:operating_starts_on'],
             'copy_availability' => ['sometimes', 'boolean'],

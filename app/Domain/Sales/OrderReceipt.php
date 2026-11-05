@@ -42,7 +42,6 @@ class OrderReceipt
                 'code' => $location->code,
                 'name' => $location->name,
                 'address' => collect([$location->address_line, $location->barangay, $location->city_municipality, $location->province])->filter()->implode(', ') ?: null,
-                'phone' => $location->phone,
             ],
             'order' => [
                 'id' => $order->id,

@@ -70,7 +70,7 @@ class LocationController extends Controller
         // Not named "location": that key is the shared location-context prop.
         return Inertia::render('admin/locations/Form', [
             'site' => [
-                ...$location->only(['id', 'code', 'name', 'address_line', 'barangay', 'city_municipality', 'province', 'postal_code', 'phone', 'email', 'is_active', 'deactivation_reason']),
+                ...$location->only(['id', 'code', 'name', 'address_line', 'barangay', 'city_municipality', 'province', 'postal_code', 'is_active', 'deactivation_reason']),
                 'type' => $location->location_type->value,
                 'status' => $location->operatingStatus($today),
                 'operating_starts_on' => $location->operating_starts_on?->toDateString(),

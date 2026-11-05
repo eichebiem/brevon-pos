@@ -26,8 +26,6 @@ use LogicException;
  * @property string|null $city_municipality
  * @property string|null $province
  * @property string|null $postal_code
- * @property string|null $phone
- * @property string|null $email
  * @property string $timezone
  * @property string $currency
  * @property bool $is_active
@@ -44,7 +42,7 @@ class Branch extends Model
 
     protected $fillable = [
         'code', 'name', 'location_type', 'address_line', 'barangay', 'city_municipality',
-        'province', 'postal_code', 'phone', 'email', 'timezone', 'currency', 'is_active',
+        'province', 'postal_code', 'timezone', 'currency', 'is_active',
         'operating_starts_on', 'operating_ends_on',
     ];
 

@@ -29,7 +29,6 @@ const paymentStatus: Record<string, string> = {
             <p v-if="receipt.location.address">
                 {{ receipt.location.address }}
             </p>
-            <p v-if="receipt.location.phone">{{ receipt.location.phone }}</p>
             <p class="mt-2 border-y border-dashed border-black py-1 font-bold">
                 {{ receipt.title }}
             </p>

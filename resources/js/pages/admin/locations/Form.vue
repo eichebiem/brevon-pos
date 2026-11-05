@@ -44,8 +44,6 @@ type Location = {
     city_municipality: string | null;
     province: string | null;
     postal_code: string | null;
-    phone: string | null;
-    email: string | null;
     operating_starts_on: string | null;
     operating_ends_on: string | null;
     is_active: boolean;
@@ -76,15 +74,12 @@ const title = computed(() =>
 );
 
 const form = useForm({
-    code: '',
     name: props.site?.name ?? '',
     address_line: props.site?.address_line ?? '',
     barangay: props.site?.barangay ?? '',
     city_municipality: props.site?.city_municipality ?? '',
     province: props.site?.province ?? '',
     postal_code: props.site?.postal_code ?? '',
-    phone: props.site?.phone ?? '',
-    email: props.site?.email ?? '',
     operating_starts_on: props.site?.operating_starts_on ?? '',
     operating_ends_on: props.site?.operating_ends_on ?? '',
     copy_availability: true,
@@ -92,9 +87,10 @@ const form = useForm({
 
 function submit(): void {
     if (props.site) {
-        form.transform(
-            ({ code: _code, copy_availability: _copy, ...rest }) => rest,
-        ).put(update(props.site.id).url, { preserveScroll: true });
+        form.transform(({ copy_availability: _copy, ...rest }) => rest).put(
+            update(props.site.id).url,
+            { preserveScroll: true },
+        );
     } else {
         form.post(store().url);
     }
@@ -277,7 +273,9 @@ function confirmMove(): void {
                 </p>
                 <p v-else class="text-sm text-muted-foreground">
                     A temporary selling site. Doughnuts are delivered from the
-                    main branch; pop-ups only sell finished-stock items.
+                    main branch; pop-ups only sell finished-stock items. Its
+                    code (POP01, POP02, …) is given automatically and starts its
+                    order numbers.
                 </p>
             </div>
             <div v-if="site && isPopUp" class="flex gap-2">
@@ -318,24 +316,7 @@ function confirmMove(): void {
                 <h2 id="details" class="font-semibold md:col-span-2">
                     Details
                 </h2>
-                <div v-if="!site" class="grid gap-2">
-                    <Label for="code">Location code</Label>
-                    <Input
-                        id="code"
-                        v-model="form.code"
-                        required
-                        maxlength="12"
-                        placeholder="POP-SMR1"
-                        class="uppercase"
-                        aria-describedby="code-help"
-                    />
-                    <p id="code-help" class="text-xs text-muted-foreground">
-                        3–12 capital letters, numbers or hyphens. It prefixes
-                        receipt numbers and cannot be changed later.
-                    </p>
-                    <InputError :message="form.errors.code" />
-                </div>
-                <div class="grid gap-2">
+                <div class="grid gap-2 md:col-span-2">
                     <Label for="name">Name</Label>
                     <Input
                         id="name"
@@ -366,16 +347,6 @@ function confirmMove(): void {
                 <div class="grid gap-2">
                     <Label for="postal_code">Postal code</Label>
                     <Input id="postal_code" v-model="form.postal_code" />
-                </div>
-                <div class="grid gap-2">
-                    <Label for="phone">Phone</Label>
-                    <Input id="phone" v-model="form.phone" type="tel" />
-                    <InputError :message="form.errors.phone" />
-                </div>
-                <div class="grid gap-2">
-                    <Label for="email">Email</Label>
-                    <Input id="email" v-model="form.email" type="email" />
-                    <InputError :message="form.errors.email" />
                 </div>
             </section>
 

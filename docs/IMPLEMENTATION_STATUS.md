@@ -293,6 +293,8 @@ Still to confirm: boxes/combo at pop-ups (D-089), hot vs iced coffee prices. Pha
 - The cart briefly computed unit price + add-ons in the browser; replaced by the server's `unit_total` (D-116).
 - Larastan: list return types in `PosCatalog` and an always-true shift check in the history query.
 
+**Change during review (user, 2026-11-06, D-121):** the location form no longer asks for a code, phone or email. Pop-ups get the next code automatically (`POP01`, `POP02`, …); the `phone` and `email` columns were dropped from `branches`, and the receipt no longer prints a phone. `composer check` passes with **248 tests**; checked in the browser by creating a pop-up on the scratch database (got `POP01`). Run `php artisan migrate` on `brevon_pos` to apply it.
+
 **Known issues / deferred**
 
 - Phase 5: order status changes and the preparation queue; verifying a pending GCash payment after checkout.

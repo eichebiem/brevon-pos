@@ -21,7 +21,10 @@ use Illuminate\Validation\ValidationException;
 class LocationService
 {
     /** Columns an administrator may edit (code and type are immutable, D-057/D-065). */
-    private const DETAIL_FIELDS = ['name', 'address_line', 'barangay', 'city_municipality', 'province', 'postal_code', 'phone', 'email'];
+    private const DETAIL_FIELDS = ['name', 'address_line', 'barangay', 'city_municipality', 'province', 'postal_code'];
+
+    /** Prefix of the codes given to new pop-ups: POP01, POP02, … (D-121). */
+    private const POP_UP_CODE_PREFIX = 'POP';
 
     public function __construct(private readonly AuditLogger $audit) {}
 
@@ -34,7 +37,7 @@ class LocationService
             $location = new Branch;
             $location->fill([
                 ...array_intersect_key($data, array_flip(self::DETAIL_FIELDS)),
-                'code' => strtoupper((string) $data['code']),
+                'code' => $this->nextPopUpCode(),
                 'location_type' => LocationType::PopUp,
                 'operating_starts_on' => $data['operating_starts_on'] ?? null,
                 'operating_ends_on' => $data['operating_ends_on'] ?? null,
@@ -180,6 +183,24 @@ class LocationService
         }
 
         return $ids->count();
+    }
+
+    /**
+     * The next free pop-up code. Codes are never reused, because locations
+     * are never deleted and old order numbers carry the code (D-121). Called
+     * inside the create transaction; the lock makes two admins creating a
+     * pop-up at once queue, and UNIQUE(code) is the final guard.
+     */
+    private function nextPopUpCode(): string
+    {
+        $highest = Branch::query()
+            ->where('code', 'like', self::POP_UP_CODE_PREFIX.'%')
+            ->lockForUpdate()
+            ->pluck('code')
+            ->map(fn (string $code) => preg_match('/^'.self::POP_UP_CODE_PREFIX.'(\d+)$/', $code, $m) === 1 ? (int) $m[1] : 0)
+            ->max() ?? 0;
+
+        return self::POP_UP_CODE_PREFIX.str_pad((string) ($highest + 1), 2, '0', STR_PAD_LEFT);
     }
 
     /**

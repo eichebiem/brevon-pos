@@ -11,6 +11,7 @@ use App\Models\Product;
 use App\Models\Terminal;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Schema;
 use Tests\Concerns\InteractsWithStaff;
 use Tests\TestCase;
 
@@ -32,7 +33,7 @@ class PopUpManagementTest extends TestCase
      */
     private function popUp(array $overrides = []): array
     {
-        return ['code' => 'pop-smr1', 'name' => 'Pop-up — SM Rosales', 'city_municipality' => 'Rosales', 'copy_availability' => false, ...$overrides];
+        return ['name' => 'Pop-up — SM Rosales', 'city_municipality' => 'Rosales', 'copy_availability' => false, ...$overrides];
     }
 
     public function test_admin_creates_a_pop_up_and_it_is_audited(): void
@@ -41,7 +42,7 @@ class PopUpManagementTest extends TestCase
 
         $response = $this->actingAs($admin)->post('/admin/locations', $this->popUp(['operating_starts_on' => '2026-12-01', 'operating_ends_on' => '2026-12-31']));
 
-        $location = Branch::query()->where('code', 'POP-SMR1')->firstOrFail();
+        $location = Branch::query()->where('code', 'POP01')->firstOrFail();
         $response->assertRedirect("/admin/locations/{$location->id}/edit");
         $this->assertSame(LocationType::PopUp, $location->location_type);
         $this->assertSame('2026-12-31', $location->operating_ends_on?->toDateString());
@@ -53,8 +54,7 @@ class PopUpManagementTest extends TestCase
     {
         $admin = $this->staff(PermissionCatalog::ADMIN);
 
-        $this->actingAs($admin)->post('/admin/locations', $this->popUp(['code' => 'BRV01']))->assertSessionHasErrors('code');
-        $this->actingAs($admin)->post('/admin/locations', $this->popUp(['code' => 'bad code!']))->assertSessionHasErrors('code');
+        $this->actingAs($admin)->post('/admin/locations', $this->popUp(['name' => '']))->assertSessionHasErrors('name');
         $this->actingAs($admin)->post('/admin/locations', $this->popUp(['operating_starts_on' => '2026-12-10', 'operating_ends_on' => '2026-12-01']))
             ->assertSessionHasErrors('operating_ends_on');
         // The type cannot be chosen: a second permanent branch is impossible through the app.
@@ -67,9 +67,8 @@ class PopUpManagementTest extends TestCase
         $admin = $this->staff(PermissionCatalog::ADMIN);
         $popUp = Branch::factory()->popUp()->create(['code' => 'POP-A']);
 
-        $this->actingAs($admin)->put("/admin/locations/{$popUp->id}", ['code' => 'POP-B', 'name' => 'X'])->assertSessionHasErrors('code');
-
-        $this->actingAs($admin)->put("/admin/locations/{$popUp->id}", ['name' => 'Renamed', 'operating_ends_on' => '2026-12-24'])->assertSessionHasNoErrors();
+        // A code sent with an edit is ignored: the code never changes (D-057, D-121).
+        $this->actingAs($admin)->put("/admin/locations/{$popUp->id}", ['code' => 'POP-B', 'name' => 'Renamed', 'operating_ends_on' => '2026-12-24'])->assertSessionHasNoErrors();
 
         $popUp->refresh();
         $this->assertSame('POP-A', $popUp->code);
@@ -126,7 +125,7 @@ class PopUpManagementTest extends TestCase
 
         $this->actingAs($admin)->post('/admin/locations', $this->popUp(['copy_availability' => true]));
 
-        $popUp = Branch::query()->where('code', 'POP-SMR1')->firstOrFail();
+        $popUp = Branch::query()->where('code', 'POP01')->firstOrFail();
         $this->assertEqualsCanonicalizing([$doughnut->id], $popUp->products()->wherePivot('is_available', true)->pluck('products.id')->all());
         $this->assertFalse($notAtMain->locations()->where('branches.id', $popUp->id)->exists());
     }
@@ -152,21 +151,36 @@ class PopUpManagementTest extends TestCase
         $manager = $this->staff(PermissionCatalog::MANAGER);
 
         $this->actingAs($manager)->post('/admin/locations', $this->popUp())->assertForbidden();
-        $this->assertDatabaseMissing('branches', ['code' => 'POP-SMR1']);
+        $this->assertSame(0, Branch::query()->where('location_type', LocationType::PopUp)->count());
     }
 
     public function test_location_edit_page_keeps_the_shared_location_context(): void
     {
         $admin = $this->staff(PermissionCatalog::ADMIN);
         $this->actingAs($admin)->post('/admin/locations', $this->popUp());
-        $popUp = Branch::query()->where('code', 'POP-SMR1')->firstOrFail();
+        $popUp = Branch::query()->where('code', 'POP01')->firstOrFail();
 
         // Regression: a page prop named "location" used to override the shared location context.
         $this->actingAs($admin)->get("/admin/locations/{$popUp->id}/edit")
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->component('admin/locations/Form')
-                ->where('site.code', 'POP-SMR1')
+                ->where('site.code', 'POP01')
                 ->where('location.current.code', $this->mainLocation()->code));
+    }
+
+    public function test_pop_up_codes_are_assigned_in_order_and_never_taken_from_the_form(): void
+    {
+        $admin = $this->staff(PermissionCatalog::ADMIN);
+        Branch::factory()->popUp()->create(['code' => 'POP07']);
+        Branch::factory()->popUp()->create(['code' => 'POP-OLD']);
+
+        $this->actingAs($admin)->post('/admin/locations', $this->popUp(['code' => 'MINE', 'phone' => '0917', 'email' => 'x@y.z']))->assertSessionHasNoErrors();
+        $this->actingAs($admin)->post('/admin/locations', $this->popUp(['name' => 'Second']))->assertSessionHasNoErrors();
+
+        $this->assertSame(['POP08', 'POP09'], Branch::query()->where('code', 'like', 'POP0%')->where('code', '!=', 'POP07')->orderBy('id')->pluck('code')->all());
+        $this->assertDatabaseMissing('branches', ['code' => 'MINE']);
+        $this->assertFalse(Schema::hasColumn('branches', 'phone'));
+        $this->assertFalse(Schema::hasColumn('branches', 'email'));
     }
 }
