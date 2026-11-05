@@ -1,0 +1,86 @@
+# Brevon POS
+
+Point of Sale and Store Management System for **Brevon Doughnuts & Coffee**.
+Requirements: [`docs/BREVON-SRS.md`](docs/BREVON-SRS.md) (SRS v1.1, prepared by Harris).
+Progress: [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md).
+
+> **Status:** Phase 1 (project foundation) only. Login works; the admin, POS and preparation screens are
+> clearly labelled shells. No sales, stock or reporting features exist yet.
+> Receipts produced by this system are **not** BIR-accredited official receipts/invoices (SRS FR-087).
+
+## Stack
+
+Laravel 13 · PHP 8.4 target (8.3–8.5 supported) · MySQL 8.4 · Vue 3 + TypeScript · Inertia 3 · Tailwind CSS 4 ·
+Laravel Fortify (auth) · PHPUnit 12 · Pint · Larastan (level 7). Built from the official Laravel Vue starter kit.
+
+## Local setup
+
+Requirements: PHP 8.4+ with `bcmath`, `intl`, `pdo_mysql`, `mbstring`; Composer 2; Node 22; MySQL 8.4.
+
+```bash
+composer install
+npm install
+cp .env.example .env
+php artisan key:generate
+```
+
+### Databases (important)
+
+Use **only** two dedicated databases, ideally with a MySQL user that can see nothing else:
+
+```sql
+CREATE DATABASE brevon_pos      CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE brevon_pos_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'brevon'@'127.0.0.1' IDENTIFIED BY '<choose-a-local-password>';
+GRANT ALL PRIVILEGES ON brevon_pos.*      TO 'brevon'@'127.0.0.1';
+GRANT ALL PRIVILEGES ON brevon_pos_test.* TO 'brevon'@'127.0.0.1';
+```
+
+Put the password in `.env` (`DB_PASSWORD`). `.env` is git-ignored; never commit credentials.
+
+**Destructive-command guard:** `migrate:fresh`, `migrate:refresh`, `migrate:reset`, `migrate:rollback`, `db:wipe`
+and `db:seed` are refused unless `APP_ENV` is `local`/`testing`, the driver is MySQL and the database is
+`brevon_pos` or `brevon_pos_test` (`config/brevon.php`, `App\Support\Database\DestructiveCommandGuard`).
+In production Laravel's own `DB::prohibitDestructiveCommands()` also applies.
+
+```bash
+php artisan migrate --seed
+```
+
+No user accounts are seeded. A local-only owner-account command (`brevon:create-owner`) arrives in Phase 2.
+
+## Run
+
+```bash
+composer run dev        # Laravel server, queue, logs and Vite together
+# or
+php artisan serve       # after `npm run build`
+```
+
+Open http://127.0.0.1:8000. `/up` is the health check.
+
+## Test and quality gate
+
+Tests run against the MySQL database `brevon_pos_test` (set in `phpunit.xml`), never SQLite, because locking and
+DECIMAL behaviour must be tested on the production engine.
+
+```bash
+composer check   # build, lint/format, vue-tsc, Pint, Larastan, PHPUnit - the full phase gate
+php artisan test # PHPUnit only
+composer lint    # fix PHP formatting
+npm run check:fix # fix JS/Vue lint + formatting
+```
+
+## Conventions
+
+- Timestamps stored in **UTC**; business dates and display use **Asia/Manila** (`config/brevon.php`).
+- Money is handled with `App\Domain\Shared\Money` (integer centavos, half-up rounding) and quantities with
+  `App\Domain\Shared\Quantity` (bcmath, 3 decimals). Never use floats for money.
+- Business logic lives in `app/Domain/<Module>`; controllers stay thin.
+- Decisions and assumptions: [`docs/DECISIONS.md`](docs/DECISIONS.md). Schema: [`docs/ERD.md`](docs/ERD.md).
+  Tests: [`docs/TEST_PLAN.md`](docs/TEST_PLAN.md).
+
+## Deployment
+
+Documented in Phase 11. Production requires HTTPS, `APP_ENV=production`, `APP_DEBUG=false`, PHP 8.4, daily database
+backups with a tested restore, and a database user without access to other schemas.
