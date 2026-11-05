@@ -35,6 +35,7 @@ final readonly class PricedCart
                 'quantity' => $line->quantity->toString(),
                 'unit_price' => $line->unitPrice->toDecimal(),
                 'option_total' => $line->optionTotal->toDecimal(),
+                'unit_total' => $line->unitPrice->add($line->optionTotal)->toDecimal(),
                 'options' => array_map(fn (array $o) => ['id' => $o['option']->id, 'name' => $o['option']->name, 'price_delta' => $o['option']->price_delta], $line->options),
                 'line_total' => $line->lineTotal->toDecimal(),
             ], $this->lines),

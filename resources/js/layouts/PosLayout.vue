@@ -1,11 +1,19 @@
 <script setup lang="ts">
 import { Link, router, usePage } from '@inertiajs/vue3';
-import { LayoutDashboard, LogOut, Timer } from '@lucide/vue';
+import {
+    LayoutDashboard,
+    LogOut,
+    ReceiptText,
+    ShoppingCart,
+    Timer,
+} from '@lucide/vue';
 import { computed } from 'vue';
 import AppLogoIcon from '@/components/AppLogoIcon.vue';
 import { Toaster } from '@/components/ui/sonner';
 import { usePermissions } from '@/composables/usePermissions';
 import { landing, logout } from '@/routes';
+import { index as posIndex } from '@/routes/pos';
+import { index as ordersIndex } from '@/routes/pos/orders';
 import { shift as shiftPage } from '@/routes/staff';
 
 const page = usePage();
@@ -40,6 +48,19 @@ const linkClass =
                 </p>
             </div>
             <nav class="flex shrink-0 items-center gap-2" aria-label="POS">
+                <Link v-if="activeShift" :href="posIndex()" :class="linkClass">
+                    <ShoppingCart class="size-4" aria-hidden="true" />
+                    <span class="hidden md:inline">Sale</span>
+                </Link>
+                <Link
+                    v-if="can('orders.view')"
+                    :href="ordersIndex()"
+                    :class="linkClass"
+                    data-test="pos-orders-link"
+                >
+                    <ReceiptText class="size-4" aria-hidden="true" />
+                    <span class="hidden md:inline">Orders</span>
+                </Link>
                 <Link
                     v-if="can('shifts.open') || can('shifts.close')"
                     :href="shiftPage()"

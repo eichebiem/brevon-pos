@@ -15,6 +15,9 @@ void createInertiaApp({
         switch (true) {
             case name.startsWith('auth/'):
                 return AuthLayout;
+            // The printable receipt is the page itself: no header or navigation.
+            case name === 'pos/Receipt':
+                return null;
             case name.startsWith('pos/'):
                 return PosLayout;
             case name.startsWith('staff/'):

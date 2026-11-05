@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Pos;
 use App\Domain\Sales\CartPricer;
 use App\Domain\Sales\CheckoutService;
 use App\Domain\Sales\IdempotencyConflict;
+use App\Domain\Shared\Money;
 use App\Domain\Shifts\ShiftService;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Pos\CheckoutRequest;
@@ -32,7 +33,15 @@ class CheckoutController extends Controller
             throw ValidationException::withMessages(['shift' => __('Open a shift before taking payments.')]);
         }
 
-        return response()->json($pricer->price($shift->branch, $request->lines())->toArray());
+        $cart = $pricer->price($shift->branch, $request->lines());
+        $tendered = $request->validated('payment.amount_tendered');
+        $tendered = $tendered === null ? null : Money::fromDecimal((string) $tendered);
+
+        // Change preview for the cash dialog; the browser never does money arithmetic (D-034).
+        return response()->json([
+            ...$cart->toArray(),
+            'change' => $tendered === null || $tendered->lessThan($cart->grandTotal) ? null : $tendered->subtract($cart->grandTotal)->toDecimal(),
+        ]);
     }
 
     public function store(CheckoutRequest $request, CheckoutService $checkout): RedirectResponse

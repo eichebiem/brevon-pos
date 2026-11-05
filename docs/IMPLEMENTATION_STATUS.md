@@ -9,8 +9,8 @@ Last updated: 2026-11-06 · Baseline: SRS **v1.1** (`docs/BREVON-SRS-v1.1.md`) �
 | 2 — Authentication and access control         | ✅ Passed                                       | Approved; committed by user ("Done Phase 2")                              |
 | 3 — Catalog, settings and operating locations | ✅ Passed                                       | Approved; committed by user ("Done Phase 3")                              |
 | 4a — Ledger core and shift open               | ✅ Passed                                       | Approved; committed by user (with the seeder changes)                     |
-| 4b — Checkout backend                         | ✅ Passed — awaiting user review                | Not committed                                                             |
-| 4c — Cashier UI and receipts                  | ⏳ Not started                                  | Sale at main + active pop-up from the screen                              |
+| 4b — Checkout backend                         | ✅ Passed                                       | Approved 2026-11-06                                                       |
+| 4c — Cashier UI and receipts                  | ✅ Passed — awaiting user review                | Not committed                                                             |
 | 5 — Orders and preparation                    | ⏳ Not started                                  |                                                                           |
 | 6 — Cashier shifts and cash control           | ⏳ Not started                                  |                                                                           |
 | 7 — Inventory and purchasing                  | ⏳ Not started                                  | Includes main → pop-up doughnut dispatch (D-063); OI-018 deferred (FE-01) |
@@ -266,3 +266,38 @@ Still to confirm: boxes/combo at pop-ups (D-089), hot vs iced coffee prices. Pha
 - Still to confirm: OI-002 (status flow), OI-005 (GCash reference format). D-101 menu questions for the client (box/combo stock and flavours, Better Together choices): client has not answered; raise again after Phase 9 (user, 2026-11-06).
 
 **Next step:** Phase 4c — cashier UI and receipts, after user review.
+
+## Phase 4c log — Cashier UI and receipts (2026-11-06)
+
+**Objective:** a cashier can sell from the screen — pick items, take cash or GCash, see the change, print an order receipt, and find and reprint past orders.
+**SRS IDs:** FR-024, FR-025, FR-029, FR-033, FR-034, FR-049, FR-050 (no customer fields), FR-104 (location scope); D-034, D-052, D-066.
+
+**Implemented**
+
+- Domain: `PosCatalog` (what the screen sells at a location, D-115), `OrderReceipt` (receipt from snapshots, D-118). `Category::topLevel()`.
+- HTTP: `GET /pos` now passes the catalog, payment methods and order types; `POST /pos/quote` also returns `unit_total` per line and cash `change` (D-116); `GET /pos/orders`, `GET /pos/orders/{order}`, `GET /pos/orders/{order}/receipt`, `POST /pos/orders/{order}/reprint` (`orders.view`, D-119, D-120).
+- UI: POS screen (tabs, search, tiles with stock, item dialog for size/add-ons/quantity/instructions, cart, order type and pickup time, order note, cash dialog with quick amounts, GCash dialog, sale-complete dialog with change and Print receipt, shortcuts); Orders page; order detail with Print again; printable 80 mm receipt page with no app header. "Sale" and "Orders" links in the POS header.
+- Docs: DECISIONS §U (D-115–D-120), TEST_PLAN map, README.
+
+**Verification (all run 2026-11-06)**
+
+| Command                                                            | Result                   |
+| ------------------------------------------------------------------ | ------------------------ |
+| `composer check` → build, `vp check`, `vue-tsc`, Pint, Larastan L7 | all pass, 0 errors       |
+| → `php artisan test` (MySQL)                                       | **247 passed** (was 238) |
+
+**Manual checks (browser, scratch DB `brevon_pos_test`, preview port 8001, 1280×800):** signed in as `cashier1`, opened a shift, sold 2 × Choco Custard + Latte (Hot 12oz, "extra hot") for ₱208.00 cash with ₱500 received → change ₱292.00, stock 12 → 10; sold Chocolate Sprinkles by GCash → "waiting for verification", stock 3 → 2; the same GCash reference on a third sale was refused with the message under the field and the cart kept; Orders page listed both with Manila times; order detail and the standalone receipt printed correctly; Print again wrote one `order.receipt_reprinted` audit entry and no new order. The user's `brevon_pos` was not touched.
+
+**Problems found and fixed during the phase**
+
+- The cart briefly computed unit price + add-ons in the browser; replaced by the server's `unit_total` (D-116).
+- Larastan: list return types in `PosCatalog` and an always-true shift check in the history query.
+
+**Known issues / deferred**
+
+- Phase 5: order status changes and the preparation queue; verifying a pending GCash payment after checkout.
+- The seeded menu has no add-on groups yet, so add-ons were checked by tests only.
+- Receipt printing uses the browser's print dialog; choosing the 80 mm printer is a one-time setup on each counter computer (Phase 11 checklist).
+- Still to confirm: OI-002, OI-005. D-101 client menu questions: raise again after Phase 9.
+
+**Next step:** Phase 5 — orders and preparation, after user review.

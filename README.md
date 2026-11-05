@@ -4,10 +4,10 @@ Point of Sale and Store Management System for **Brevon Doughnuts & Coffee**.
 Requirements: [`docs/BREVON-SRS-v1.1.md`](docs/BREVON-SRS-v1.1.md) (SRS v1.1, prepared by Harris).
 Progress: [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md).
 
-> **Status:** Phase 4b (checkout backend). Staff sign-in, users, roles, audit log, catalog and prices, store
+> **Status:** Phase 4c (cashier UI and receipts). Staff sign-in, users, roles, audit log, catalog and prices, store
 > settings, payment methods, pop-up locations, terminals, opening stock, stock on hand/movements and cashier shifts
-> work. Checkout works on the server (`POST /pos/checkout`: cash and GCash, stock deduction, shift link, safe retries);
-> the cashier screen that uses it arrives in Phase 4c. Preparation and dashboard screens are still labelled shells.
+> work. Cashiers can sell from the POS screen (cash and GCash, server totals, stock deduction, safe retries), print an
+> 80 mm order receipt, and find and reprint past orders. Preparation and dashboard screens are still labelled shells.
 > Receipts produced by this system are **not** BIR-accredited official receipts/invoices (SRS FR-087).
 
 ## Stack

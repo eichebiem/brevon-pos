@@ -15,6 +15,7 @@ use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\LocationSwitchController;
 use App\Http\Controllers\Pos\CheckoutController;
+use App\Http\Controllers\Pos\OrderController as PosOrderController;
 use App\Http\Controllers\PosController;
 use App\Http\Controllers\Staff\ShiftController;
 use Illuminate\Support\Facades\Route;
@@ -38,6 +39,12 @@ Route::middleware(['auth'])->group(function () {
         ->middleware('permission:pos.create-sale')->name('pos.quote');
     Route::post('pos/checkout', [CheckoutController::class, 'store'])
         ->middleware(['permission:pos.create-sale', 'permission:payments.record', 'throttle:60,1'])->name('pos.checkout');
+    Route::middleware('permission:orders.view')->group(function () {
+        Route::get('pos/orders', [PosOrderController::class, 'index'])->name('pos.orders.index');
+        Route::get('pos/orders/{order}', [PosOrderController::class, 'show'])->name('pos.orders.show');
+        Route::get('pos/orders/{order}/receipt', [PosOrderController::class, 'receipt'])->name('pos.orders.receipt');
+        Route::post('pos/orders/{order}/reprint', [PosOrderController::class, 'reprint'])->name('pos.orders.reprint');
+    });
 
     // The cashier's own shift (FR-073–FR-079). Location comes from the terminal (D-060).
     Route::get('staff/shift', [ShiftController::class, 'show'])

@@ -41,6 +41,12 @@ class Category extends Model
         return $this->belongsTo(Category::class, 'parent_id');
     }
 
+    /** The top-level category this one sits under (itself when it is top level): the POS tab. */
+    public function topLevel(): self
+    {
+        return $this->parent ?? $this;
+    }
+
     /**
      * @return HasMany<Category, $this>
      */
