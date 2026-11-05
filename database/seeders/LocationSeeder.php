@@ -18,7 +18,7 @@ class LocationSeeder extends Seeder
         $main = Branch::query()->firstOrCreate(
             ['code' => 'BRV01'],
             [
-                'name' => 'Brevon Doughnuts & Coffee — Main (provisional)',
+                'name' => 'Brevon Doughnuts & Coffee — Main',
                 'location_type' => LocationType::Permanent,
                 'timezone' => 'Asia/Manila',
                 'currency' => 'PHP',

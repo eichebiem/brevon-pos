@@ -50,25 +50,33 @@ php artisan storage:link   # needed for product images and the store logo
 ```
 
 Seeding creates the five roles, their permissions, the permanent location `BRV01` (name provisional), units of
-measure and four starter categories (no products).
-**Local only:** when `APP_ENV=local`, seeding also creates two accounts at `BRV01` (D-084, D-100). They are never
-created in testing, staging or production, and re-seeding never resets an existing account's password.
+measure and four starter categories, plus the accounts and menu below. Re-seeding only adds what is missing: it never
+resets an existing account's password or overwrites a product.
 
-| Name      | Username   | Password   | Role    |
-| --------- | ---------- | ---------- | ------- |
-| Harris    | `harris`   | `password` | Owner   |
-| Cashier 1 | `cashier1` | `password` | Cashier |
+**Default Owners — every environment, including production (D-102):**
 
-To add only the missing local accounts to an existing database: `php artisan db:seed --class=LocalUsersSeeder`.
+| Name    | Username  | Starting password | Role  |
+| ------- | --------- | ----------------- | ----- |
+| Harris  | `harris`  | `password`        | Owner |
+| Chris   | `chris`   | `password`        | Owner |
+| Desiree | `desiree` | `password`        | Owner |
 
-In any other environment no accounts are seeded. Create the first Owner with:
+> **Security:** on any shared or live server, each owner must change this password right after the first sign-in
+> (Settings → Password). Their emails (`…@brevon.test`) are placeholders: set real ones in **Administration → Users**,
+> or password resets cannot reach them.
 
-```bash
-php artisan brevon:create-owner --name="Your Name" --username=yourname
-```
+**Local only (D-100):** when `APP_ENV=local`, seeding also creates Cashier 1 (`cashier1` / `password`). It is never
+created in testing, staging or production.
 
-It asks for the username (if `--username` is not given), the email and a password of at least 12 characters (or reads `BREVON_DEV_OWNER_EMAIL` /
-`BREVON_DEV_OWNER_PASSWORD` from `.env`), refuses to run in production, and is recorded in the audit log.
+**Menu (D-101):** all environments get the shop's 36 menu items, with Harris recorded as the one who set the prices. Running `MenuSeeder` on its own also creates the default Owners if they are missing.
+
+To add only what is missing to an existing database: `php artisan db:seed --class=DefaultOwnersSeeder`,
+`--class=LocalUsersSeeder` or `--class=MenuSeeder`.
+
+More Owners can be created with `php artisan brevon:create-owner --name="Your Name" --username=yourname`. It asks
+for the username (if `--username` is not given), the email and a password of at least 12 characters (or reads
+`BREVON_DEV_OWNER_EMAIL` / `BREVON_DEV_OWNER_PASSWORD` from `.env`), refuses to run in production, and is recorded in
+the audit log.
 Further accounts are created in **Administration → Users**. Every account has a username, which staff use to sign in
 (their email address also works); the email is kept for password resets.
 

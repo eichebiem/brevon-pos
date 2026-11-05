@@ -213,4 +213,13 @@ Last updated: 2026-11-05 · Baseline: SRS **v1.1** (`docs/BREVON-SRS-v1.1.md`) �
 
 **Change requested during review (D-099):** the login page asks for a username (email still accepted) and every account now requires a username.
 
+**Added during review:** default Owners Harris, Chris and Desiree in every environment, starting password `password` — change at go-live (D-102); local-only Cashier 1 (D-100); `MenuSeeder` with the shop's 36 menu items from the menu boards (D-101, `MenuSeederTest`). Gate after these: 203 tests, 1,106 assertions. Checked on the scratch database: 36 products, sub-categories as planned. The menu is the starting catalog in every environment, including production (D-101).
+
+**Reminders — user is asking the client (raise again before bundles / Phase 4b checkout):**
+
+- Assorted boxes and Better Together: how doughnut stock is deducted and how the flavour choices are recorded.
+- Better Together: which doughnuts (regular only or any) and which lemonade flavours are allowed.
+
+Still to confirm: boxes/combo at pop-ups (D-089), hot vs iced coffee prices. Phase 11: allow the seeding run on staging/production; go-live checklist — each owner changes the `password` starting password and sets a real email (D-102).
+
 **Next step:** Phase 4b — checkout backend, after user review.
