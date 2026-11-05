@@ -47,14 +47,14 @@ erDiagram
       bigint branch_id FK
       bool is_default }
     terminals { bigint branch_id FK
-      varchar terminal_code }
+      varchar terminal_code "assigned by the app: POS-1, POS-2… (D-122)" }
     login_events { bigint user_id FK "nullable"
       varchar identifier
       bool succeeded
       varchar ip_address }
 ```
 
-Constraints: UNIQUE `user_branch(user_id, branch_id)`; UNIQUE `terminals(branch_id, terminal_code)`; spatie tables per package migration (teams off).
+Constraints: UNIQUE `user_branch(user_id, branch_id)`; UNIQUE `terminals(branch_id, terminal_code)` (new codes are numbered across all locations, so they never repeat, D-122); spatie tables per package migration (teams off).
 
 **Operating locations (SRS v1.1, D-057–D-066, D-121).** `branches` holds both the single permanent branch and temporary pop-up stands. Address columns are name, street, barangay, city, province and postal code; there is no phone or email column (dropped in `2026_11_06_110000`, D-121). Constraints: UNIQUE `code`; UNIQUE `permanent_guard` (generated `IF(location_type='permanent',1,NULL)`) → at most one permanent location; CHECK `operating_ends_on >= operating_starts_on`; app rule: pop-up dates optional (enforced only when set), permanent has none. Phase 7 adds `stock_transfers` / `stock_transfer_items` for the main → pop-up doughnut dispatch (D-063). Locations and terminals are never deleted (no soft delete); every FK to `branches` is RESTRICT, so a closed pop-up keeps all orders, shifts, balances, movements, and audit rows. `branches.acceptsNewOperationsOn(date)` = active AND (permanent OR date within the operating period) (D-059).
 

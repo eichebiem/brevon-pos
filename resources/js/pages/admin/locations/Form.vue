@@ -154,7 +154,7 @@ function copyFromMain(): void {
 }
 
 // Terminals
-const terminalForm = useForm({ terminal_code: '', name: '' });
+const terminalForm = useForm({ name: '' });
 
 function addTerminal(): void {
     if (!props.site) {
@@ -526,24 +526,20 @@ function confirmMove(): void {
                 @submit.prevent="addTerminal"
             >
                 <div class="grid gap-1">
-                    <Label for="new-terminal-code">Terminal code</Label>
-                    <Input
-                        id="new-terminal-code"
-                        v-model="terminalForm.terminal_code"
-                        placeholder="POS-2"
-                        class="w-32 uppercase"
-                        required
-                    />
-                    <InputError :message="terminalForm.errors.terminal_code" />
-                </div>
-                <div class="grid gap-1">
-                    <Label for="new-terminal-name">Name</Label>
+                    <Label for="new-terminal-name">New terminal name</Label>
                     <Input
                         id="new-terminal-name"
                         v-model="terminalForm.name"
                         placeholder="Front counter"
+                        aria-describedby="new-terminal-help"
                         required
                     />
+                    <p
+                        id="new-terminal-help"
+                        class="text-xs text-muted-foreground"
+                    >
+                        Its code (POS-1, POS-2, …) is given automatically.
+                    </p>
                     <InputError :message="terminalForm.errors.name" />
                 </div>
                 <Button type="submit" :disabled="terminalForm.processing"

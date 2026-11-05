@@ -12,18 +12,22 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * POS terminals (FR-106, D-060, N-12). Each terminal belongs to one
- * location; moving it is an audited reassignment.
+ * location; moving it is an audited reassignment. Codes are assigned by the
+ * app — POS-1, POS-2, … numbered across all locations — so a terminal keeps
+ * its code when it moves (D-122).
  */
 class TerminalService
 {
+    private const CODE_PREFIX = 'POS-';
+
     public function __construct(private readonly AuditLogger $audit) {}
 
-    public function create(User $actor, Branch $location, string $code, string $name): Terminal
+    public function create(User $actor, Branch $location, string $name): Terminal
     {
-        $code = strtoupper(trim($code));
-        $this->assertCodeFree($location, $code);
+        return DB::transaction(function () use ($actor, $location, $name) {
+            $code = $this->nextCode();
+            $this->assertCodeFree($location, $code);
 
-        return DB::transaction(function () use ($actor, $location, $code, $name) {
             $terminal = Terminal::query()->create([
                 'branch_id' => $location->id,
                 'terminal_code' => $code,
@@ -87,6 +91,23 @@ class TerminalService
 
             return $terminal;
         });
+    }
+
+    /**
+     * The next free terminal code. Terminals are never deleted, so a code is
+     * never reused; the lock makes two admins adding a terminal at once queue,
+     * and UNIQUE(branch_id, terminal_code) is the final guard.
+     */
+    private function nextCode(): string
+    {
+        $highest = Terminal::query()
+            ->where('terminal_code', 'like', self::CODE_PREFIX.'%')
+            ->lockForUpdate()
+            ->pluck('terminal_code')
+            ->map(fn (string $code) => preg_match('/^'.self::CODE_PREFIX.'(\d+)$/', $code, $m) === 1 ? (int) $m[1] : 0)
+            ->max() ?? 0;
+
+        return self::CODE_PREFIX.($highest + 1);
     }
 
     private function assertCodeFree(Branch $location, string $code, string $field = 'terminal_code'): void

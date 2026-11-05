@@ -28,7 +28,7 @@ class LocationSeeder extends Seeder
 
         Terminal::query()->firstOrCreate(
             ['branch_id' => $main->id, 'terminal_code' => 'POS-1'],
-            ['name' => 'Main counter', 'is_active' => true],
+            ['name' => 'Main branch', 'is_active' => true],
         );
     }
 }

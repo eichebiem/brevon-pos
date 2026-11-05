@@ -18,17 +18,16 @@ class TerminalController extends Controller
 
     public function store(Request $request, Branch $location): RedirectResponse
     {
-        $request->merge(['terminal_code' => strtoupper(trim((string) $request->input('terminal_code')))]);
+        // The code is assigned by the app (D-122); only the name is entered.
         $validated = $request->validate([
-            'terminal_code' => ['required', 'string', 'min:2', 'max:20', 'regex:/^[A-Z0-9][A-Z0-9-]*$/'],
             'name' => ['required', 'string', 'max:100'],
-        ], ['terminal_code.regex' => __('Use capital letters, numbers and hyphens, e.g. POS-2.')]);
+        ]);
 
         /** @var User $actor */
         $actor = $request->user();
-        $this->terminals->create($actor, $location, (string) $validated['terminal_code'], (string) $validated['name']);
+        $terminal = $this->terminals->create($actor, $location, (string) $validated['name']);
 
-        Inertia::flash('toast', ['type' => 'success', 'message' => __('Terminal added.')]);
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('Terminal :code added.', ['code' => $terminal->terminal_code])]);
 
         return back();
     }
