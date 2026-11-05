@@ -19,9 +19,6 @@ return [
 
     'currency_symbol' => '₱',
 
-    // BR-017 / D-041: a cashier needs an open shift to accept cash payments.
-    'shift_enforcement' => (bool) env('BREVON_SHIFT_ENFORCEMENT', true),
-
     // FR-062 / BR-013 / D-047: negative stock is blocked by default.
     'allow_negative_stock' => (bool) env('BREVON_ALLOW_NEGATIVE_STOCK', false),
 

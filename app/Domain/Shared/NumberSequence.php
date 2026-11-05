@@ -24,9 +24,14 @@ class NumberSequence
         $key = ['branch_id' => $branch->id, 'sequence_type' => $type, 'business_date' => $businessDate->toDateString()];
         $now = now();
 
-        DB::table('number_sequences')->insertOrIgnore([...$key, 'last_number' => 0, 'created_at' => $now, 'updated_at' => $now]);
-
+        // Lock an existing counter directly. Inserting first (INSERT IGNORE)
+        // would take a shared lock on the existing row, and two requests then
+        // deadlock when both upgrade it (same finding as D-096).
         $row = DB::table('number_sequences')->where($key)->lockForUpdate()->first(['id', 'last_number']);
+        if ($row === null) {
+            DB::table('number_sequences')->insertOrIgnore([...$key, 'last_number' => 0, 'created_at' => $now, 'updated_at' => $now]);
+            $row = DB::table('number_sequences')->where($key)->lockForUpdate()->first(['id', 'last_number']);
+        }
 
         if ($row === null) {
             throw new LogicException('Number sequence row missing after insert.');

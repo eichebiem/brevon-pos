@@ -4,9 +4,10 @@ Point of Sale and Store Management System for **Brevon Doughnuts & Coffee**.
 Requirements: [`docs/BREVON-SRS-v1.1.md`](docs/BREVON-SRS-v1.1.md) (SRS v1.1, prepared by Harris).
 Progress: [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md).
 
-> **Status:** Phase 4a (stock ledger and shifts). Staff sign-in, users, roles, audit log, catalog and prices, store
-> settings, pop-up locations, terminals, opening stock, stock on hand/movements and cashier shifts work. Checkout,
-> preparation and dashboard screens are still clearly labelled shells. No sales or reporting features exist yet.
+> **Status:** Phase 4b (checkout backend). Staff sign-in, users, roles, audit log, catalog and prices, store
+> settings, payment methods, pop-up locations, terminals, opening stock, stock on hand/movements and cashier shifts
+> work. Checkout works on the server (`POST /pos/checkout`: cash and GCash, stock deduction, shift link, safe retries);
+> the cashier screen that uses it arrives in Phase 4c. Preparation and dashboard screens are still labelled shells.
 > Receipts produced by this system are **not** BIR-accredited official receipts/invoices (SRS FR-087).
 
 ## Stack
@@ -49,7 +50,7 @@ php artisan migrate --seed
 php artisan storage:link   # needed for product images and the store logo
 ```
 
-Seeding creates the five roles, their permissions, the permanent location `BRV01` (name provisional), units of
+Seeding creates the five roles, their permissions, the permanent location `BRV01` (Brevon Doughnuts & Coffee — Main), units of
 measure and four starter categories, plus the accounts and menu below. Re-seeding only adds what is missing: it never
 resets an existing account's password or overwrites a product.
 

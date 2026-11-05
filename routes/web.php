@@ -5,6 +5,7 @@ use App\Http\Controllers\Admin\CategoryController;
 use App\Http\Controllers\Admin\Inventory\StockController;
 use App\Http\Controllers\Admin\LocationController;
 use App\Http\Controllers\Admin\OptionGroupController;
+use App\Http\Controllers\Admin\PaymentMethodController;
 use App\Http\Controllers\Admin\ProductController;
 use App\Http\Controllers\Admin\ProductPriceController;
 use App\Http\Controllers\Admin\RoleController;
@@ -13,6 +14,7 @@ use App\Http\Controllers\Admin\TerminalController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\LocationSwitchController;
+use App\Http\Controllers\Pos\CheckoutController;
 use App\Http\Controllers\PosController;
 use App\Http\Controllers\Staff\ShiftController;
 use Illuminate\Support\Facades\Route;
@@ -32,6 +34,10 @@ Route::middleware(['auth'])->group(function () {
         ->middleware('permission:dashboard.view')->name('dashboard');
     Route::get('pos', [PosController::class, 'index'])
         ->middleware('permission:pos.access')->name('pos.index');
+    Route::post('pos/quote', [CheckoutController::class, 'quote'])
+        ->middleware('permission:pos.create-sale')->name('pos.quote');
+    Route::post('pos/checkout', [CheckoutController::class, 'store'])
+        ->middleware(['permission:pos.create-sale', 'permission:payments.record', 'throttle:60,1'])->name('pos.checkout');
 
     // The cashier's own shift (FR-073–FR-079). Location comes from the terminal (D-060).
     Route::get('staff/shift', [ShiftController::class, 'show'])
@@ -80,6 +86,8 @@ Route::middleware(['auth'])->group(function () {
         Route::middleware('permission:settings.manage')->group(function () {
             Route::get('settings', [StoreSettingsController::class, 'edit'])->name('settings.edit');
             Route::put('settings', [StoreSettingsController::class, 'update'])->name('settings.update');
+            Route::get('payment-methods', [PaymentMethodController::class, 'index'])->name('payment-methods.index');
+            Route::put('payment-methods/{paymentMethod}', [PaymentMethodController::class, 'update'])->name('payment-methods.update');
         });
 
         // Catalog (FR-015–FR-021). Viewing needs products.view; each change its own permission.

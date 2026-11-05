@@ -1,0 +1,366 @@
+<?php
+
+namespace App\Domain\Sales;
+
+use App\Domain\Inventory\InsufficientStock;
+use App\Domain\Inventory\InventoryLedger;
+use App\Domain\Inventory\StockChange;
+use App\Domain\Shared\AuditLogger;
+use App\Domain\Shared\BusinessClock;
+use App\Domain\Shared\Money;
+use App\Domain\Shared\NumberSequence;
+use App\Domain\Shared\Quantity;
+use App\Enums\InventoryMovementType;
+use App\Enums\InventoryTrackingMode;
+use App\Enums\OrderPaymentStatus;
+use App\Enums\OrderStatus;
+use App\Enums\PaymentMethodType;
+use App\Enums\PaymentStatus;
+use App\Enums\ProductType;
+use App\Models\Branch;
+use App\Models\CashierShift;
+use App\Models\Order;
+use App\Models\OrderItem;
+use App\Models\OrderItemOption;
+use App\Models\OrderStatusHistory;
+use App\Models\Payment;
+use App\Models\PaymentMethod;
+use App\Models\User;
+use Carbon\CarbonImmutable;
+use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
+
+/**
+ * Completes a sale in one database transaction (FR-032; prompt invariants
+ * 1–6, 9–11): the order, its lines and options, status history, payment,
+ * stock deduction and the shift link either all commit or none do.
+ *
+ * Location, terminal and shift come from the cashier's open shift (FR-012,
+ * FR-106, D-060), and the location's operating period is re-checked inside
+ * the transaction (FR-107). Rows are locked in one fixed order — shift,
+ * payment method (GCash reference check), number sequence, stock balances —
+ * so concurrent checkouts queue instead of deadlocking.
+ */
+class CheckoutService
+{
+    public function __construct(
+        private readonly CartPricer $pricer,
+        private readonly NumberSequence $numbers,
+        private readonly InventoryLedger $ledger,
+        private readonly AuditLogger $audit,
+    ) {}
+
+    public function checkout(User $cashier, CheckoutData $data): CheckoutResult
+    {
+        $hash = $data->requestHash();
+
+        // A retry of a sale that already went through returns that sale,
+        // even if the shift has closed or stock has run out since (UC-003 A4).
+        if ($existing = $this->existing($cashier, $data->idempotencyKey, $hash)) {
+            return new CheckoutResult($existing, true);
+        }
+
+        try {
+            return DB::transaction(fn () => $this->complete($cashier, $data, $hash), attempts: 3);
+        } catch (UniqueConstraintViolationException $e) {
+            // Two copies of the same request raced; the unique key let only one in.
+            if ($existing = $this->existing($cashier, $data->idempotencyKey, $hash)) {
+                return new CheckoutResult($existing, true);
+            }
+
+            // The database refused a reference number that is already recorded.
+            if (str_contains($e->getMessage(), 'payments_method_reference_unique')) {
+                throw ValidationException::withMessages(['payment.reference' => __('This reference number was already used for another order.')]);
+            }
+
+            throw $e;
+        }
+    }
+
+    private function complete(User $cashier, CheckoutData $data, string $hash): CheckoutResult
+    {
+        $shift = $this->lockOpenShift($cashier);
+        /** @var Branch $location */
+        $location = $shift->branch()->firstOrFail();
+        $today = BusinessClock::today();
+
+        if (! $location->acceptsNewOperationsOn($today)) {
+            throw ValidationException::withMessages(['items' => __(':location is not open for sales today. Close the shift.', ['location' => $location->name])]);
+        }
+
+        // Re-check under the shift lock: a duplicate request from the same
+        // cashier waits on that lock and then sees the first one's order.
+        // Plain read on purpose: a locking read that finds nothing takes a
+        // gap lock, which deadlocked concurrent checkouts (D-106). The
+        // unique (branch, key) index remains the final guard.
+        $existing = Order::query()->where('branch_id', $location->id)->where('idempotency_key', $data->idempotencyKey)->first();
+        if ($existing !== null) {
+            return new CheckoutResult($this->replay($existing, $hash), true);
+        }
+
+        $this->assertOrderDetails($data);
+        $cart = $this->pricer->price($location, $data->lines);
+
+        if ($data->expectedTotal !== null && ! $data->expectedTotal->equals($cart->grandTotal)) {
+            throw ValidationException::withMessages(['expected_total' => __('Prices changed: the total is now :total. Review the order and try again.', ['total' => $cart->grandTotal->format()])]);
+        }
+
+        if (! $cart->grandTotal->isPositive()) {
+            throw ValidationException::withMessages(['items' => __('The order total must be more than zero.')]);
+        }
+
+        $method = $this->lockMethod($data->payment);
+        $payment = $this->preparePayment($cashier, $method, $data->payment, $cart->grandTotal);
+
+        $number = sprintf('%s-%s-%04d', $location->code, $today->format('Ymd'), $this->numbers->next($location, 'order', $today));
+        $status = $this->initialStatus($data, $cart);
+        $now = now();
+
+        $order = new Order;
+        $order->forceFill([
+            'branch_id' => $location->id,
+            'terminal_id' => $shift->terminal_id,
+            'cashier_shift_id' => $shift->id,
+            'order_number' => $number,
+            'business_date' => $today->toDateString(),
+            'order_type' => $data->orderType,
+            'status' => $status,
+            'payment_status' => $payment['status'] === PaymentStatus::Verified ? OrderPaymentStatus::Paid : OrderPaymentStatus::PendingVerification,
+            'subtotal' => $cart->subtotal->toDecimal(),
+            'discount_total' => $cart->discountTotal->toDecimal(),
+            'tax_total' => $cart->taxTotal->toDecimal(),
+            'service_charge' => '0.00',
+            'grand_total' => $cart->grandTotal->toDecimal(),
+            'amount_paid' => $cart->grandTotal->toDecimal(),
+            'amount_due' => '0.00',
+            'notes' => $data->notes,
+            'pickup_at' => $data->pickupAt,
+            'created_by' => $cashier->id,
+            'completed_at' => $status === OrderStatus::Completed ? $now : null,
+            'idempotency_key' => $data->idempotencyKey,
+            'idempotency_request_hash' => $hash,
+        ])->save();
+
+        $this->saveLines($order, $cart);
+        $this->recordStatus($order, null, OrderStatus::Confirmed, $cashier);
+        if ($status === OrderStatus::Completed) {
+            $this->recordStatus($order, OrderStatus::Confirmed, OrderStatus::Completed, $cashier);
+        }
+
+        $record = new Payment;
+        $record->forceFill([...$payment, 'order_id' => $order->id, 'payment_method_id' => $method->id, 'recorded_by' => $cashier->id, 'paid_at' => $now])->save();
+
+        $this->deductStock($cashier, $location, $order, $cart);
+
+        $this->audit->record('order.created', $order, null, [
+            'order_number' => $order->order_number,
+            'order_type' => $data->orderType->value,
+            'status' => $status->value,
+            'grand_total' => $order->grand_total,
+            'lines' => count($cart->lines),
+            'shift' => $shift->shift_number,
+        ], $location->id, $cashier);
+        $this->audit->record('payment.recorded', $record, null, [
+            'order_number' => $order->order_number,
+            'method' => $method->code,
+            'amount' => $record->amount,
+            'amount_tendered' => $record->amount_tendered,
+            'change_amount' => $record->change_amount,
+            'reference_number' => $record->reference_number,
+            'status' => $record->status->value,
+        ], $location->id, $cashier);
+
+        return new CheckoutResult($order, false);
+    }
+
+    private function existing(User $cashier, string $key, string $hash): ?Order
+    {
+        $order = Order::query()->where('created_by', $cashier->id)->where('idempotency_key', $key)->first();
+
+        return $order === null ? null : $this->replay($order, $hash);
+    }
+
+    private function replay(Order $order, string $hash): Order
+    {
+        if (! hash_equals((string) $order->idempotency_request_hash, $hash)) {
+            throw new IdempotencyConflict($order->order_number);
+        }
+
+        return $order;
+    }
+
+    /** BR-017, D-041: every POS sale belongs to the cashier's open shift, which also fixes the location. */
+    private function lockOpenShift(User $cashier): CashierShift
+    {
+        $shift = CashierShift::query()->open()->where('user_id', $cashier->id)->lockForUpdate()->first();
+
+        if ($shift === null) {
+            throw ValidationException::withMessages(['shift' => __('Open a shift before taking payments.')]);
+        }
+
+        return $shift;
+    }
+
+    private function assertOrderDetails(CheckoutData $data): void
+    {
+        if ($data->orderType->needsPickupTime()) {
+            if ($data->pickupAt === null) {
+                throw ValidationException::withMessages(['pickup_at' => __('Enter the pickup date and time.')]);
+            }
+            if ($data->pickupAt->lessThanOrEqualTo(BusinessClock::now())) {
+                throw ValidationException::withMessages(['pickup_at' => __('The pickup time must be in the future.')]);
+            }
+        }
+    }
+
+    private function lockMethod(PaymentInput $input): PaymentMethod
+    {
+        // Locked so two GCash payments with the same reference cannot both pass the duplicate check.
+        $method = PaymentMethod::query()->where('code', $input->methodCode)->lockForUpdate()->first();
+
+        if ($method === null || ! $method->is_active) {
+            throw ValidationException::withMessages(['payment.method' => __('This payment method is not available.')]);
+        }
+
+        return $method;
+    }
+
+    /**
+     * @return array{amount: string, amount_tendered: string|null, change_amount: string, reference_number: string|null, status: PaymentStatus, verified_by: int|null, verified_at: CarbonImmutable|null}
+     */
+    private function preparePayment(User $cashier, PaymentMethod $method, PaymentInput $input, Money $due): array
+    {
+        if ($method->type === PaymentMethodType::Cash) {
+            // D-038, BR-006: the payment is the amount due; change is handed back, never revenue.
+            if ($input->amountTendered === null || $input->amountTendered->lessThan($due)) {
+                throw ValidationException::withMessages(['payment.amount_tendered' => __('Cash received must be at least :due.', ['due' => $due->format()])]);
+            }
+
+            return [
+                'amount' => $due->toDecimal(),
+                'amount_tendered' => $input->amountTendered->toDecimal(),
+                'change_amount' => $input->amountTendered->subtract($due)->toDecimal(),
+                'reference_number' => null,
+                'status' => PaymentStatus::Verified,
+                'verified_by' => null,
+                'verified_at' => null,
+            ];
+        }
+
+        $reference = $input->reference === null ? null : strtoupper(trim($input->reference));
+        if ($method->requires_reference) {
+            if ($reference === null || preg_match('/^[A-Z0-9]{6,40}$/', $reference) !== 1) {
+                throw ValidationException::withMessages(['payment.reference' => __('Enter the :method reference number (6–40 letters or digits).', ['method' => $method->name])]);
+            }
+
+            if ($this->referenceUsed($method, $reference)) {
+                throw ValidationException::withMessages(['payment.reference' => __('This :method reference number was already used for another order.', ['method' => $method->name])]);
+            }
+        }
+
+        // D-039, BR-019: manual verification, only by someone allowed to verify.
+        if ($input->markVerified && ! $cashier->can('payments.verify-ewallet')) {
+            throw ValidationException::withMessages(['payment.verified' => __('You are not allowed to mark :method payments as verified.', ['method' => $method->name])]);
+        }
+
+        return [
+            'amount' => $due->toDecimal(),
+            'amount_tendered' => null,
+            'change_amount' => '0.00',
+            'reference_number' => $reference,
+            'status' => $input->markVerified ? PaymentStatus::Verified : PaymentStatus::Pending,
+            'verified_by' => $input->markVerified ? $cashier->id : null,
+            'verified_at' => $input->markVerified ? CarbonImmutable::now() : null,
+        ];
+    }
+
+    /** D-109: a reference number is used once per method, at any location; the database enforces it too. */
+    private function referenceUsed(PaymentMethod $method, string $reference): bool
+    {
+        return Payment::query()->where('payment_method_id', $method->id)->where('reference_number', $reference)->exists();
+    }
+
+    /**
+     * D-044: items made to order go to preparation; an order of ready-made
+     * items only is completed at once, unless it is collected later.
+     */
+    private function initialStatus(CheckoutData $data, PricedCart $cart): OrderStatus
+    {
+        $needsPreparation = array_any($cart->lines, fn (PricedLine $l) => $l->product->product_type === ProductType::MadeToOrder);
+
+        return $needsPreparation || $data->orderType->needsPickupTime() ? OrderStatus::Confirmed : OrderStatus::Completed;
+    }
+
+    private function saveLines(Order $order, PricedCart $cart): void
+    {
+        foreach ($cart->lines as $line) {
+            $item = new OrderItem;
+            $item->forceFill([
+                'order_id' => $order->id,
+                'product_id' => $line->product->id,
+                'variant_id' => $line->variant?->id,
+                'sku_snapshot' => $line->variant->sku ?? $line->product->sku,
+                'product_name_snapshot' => $line->product->name,
+                'variant_name_snapshot' => $line->variant?->name,
+                'product_type_snapshot' => $line->product->product_type->value,
+                'quantity' => $line->quantity->toString(),
+                'unit_price' => $line->unitPrice->toDecimal(),
+                'option_total' => $line->optionTotal->toDecimal(),
+                'line_total' => $line->lineTotal->toDecimal(),
+                'notes' => $line->notes,
+            ])->save();
+
+            foreach ($line->options as $choice) {
+                $option = new OrderItemOption;
+                $option->forceFill([
+                    'order_item_id' => $item->id,
+                    'option_id' => $choice['option']->id,
+                    'option_group_name_snapshot' => $choice['group']->name,
+                    'option_name_snapshot' => $choice['option']->name,
+                    'price_delta_snapshot' => $choice['option']->price_delta,
+                ])->save();
+            }
+        }
+    }
+
+    private function recordStatus(Order $order, ?OrderStatus $from, OrderStatus $to, User $actor): void
+    {
+        $history = new OrderStatusHistory;
+        $history->forceFill(['order_id' => $order->id, 'from_status' => $from, 'to_status' => $to, 'changed_by' => $actor->id, 'created_at' => now()])->save();
+    }
+
+    /**
+     * BR-009, D-046: finished-stock lines reduce their stock item now.
+     * Recipe-at-sale lines deduct their recipe once recipes exist (Phase 8);
+     * untracked lines have no stock effect. Ingredients of finished goods
+     * were deducted at production, never again here (FR-071).
+     */
+    private function deductStock(User $cashier, Branch $location, Order $order, PricedCart $cart): void
+    {
+        /** @var array<int, Quantity> $perItem */
+        $perItem = [];
+        foreach ($cart->lines as $line) {
+            if ($line->product->inventory_tracking_mode !== InventoryTrackingMode::FinishedStock) {
+                continue;
+            }
+            $itemId = (int) $line->stockItemId();
+            $perItem[$itemId] = ($perItem[$itemId] ?? Quantity::zero())->add($line->quantity);
+        }
+
+        $changes = [];
+        foreach ($perItem as $itemId => $quantity) {
+            $changes[] = new StockChange($location->id, $itemId, InventoryMovementType::Sale, $quantity, reference: $order);
+        }
+
+        try {
+            $this->ledger->post($cashier, $changes);
+        } catch (InsufficientStock $e) {
+            throw ValidationException::withMessages(['items' => __('Not enough :item in stock: :available left, :requested in this order.', [
+                'item' => $e->itemName,
+                'available' => rtrim(rtrim($e->available, '0'), '.') ?: '0',
+                'requested' => rtrim(rtrim($e->requested, '0'), '.'),
+            ])]);
+        }
+    }
+}

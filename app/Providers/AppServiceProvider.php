@@ -10,6 +10,8 @@ use App\Models\Employee;
 use App\Models\InventoryItem;
 use App\Models\InventoryMovement;
 use App\Models\OptionGroup;
+use App\Models\Order;
+use App\Models\Payment;
 use App\Models\PaymentMethod;
 use App\Models\Product;
 use App\Models\ProductPrice;
@@ -76,6 +78,8 @@ class AppServiceProvider extends ServiceProvider
             'payment_method' => PaymentMethod::class,
             'inventory_movement' => InventoryMovement::class,
             'cashier_shift' => CashierShift::class,
+            'order' => Order::class,
+            'payment' => Payment::class,
         ]);
 
         DB::prohibitDestructiveCommands(

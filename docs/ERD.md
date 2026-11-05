@@ -141,9 +141,11 @@ erDiagram
 
 **No customer data (D-067):** there is no `customers` table and `orders` has no customer FK, name, phone, email or address columns. `orders.branch_id`, `terminal_id`, `cashier_shift_id` are copied from the cashier's open shift (D-060).
 
-Constraints: UNIQUE `orders(branch_id, order_number)`, UNIQUE `orders(branch_id, idempotency_key)`; INDEX `orders(branch_id, business_date, status)`, `orders(cashier_shift_id)`, `payments(order_id, status)`, `payments(payment_method_id, reference_number)`, `order_items(product_id)`. All FKs from orders/payments/refunds RESTRICT. Order items keep `sku_snapshot`, `product_name_snapshot`, `variant_name_snapshot`, `unit_price` (FR-022, BR-015).
+Constraints: UNIQUE `orders(branch_id, order_number)`, UNIQUE `orders(branch_id, idempotency_key)`; INDEX `orders(branch_id, business_date, status)`, `orders(cashier_shift_id)`, `payments(order_id, status)`, UNIQUE `payments(payment_method_id, reference_number)`, `order_items(product_id)`. All FKs from orders/payments/refunds RESTRICT. Order items keep `sku_snapshot`, `product_name_snapshot`, `variant_name_snapshot`, `unit_price` (FR-022, BR-015).
 
 `payment_status` values: `unpaid`, `pending_verification`, `paid`, `partially_refunded`, `refunded`.
+
+**Phase 4b (built, D-103–D-111):** `orders.idempotency_request_hash` CHAR(64); `order_items.product_type_snapshot` and `order_item_options.option_group_name_snapshot` added to the SRS columns. CHECKs: order type, status, payment status, non-negative money on orders and lines, `payments.amount > 0`, `amount_tendered >= amount`; UNIQUE `payments(payment_method_id, reference_number)` — a GCash reference is recorded once, at any location (replaces the plain index above). Every FK RESTRICT; models refuse delete(). Sales post `sale` movements referencing the order (`reference_type = 'order'`).
 
 ## 4. Cash management
 
@@ -237,7 +239,7 @@ UNIQUE `recipes(product_id, version)`. Posting a batch: one transaction, status 
 2. branches (with location columns, D-057/D-058/D-062 — `deactivated_by` FK added after users exist; users table already exists from step 1), employees, alter users (+employee_id, username, is_active, last_login_at, soft deletes), user_branch, terminals, spatie permission tables, login_events, audit_logs — **Phase 2 (done)**; `settings` → Phase 3, `number_sequences` → Phase 4, `notifications` → when first needed (D-083). Pop-up management UI and operating-date rules in Phase 3
 3. settings, categories, units_of_measure, inventory_items, products (+inventory_item_id), product_variants, product_prices, product_branch, option_groups, product_option_group, product_options — **Phase 3 (done)** (units/inventory_items stubs needed for the product link; full inventory UI in Phase 7)
 4. number_sequences, branch_inventory, inventory_movements (no `inventory_lot_id` until Phase 7) — **Phase 4a (done)**, D-051/D-096
-5. payment_methods, cashier_shifts — **Phase 4a (done)**; orders, order_items, order_item_options, order_status_histories, payments — Phase 4
+5. payment_methods, cashier_shifts — **Phase 4a (done)**; orders, order_items, order_item_options, order_status_histories, payments — **Phase 4b (done)**
 6. cash_movements — Phase 6
 7. suppliers, inventory_lots, stock_adjustments(+items), purchase_orders(+items), goods_receipts(+items) — Phase 7
 8. recipes, recipe_items, production_batches, production_batch_items, waste_records — Phase 8

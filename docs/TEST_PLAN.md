@@ -78,7 +78,7 @@ ID format `T-<area>-<n>`; each maps to SRS requirements.
 - T-POS-2 inactive/unavailable/unbranched product blocks checkout (FR-027, UC-003 A1)
 - T-POS-3 successful cash checkout creates order, items (snapshots), payment, status history, stock movements, shift link atomically (FR-032)
 - T-POS-4 cash change = tendered − due; tendered < due rejected (FR-038, BR-006)
-- T-POS-5 GCash requires reference; duplicate reference blocked; verified only with permission; otherwise pending_verification (FR-039, BR-019)
+- T-POS-5 GCash requires reference; duplicate reference blocked at every location and by the database (D-109); verified only with permission; otherwise pending_verification (FR-039, BR-019)
 - T-POS-6 **idempotency**: same key+payload returns same order, no duplicates; same key different payload → 409 (FR-031, UC-003 A4)
 - T-POS-7 order numbers unique & sequential per branch/business date incl. Manila midnight boundary (FR-030, BR-016, NFR-015)
 - T-POS-8 **rollback**: injected failure after payment insert leaves no order/payment/movement/sequence consumption visible (NFR-006, invariant 5)
@@ -96,6 +96,8 @@ ID format `T-<area>-<n>`; each maps to SRS requirements.
 - T-PRIV-3 advance pickup order saved with `pickup_at` and notes only, no contact fields (FR-049)
 
 **Phase 4a implementation map:** `tests/Feature/Inventory/InventoryLedgerTest.php` (T-INV-1, T-INV-2, T-INV-8, T-INV-9, append-only movements, weighted average, reconcile command), `InventoryConcurrencyTest.php` (T-INV-3 with two forked processes on separate MySQL connections, plus four processes creating the same balance row; `@group concurrency`, uses `DatabaseTruncation`), `OpeningStockTest.php` (D-093, stock and movement screens per location), `tests/Feature/Shifts/ShiftTest.php` (T-SHF-1, T-SHF-3, T-SHF-4, shift numbers, location taken from the terminal, close and variance, T-LOC-5/T-LOC-8 open-shift guards), `RouteAuthorizationTest.php` (new routes). T-SHF-2 and the T-POS-* items belong to Phase 4b.
+
+**Phase 4b implementation map:** `tests/Feature/Sales/CheckoutTest.php` (T-POS-1–T-POS-12, T-POS-14–T-POS-17, T-SHF-2, T-SHF-4 no sales after the pop-up ended, T-PRIV-1–T-PRIV-3: cash sale end to end, server pricing with variants/options and ignored client prices, snapshots, idempotent retry and 409, insufficient stock and multi-line stock totals, injected-failure rollback, GCash reference/duplicate (any location, any letter case, database UNIQUE)/verification, cash shortfall, inactive method, changed-price stop, unsellable items, option rules, no shift, pop-up sale and pop-up drinks refused, advance pickup, numbering, quote, permissions, no deletes, no customer columns); `CheckoutConcurrencyTest.php` (forked processes: last doughnut sold once; four simultaneous first-of-day sales get 0001–0004 with no deadlock; double-submit recorded once); `PaymentMethodSettingsTest.php`; `SalesAndShiftsTest.php` (expected cash = float + cash sales, closed shift takes no sales, pop-up dates vs sales). T-POS-13 (reprint) moves to Phase 4c with the receipt.
 
 ### Orders & preparation (Phase 5)
 

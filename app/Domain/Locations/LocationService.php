@@ -7,6 +7,7 @@ use App\Domain\Shared\AuditLogger;
 use App\Enums\LocationType;
 use App\Models\Branch;
 use App\Models\CashierShift;
+use App\Models\Order;
 use App\Models\Product;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -64,7 +65,7 @@ class LocationService
             $location->fill(array_intersect_key($data, array_flip(self::DETAIL_FIELDS)));
 
             if (! $location->isPermanent()) {
-                // Phase 4 adds: dates may not exclude days that already have sales (D-062).
+                $this->assertDatesKeepSales($location, $data['operating_starts_on'] ?? null, $data['operating_ends_on'] ?? null);
                 $location->fill([
                     'operating_starts_on' => $data['operating_starts_on'] ?? null,
                     'operating_ends_on' => $data['operating_ends_on'] ?? null,
@@ -80,6 +81,30 @@ class LocationService
 
             return $location;
         });
+    }
+
+    /** D-062: a pop-up's operating dates may not leave out days that already have sales. */
+    private function assertDatesKeepSales(Branch $location, ?string $startsOn, ?string $endsOn): void
+    {
+        $sales = Order::query()->where('branch_id', $location->id);
+
+        $first = (clone $sales)->min('business_date');
+        $last = (clone $sales)->max('business_date');
+
+        if ($first === null || $last === null) {
+            return;
+        }
+
+        $first = substr((string) $first, 0, 10);
+        $last = substr((string) $last, 0, 10);
+
+        if ($startsOn !== null && $startsOn > $first) {
+            throw ValidationException::withMessages(['operating_starts_on' => __('This location has sales from :date. The start date cannot be later than that.', ['date' => $first])]);
+        }
+
+        if ($endsOn !== null && $endsOn < $last) {
+            throw ValidationException::withMessages(['operating_ends_on' => __('This location has sales up to :date. The end date cannot be earlier than that.', ['date' => $last])]);
+        }
     }
 
     public function deactivate(User $actor, Branch $location, string $reason): Branch

@@ -15,6 +15,7 @@ import {
     ShoppingCart,
     Timer,
     Users,
+    Wallet,
 } from '@lucide/vue';
 import { computed } from 'vue';
 import AppLogo from '@/components/AppLogo.vue';
@@ -37,6 +38,7 @@ import { index as categoriesIndex } from '@/routes/admin/categories';
 import { movements, stock } from '@/routes/admin/inventory';
 import { index as locationsIndex } from '@/routes/admin/locations';
 import { index as optionGroupsIndex } from '@/routes/admin/option-groups';
+import { index as paymentMethodsIndex } from '@/routes/admin/payment-methods';
 import { index as productsIndex } from '@/routes/admin/products';
 import { edit as storeSettings } from '@/routes/admin/settings';
 import { index as rolesIndex } from '@/routes/admin/roles';
@@ -133,6 +135,12 @@ const administration = computed(() =>
             title: 'Store settings',
             href: storeSettings(),
             icon: Settings2,
+            permission: 'settings.manage',
+        },
+        {
+            title: 'Payment methods',
+            href: paymentMethodsIndex(),
+            icon: Wallet,
             permission: 'settings.manage',
         },
         {

@@ -1,6 +1,6 @@
 # Brevon POS — Implementation Status
 
-Last updated: 2026-11-05 · Baseline: SRS **v1.1** (`docs/BREVON-SRS-v1.1.md`) · Prompt: `CLAUDE_CODE_PROMPT_BREVON_POS_v1.1.md` (v1.3)
+Last updated: 2026-11-06 · Baseline: SRS **v1.1** (`docs/BREVON-SRS-v1.1.md`) · Prompt: `CLAUDE_CODE_PROMPT_BREVON_POS_v1.1.md` (v1.3)
 
 | Phase                                         | Status                                          | Notes                                                                     |
 | --------------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------- |
@@ -8,8 +8,9 @@ Last updated: 2026-11-05 · Baseline: SRS **v1.1** (`docs/BREVON-SRS-v1.1.md`) �
 | 1 — Project foundation                        | ✅ Passed                                       | Approved; committed by user as "Initial Commit"                           |
 | 2 — Authentication and access control         | ✅ Passed                                       | Approved; committed by user ("Done Phase 2")                              |
 | 3 — Catalog, settings and operating locations | ✅ Passed                                       | Approved; committed by user ("Done Phase 3")                              |
-| 4a — Ledger core and shift open               | ✅ Passed — awaiting user review                | Not committed                                                             |
-| 4b/4c — Checkout backend, cashier UI          | ⏳ Not started                                  | Sale at main + active pop-up                                              |
+| 4a — Ledger core and shift open               | ✅ Passed                                       | Approved; committed by user (with the seeder changes)                     |
+| 4b — Checkout backend                         | ✅ Passed — awaiting user review                | Not committed                                                             |
+| 4c — Cashier UI and receipts                  | ⏳ Not started                                  | Sale at main + active pop-up from the screen                              |
 | 5 — Orders and preparation                    | ⏳ Not started                                  |                                                                           |
 | 6 — Cashier shifts and cash control           | ⏳ Not started                                  |                                                                           |
 | 7 — Inventory and purchasing                  | ⏳ Not started                                  | Includes main → pop-up doughnut dispatch (D-063); OI-018 deferred (FE-01) |
@@ -223,3 +224,45 @@ Last updated: 2026-11-05 · Baseline: SRS **v1.1** (`docs/BREVON-SRS-v1.1.md`) �
 Still to confirm: boxes/combo at pop-ups (D-089), hot vs iced coffee prices. Phase 11: allow the seeding run on staging/production; go-live checklist — each owner changes the `password` starting password and sets a real email (D-102).
 
 **Next step:** Phase 4b — checkout backend, after user review.
+
+## Phase 4b log — Checkout backend (2026-11-06)
+
+**Objective:** a sale that is priced on the server, paid by cash or GCash, takes stock, links to the shift, and either fully commits or leaves nothing behind — safe against double clicks and simultaneous cashiers.
+**SRS IDs:** FR-012, FR-023, FR-026–FR-028, FR-030–FR-032, FR-035–FR-039, FR-045 (payment audit), FR-071, FR-077 (cash sales), FR-106, FR-107, BR-002–BR-007, BR-009, BR-016, BR-017, BR-019; prompt invariants 1–7, 9–12, 15.
+
+**Implemented**
+
+- Schema (1 migration): `orders`, `order_items`, `order_item_options`, `order_status_histories`, `payments` with CHECKs and RESTRICT FKs (D-111).
+- Domain (`app/Domain/Sales`): `CartPricer` (server pricing and validation, D-107), `CheckoutService` (one transaction, fixed lock order, idempotency, payments, stock, status, audit; D-103–D-109), DTOs `CartLine`, `CheckoutData`, `PaymentInput`, `PricedCart`. `ExpectedCash` counts cash sales (D-110). `NumberSequence` locking fixed (D-106). `PaymentMethodService` (D-112). Location dates checked against sales (D-113).
+- HTTP: `POST /pos/checkout` (`pos.create-sale` + `payments.record`, 60/min) and `POST /pos/quote` (JSON totals). The POS screen that uses them is Phase 4c.
+- UI: Administration → Payment methods.
+- Config: `BREVON_SHIFT_ENFORCEMENT` removed (D-103). GCash reference numbers are unique per method at every location, enforced in the database too; there is no setting to allow duplicates (user change during review, D-109).
+- Docs: DECISIONS §T (D-103–D-114), ERD, TEST_PLAN map, README.
+
+**Verification (all run 2026-11-06)**
+
+| Command                                                            | Result                                                                     |
+| ------------------------------------------------------------------ | -------------------------------------------------------------------------- |
+| `php artisan migrate` on `brevon_pos_test` (fresh, with seeders)   | pass                                                                       |
+| `composer check` → build, `vp check`, `vue-tsc`, Pint, Larastan L7 | all pass, 0 errors                                                         |
+| → `php artisan test` (MySQL)                                       | **238 passed** (was 203), including 3 new forked-process concurrency tests |
+| `CheckoutConcurrencyTest` four-way race, repeated                  | 10/10 passed after the D-106 fix                                           |
+
+**Manual checks (browser, scratch DB `brevon_pos_test`, preview port 8001):** signed in as `harris`; Payment methods page shows Cash and GCash; turning GCash off and on saves, shows the toast, and the badge follows the saved value (confirmed against the database). Checkout itself has no screen until 4c, so it was verified by the feature and concurrency tests only. The user's `brevon_pos` was not touched and has not been migrated with the 4b tables yet.
+
+**Problems found and fixed during the phase**
+
+- **Deadlock with simultaneous checkouts** (four cashiers at once): a locking read that found no existing order took a gap lock. Fixed with a plain read under the shift lock (D-106).
+- `NumberSequence` used INSERT IGNORE before locking, the same pattern that deadlocked the ledger in 4a; fixed (D-106).
+- Advance-pickup time was saved 8 hours off (Manila time written as UTC); now converted before saving.
+- Payment methods page: the status badge did not follow saves; fixed and re-checked in the browser.
+
+**Known issues / deferred**
+
+- Phase 4c: POS screen (cart, order type, cash/GCash dialogs), confirmation, 80 mm receipt and reprint (T-POS-13), POS order history.
+- Phase 5: status changes after checkout and the preparation queue; GCash verification after checkout.
+- Phase 8: recipe-at-sale deduction (D-114). Phase 9: discounts, tax, refunds, split tender.
+- "Enabled order types" setting (D-029) not built; all five types are accepted.
+- Still to confirm: OI-002 (status flow), OI-005 (GCash reference format). D-101 menu questions for the client (box/combo stock and flavours, Better Together choices): client has not answered; raise again after Phase 9 (user, 2026-11-06).
+
+**Next step:** Phase 4c — cashier UI and receipts, after user review.
