@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
 import {
+    ChartColumn,
     ChefHat,
     Coins,
     BadgeCheck,
@@ -62,6 +63,7 @@ import { index as productsIndex } from '@/routes/admin/products';
 import { index as purchaseOrdersIndex } from '@/routes/admin/purchase-orders';
 import { index as receiptsIndex } from '@/routes/admin/receipts';
 import { index as recipesIndex } from '@/routes/admin/recipes';
+import { sales as salesReport } from '@/routes/admin/reports';
 import { edit as storeSettings } from '@/routes/admin/settings';
 import { index as discountsIndex } from '@/routes/admin/discounts';
 import { index as rolesIndex } from '@/routes/admin/roles';
@@ -233,6 +235,17 @@ const purchasing = computed(() =>
     ]),
 );
 
+const reports = computed(() =>
+    visible([
+        {
+            title: 'Sales report',
+            href: salesReport(),
+            icon: ChartColumn,
+            permission: 'reports.sales',
+        },
+    ]),
+);
+
 const administration = computed(() =>
     visible([
         {
@@ -324,6 +337,7 @@ const administration = computed(() =>
                 label="Purchasing"
                 :items="purchasing"
             />
+            <NavMain v-if="reports.length" label="Reports" :items="reports" />
             <NavMain
                 v-if="administration.length"
                 label="Administration"

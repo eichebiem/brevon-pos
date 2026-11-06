@@ -19,6 +19,7 @@ use App\Http\Controllers\Admin\ProductPriceController;
 use App\Http\Controllers\Admin\Purchasing\GoodsReceiptController;
 use App\Http\Controllers\Admin\Purchasing\PurchaseOrderController;
 use App\Http\Controllers\Admin\Purchasing\SupplierController;
+use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\ShiftReviewController;
 use App\Http\Controllers\Admin\StoreSettingsController;
@@ -49,8 +50,13 @@ Route::middleware(['auth'])->group(function () {
     Route::get('home', HomeController::class)->name('landing');
     Route::post('location', LocationSwitchController::class)->name('location.switch');
 
-    Route::inertia('admin/dashboard', 'admin/Dashboard')
+    Route::get('admin/dashboard', [ReportController::class, 'dashboard'])
         ->middleware('permission:dashboard.view')->name('dashboard');
+    // Reports (FR-088–FR-097, D-156–D-159).
+    Route::get('admin/reports/sales', [ReportController::class, 'sales'])
+        ->middleware('permission:reports.sales')->name('admin.reports.sales');
+    Route::get('admin/reports/sales/export/{section}', [ReportController::class, 'exportSales'])
+        ->middleware(['permission:reports.sales', 'permission:reports.export', 'throttle:30,1'])->name('admin.reports.sales.export');
     Route::get('pos', [PosController::class, 'index'])
         ->middleware('permission:pos.access')->name('pos.index');
     Route::post('pos/quote', [CheckoutController::class, 'quote'])

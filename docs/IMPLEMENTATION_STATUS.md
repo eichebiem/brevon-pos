@@ -17,8 +17,9 @@ Last updated: 2026-11-06 · Baseline: SRS **v1.1** (`docs/BREVON-SRS-v1.1.md`) �
 | 7b — Purchasing                               | ✅ Passed                                       | Approved 2026-11-06; re-review at end of development (client changes)  |
 | 8 — Recipes and production                    | ✅ Passed                                       | Approved 2026-11-06; re-review at end of development (client feedback) |
 | 9a — Discounts and tax                        | ✅ Passed                                       | Approved 2026-11-06; SC/PWD off until accountant confirms              |
-| 9b — Refunds and voids                        | 🟡 Awaiting review                              | Refund approval limit ₱0.00 TBC                                        |
-| 10 — Dashboards and reports                   | ⏳ Not started                                  | Location filters incl. closed pop-ups                                  |
+| 9b — Refunds and voids                        | ✅ Passed                                       | Approved 2026-11-06; refund approval limit ₱0.00 TBC                   |
+| 10a — Dashboard and sales reports             | 🟡 Awaiting review                              | Definitions TBC with the accountant (OI-008)                           |
+| 10b — Operational reports                     | ⏳ Not started                                  | Refunds/voids/discounts, variance, stock, production, waste; XLSX      |
 | 11 — Hardening and release readiness          | ⏳ Not started                                  |                                                                        |
 
 ## Phase 0 log
@@ -549,3 +550,32 @@ Still to confirm: boxes/combo at pop-ups (D-089), hot vs iced coffee prices. Pha
 - Still to confirm: Phase 6 limits (₱500.00, ₱0.00), the 7-day expiry window, the 9a items. Re-review Phases 7 and 8 at the end of development.
 
 **Next step:** Phase 10 (reports), after user review — and the D-101 client menu questions now that Phase 9 is done.
+
+## Phase 10a log — Dashboard and sales reports (2026-11-06)
+
+**Objective:** give the owner and managers sales figures they can trust: a dashboard, sales by period, product, category, cashier and payment method, with clear definitions, location and other filters, CSV export and print. Phase 10 is split: operational reports are 10b.
+**SRS IDs:** FR-088–FR-092, FR-095–FR-097, FR-105, FR-108, UC-009, NFR-009; T-RPT-1–T-RPT-4.
+
+**Implemented**
+
+- Domain `app/Domain/Reports`: `ReportScope` (locations a user may report on, filter validation), `ReportFilters` (Manila business dates, UTC range), `SalesFigures` (one definition of gross/discounts/refunds/net/tax/orders/average), `SalesReport` (summary, by period/product/category/cashier, collections — all summed in SQL from order lines), `Dashboard`. No schema change.
+- HTTP / UI: `/admin/dashboard` (was a placeholder) and `/admin/reports/sales` with quick dates and filters, the definitions on screen, five tables, CSV export per table (`/admin/reports/sales/export/{section}`, audited) and print; sidebar › Reports › Sales report.
+- Docs: DECISIONS §AC (D-156–D-159), TEST_PLAN map, README.
+
+**Verification (all run 2026-11-06)**
+
+| Command                                                            | Result                   |
+| ------------------------------------------------------------------ | ------------------------ |
+| `composer check` → build, `vp check`, `vue-tsc`, Pint, Larastan L7 | all pass, 0 errors       |
+| → `php artisan test` (MySQL)                                       | **334 passed** (was 329) |
+
+**Manual checks (browser, scratch DB `brevon_pos_test`):** signed in as `harris` after two ₱176.00 cash sales by `cashier1`. Dashboard: gross and net ₱352.00, 2 orders, average ₱176.00, low stock 0, one day bar, best sellers Chocolate Sprinkles (6, ₱264.00) and Strawberry Sprinkles (2, ₱88.00). Sales report: every table adds up to ₱352.00; Week grouping shows "Week of Nov 2, 2026"; the products CSV downloaded with the right header, rows and file name. Zero discounts showed as "−₱0.00" and were fixed to "₱0.00". No app errors. The user's `brevon_pos` was not touched.
+
+**Known issues / deferred**
+
+- To confirm with the accountant: the definitions (D-156), especially counting sales on the sale date and refunds against the sale date (the refunds report in 10b will add the refund-date view).
+- 10b: refunds/voids/discounts, cash variance, inventory movement, production and waste reports; XLSX; print layouts. NFR-009 (5 s) not load-tested yet; queries are single grouped SQL statements on indexed `orders (branch_id, business_date, status)`.
+- Category reporting uses each product's current category.
+- Nothing to migrate on the user's `brevon_pos` for 10a (apart from 9b's migration if not run yet).
+
+**Next step:** Phase 10b — operational reports, after user review.
