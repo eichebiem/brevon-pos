@@ -2,23 +2,24 @@
 
 Last updated: 2026-11-06 · Baseline: SRS **v1.1** (`docs/BREVON-SRS-v1.1.md`) · Prompt: `CLAUDE_CODE_PROMPT_BREVON_POS_v1.1.md` (v1.3)
 
-| Phase                                         | Status                                          | Notes                                                                 |
-| --------------------------------------------- | ----------------------------------------------- | --------------------------------------------------------------------- |
-| 0 — Discovery and technical plan              | ✅ Passed (docs only), re-baselined to SRS v1.1 | Approved 2026-11-05                                                   |
-| 1 — Project foundation                        | ✅ Passed                                       | Approved; committed by user as "Initial Commit"                       |
-| 2 — Authentication and access control         | ✅ Passed                                       | Approved; committed by user ("Done Phase 2")                          |
-| 3 — Catalog, settings and operating locations | ✅ Passed                                       | Approved; committed by user ("Done Phase 3")                          |
-| 4a — Ledger core and shift open               | ✅ Passed                                       | Approved; committed by user (with the seeder changes)                 |
-| 4b — Checkout backend                         | ✅ Passed                                       | Approved 2026-11-06                                                   |
-| 4c — Cashier UI and receipts                  | ✅ Passed                                       | Approved 2026-11-06 (with D-121, D-122)                               |
-| 5 — Orders and preparation                    | ✅ Passed                                       | Approved 2026-11-06                                                   |
-| 6 — Cashier shifts and cash control           | ✅ Passed                                       | Approved 2026-11-06; two limits to confirm (D-127, D-128)             |
-| 7a — Stock control                            | ✅ Passed                                       | Approved 2026-11-06 (D-131–D-134)                                     |
-| 7b — Purchasing                               | ✅ Passed                                       | Approved 2026-11-06; re-review at end of development (client changes) |
-| 8 — Recipes and production                    | 🟡 Awaiting review                              | D-140–D-144; costing method TBC (OI-014)                              |
-| 9 — Refunds, discounts, tax configuration     | ⏳ Not started                                  | SC/PWD: name, card no., address; 12%, VAT disregarded (D-068)         |
-| 10 — Dashboards and reports                   | ⏳ Not started                                  | Location filters incl. closed pop-ups                                 |
-| 11 — Hardening and release readiness          | ⏳ Not started                                  |                                                                       |
+| Phase                                         | Status                                          | Notes                                                                  |
+| --------------------------------------------- | ----------------------------------------------- | ---------------------------------------------------------------------- |
+| 0 — Discovery and technical plan              | ✅ Passed (docs only), re-baselined to SRS v1.1 | Approved 2026-11-05                                                    |
+| 1 — Project foundation                        | ✅ Passed                                       | Approved; committed by user as "Initial Commit"                        |
+| 2 — Authentication and access control         | ✅ Passed                                       | Approved; committed by user ("Done Phase 2")                           |
+| 3 — Catalog, settings and operating locations | ✅ Passed                                       | Approved; committed by user ("Done Phase 3")                           |
+| 4a — Ledger core and shift open               | ✅ Passed                                       | Approved; committed by user (with the seeder changes)                  |
+| 4b — Checkout backend                         | ✅ Passed                                       | Approved 2026-11-06                                                    |
+| 4c — Cashier UI and receipts                  | ✅ Passed                                       | Approved 2026-11-06 (with D-121, D-122)                                |
+| 5 — Orders and preparation                    | ✅ Passed                                       | Approved 2026-11-06                                                    |
+| 6 — Cashier shifts and cash control           | ✅ Passed                                       | Approved 2026-11-06; two limits to confirm (D-127, D-128)              |
+| 7a — Stock control                            | ✅ Passed                                       | Approved 2026-11-06 (D-131–D-134)                                      |
+| 7b — Purchasing                               | ✅ Passed                                       | Approved 2026-11-06; re-review at end of development (client changes)  |
+| 8 — Recipes and production                    | ✅ Passed                                       | Approved 2026-11-06; re-review at end of development (client feedback) |
+| 9a — Discounts and tax                        | 🟡 Awaiting review                              | D-145–D-149; SC/PWD seeded off until accountant confirms               |
+| 9b — Refunds and voids                        | ⏳ Not started                                  | Works from discounted line amounts                                     |
+| 10 — Dashboards and reports                   | ⏳ Not started                                  | Location filters incl. closed pop-ups                                  |
+| 11 — Hardening and release readiness          | ⏳ Not started                                  |                                                                        |
 
 ## Phase 0 log
 
@@ -486,3 +487,34 @@ Still to confirm: boxes/combo at pop-ups (D-089), hot vs iced coffee prices. Pha
 - The user's `brevon_pos` needs `php artisan migrate` (Phase 4b tables, D-121, Phase 6, 7a, 7b and 8).
 
 **Next step:** Phase 9 — refunds, discounts and tax configuration, after user review.
+
+## Phase 9a log — Discounts and tax (2026-11-06)
+
+**Objective:** give discounts at the counter under control (presets, manager approval for big ones), record the Senior Citizen / PWD discount the way the owner decided (D-068), and have a tax framework ready but switched off. Phase 9 is split: refunds and voids are 9b.
+**SRS IDs:** FR-044 (discounts), FR-083–FR-087, BR-018; T-DSC-1, T-SCD-1, T-SCD-2, T-TAX-1, T-PRIV-1 (amended).
+
+**Implemented**
+
+- Schema (`2026_11_06_160000`): `discounts` (+ `kind`, `product_id`, `category_id`), `order_discounts` (one per order; + type/value snapshots), `order_discount_beneficiaries` (encrypted SC/PWD details), `tax_rules`, `order_tax_lines` (+ `inclusive_snapshot`). CHECK rules. Morph names `discount`, `order_discount`, `tax_rule`. `DiscountSeeder` adds the SC/PWD discount switched off.
+- Permissions: new `discounts.approve` (Owner, Admin, Manager) and `discounts.view-beneficiary` (Owner, Admin); Cashiers now get `pos.apply-discount` by default. Store setting "Approve discounts over" (₱100.00).
+- Domain: `DiscountCalculator` (eligibility, maths, allocation, beneficiary checks), `DiscountApproval` (who must approve; manager sign-in at the counter, rate limited), `DiscountPresets`, `TaxCalculator`, `TaxRules`. `CartPricer` applies the discount then tax; `CheckoutService` locks limited discounts, checks approval, saves the order discount, beneficiary, per-line shares and tax lines.
+- HTTP / UI: Discounts and Tax rules screens (sidebar › Administration); POS "Discount" button and dialog (presets, SC/PWD details and items), "Manager approval needed" box, subtotal / discount / tax breakdown; receipts show the discount (with masked beneficiary and approver) and tax lines; the order page shows the discount and, for owners, "Show full details (logged)".
+- Docs: DECISIONS §AA (D-145–D-149), ERD §3, TEST_PLAN map, README.
+
+**Verification (all run 2026-11-06)**
+
+| Command                                                            | Result                   |
+| ------------------------------------------------------------------ | ------------------------ |
+| `composer check` → build, `vp check`, `vue-tsc`, Pint, Larastan L7 | all pass, 0 errors       |
+| → `php artisan test` (MySQL)                                       | **321 passed** (was 306) |
+
+**Manual checks (browser, scratch DB `brevon_pos_test`):** as `cashier1`, 2 Choco Custard (₱88.00) with "Staff meal 20%" (needs a manager): the cart showed −₱17.60 and ₱70.40, and payment stayed blocked until `harris` approved in the approval box; paid ₱100, change ₱29.60. Then 2 Kitkat (₱98.00) with Senior Citizen / PWD for "Maria Clara Santos": −₱11.76, total ₱86.24, no approval needed. The cashier's order page and receipt showed "M*** C*** S***" and "••••9123" with no way to see more; signed in as `harris`, "Show full details" showed the name, ID and address. The Discounts screen showed one use each. No app errors in the console. The user's `brevon_pos` was not touched.
+
+**Known issues / deferred**
+
+- To confirm with the owner/accountant: the SC/PWD rate (12% chosen by the owner vs the 20% + VAT exemption in law) and its privacy notice and retention (OI-007, OI-019) — the discount stays off until then; the ₱100.00 discount approval limit; any tax rule (none is on).
+- One discount per order; no typed-in amounts at the counter; one SC/PWD beneficiary per order.
+- On the user's `brevon_pos`: run `php artisan migrate`, then `php artisan db:seed --class=RolesAndPermissionsSeeder` and `php artisan db:seed --class=DiscountSeeder`. Existing roles keep their customised permissions, so give Cashier `pos.apply-discount` and Manager `discounts.approve` on the Roles screen (Owner gets everything automatically).
+- Still to confirm: Phase 6 limits (₱500.00, ₱0.00), the 7-day expiry window. Re-review Phases 7 and 8 at the end of development. D-101 client menu questions: raise after Phase 9 (9b).
+
+**Next step:** Phase 9b — refunds and voids, after user review.

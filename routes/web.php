@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\AuditLogController;
 use App\Http\Controllers\Admin\CategoryController;
+use App\Http\Controllers\Admin\DiscountController;
 use App\Http\Controllers\Admin\Inventory\DispatchController;
 use App\Http\Controllers\Admin\Inventory\InventoryItemController;
 use App\Http\Controllers\Admin\Inventory\StockAdjustmentController;
@@ -21,6 +22,7 @@ use App\Http\Controllers\Admin\Purchasing\SupplierController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\ShiftReviewController;
 use App\Http\Controllers\Admin\StoreSettingsController;
+use App\Http\Controllers\Admin\TaxRuleController;
 use App\Http\Controllers\Admin\TerminalController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\HomeController;
@@ -59,6 +61,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('pos/orders/{order}', [PosOrderController::class, 'show'])->name('pos.orders.show');
         Route::get('pos/orders/{order}/receipt', [PosOrderController::class, 'receipt'])->name('pos.orders.receipt');
         Route::post('pos/orders/{order}/reprint', [PosOrderController::class, 'reprint'])->name('pos.orders.reprint');
+        Route::get('pos/orders/{order}/beneficiary', [PosOrderController::class, 'beneficiary'])->middleware('permission:discounts.view-beneficiary')->name('pos.orders.beneficiary');
     });
 
     // The cashier's own shift (FR-073–FR-079). Location comes from the terminal (D-060).
@@ -129,6 +132,16 @@ Route::middleware(['auth'])->group(function () {
             Route::put('settings', [StoreSettingsController::class, 'update'])->name('settings.update');
             Route::get('payment-methods', [PaymentMethodController::class, 'index'])->name('payment-methods.index');
             Route::put('payment-methods/{paymentMethod}', [PaymentMethodController::class, 'update'])->name('payment-methods.update');
+            Route::get('discounts', [DiscountController::class, 'index'])->name('discounts.index');
+            Route::get('discounts/create', [DiscountController::class, 'create'])->name('discounts.create');
+            Route::post('discounts', [DiscountController::class, 'store'])->name('discounts.store');
+            Route::get('discounts/{discount}/edit', [DiscountController::class, 'edit'])->name('discounts.edit');
+            Route::put('discounts/{discount}', [DiscountController::class, 'update'])->name('discounts.update');
+            Route::get('tax-rules', [TaxRuleController::class, 'index'])->name('tax-rules.index');
+            Route::get('tax-rules/create', [TaxRuleController::class, 'create'])->name('tax-rules.create');
+            Route::post('tax-rules', [TaxRuleController::class, 'store'])->name('tax-rules.store');
+            Route::get('tax-rules/{taxRule}/edit', [TaxRuleController::class, 'edit'])->name('tax-rules.edit');
+            Route::put('tax-rules/{taxRule}', [TaxRuleController::class, 'update'])->name('tax-rules.update');
         });
 
         // Catalog (FR-015–FR-021). Viewing needs products.view; each change its own permission.

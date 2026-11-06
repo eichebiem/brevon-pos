@@ -2,6 +2,7 @@
 
 namespace App\Domain\Sales;
 
+use App\Domain\Discounts\DiscountRequest;
 use App\Domain\Shared\Money;
 use App\Enums\OrderType;
 use Carbon\CarbonImmutable;
@@ -25,6 +26,7 @@ final readonly class CheckoutData
         public ?string $notes = null,
         public ?CarbonImmutable $pickupAt = null,
         public ?Money $expectedTotal = null,
+        public ?DiscountRequest $discount = null,
     ) {}
 
     /** SHA-256 of the normalised request, stored with the order (D-026). */
@@ -35,6 +37,7 @@ final readonly class CheckoutData
             'notes' => $this->notes,
             'pickup_at' => $this->pickupAt?->utc()->toIso8601String(),
             'expected_total' => $this->expectedTotal?->minor(),
+            'discount' => $this->discount?->fingerprint(),
             'lines' => array_map(fn (CartLine $l) => [
                 $l->productId, $l->variantId, $l->quantity->toString(), $l->optionIds, $l->notes,
             ], $this->lines),

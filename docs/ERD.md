@@ -115,8 +115,11 @@ erDiagram
     payments |o--o{ refunds : ""
     refunds ||--|{ refund_items : ""
     order_items ||--o{ refund_items : ""
-    orders ||--o{ order_discounts : ""
+    orders ||--o| order_discounts : "one per order (D-146)"
     discounts |o--o{ order_discounts : ""
+    order_discounts ||--o| order_discount_beneficiaries : "SC/PWD only"
+    products |o--o{ discounts : "product scope"
+    categories |o--o{ discounts : "category scope"
     orders ||--o{ order_tax_lines : ""
     tax_rules |o--o{ order_tax_lines : ""
 
@@ -146,6 +149,8 @@ Constraints: UNIQUE `orders(branch_id, order_number)`, UNIQUE `orders(branch_id,
 `payment_status` values: `unpaid`, `pending_verification`, `paid`, `partially_refunded`, `refunded`.
 
 **Phase 4b (built, D-103–D-111):** `orders.idempotency_request_hash` CHAR(64); `order_items.product_type_snapshot` and `order_item_options.option_group_name_snapshot` added to the SRS columns. CHECKs: order type, status, payment status, non-negative money on orders and lines, `payments.amount > 0`, `amount_tendered >= amount`; UNIQUE `payments(payment_method_id, reference_number)` — a GCash reference is recorded once, at any location (replaces the plain index above). Every FK RESTRICT; models refuse delete(). Sales post `sale` movements referencing the order (`reference_type = 'order'`).
+
+**Phase 9a (built, D-145–D-149):** `discounts` per SRS §8.5 plus `kind` (`standard` / `senior_pwd`) and `product_id` / `category_id` for product- and category-scoped discounts (CHECK: the right one is set for the scope; SC/PWD is always order-wide percentage; percentages ≤ 100; ends after starts). `order_discounts`: UNIQUE `order_id` (one discount per order), plus `discount_type_snapshot` and `discount_value_snapshot`; `approved_by` is the manager who approved at the counter. `order_discount_beneficiaries` (D-068, D-148): one row per SC/PWD order discount, `beneficiary_type` (`senior_citizen` / `pwd`), `full_name`, `card_number`, `address` — **the only personal data in V1, encrypted at rest (Laravel `encrypted` cast), never indexed or searched**. `tax_rules` per SRS (percentage only; none seeded); `order_tax_lines` per SRS plus `inclusive_snapshot`. `order_items.discount_amount` and `tax_amount` hold each line's share (they add up to the order totals); `line_total` stays the price before discount. Grand total = subtotal − discount + tax added on top; tax included in prices is shown in `tax_total` but does not change the total. All new order rows are immutable (model guards).
 
 ## 4. Cash management
 

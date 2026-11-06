@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import {
+    BadgePercent,
     Banknote,
     Minus,
     Plus,
@@ -12,6 +13,8 @@ import {
 } from '@lucide/vue';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
+import ApproveDiscountDialog from '@/components/pos/ApproveDiscountDialog.vue';
+import DiscountDialog from '@/components/pos/DiscountDialog.vue';
 import ItemDialog from '@/components/pos/ItemDialog.vue';
 import PaymentDialog from '@/components/pos/PaymentDialog.vue';
 import ProductTile from '@/components/pos/ProductTile.vue';
@@ -26,7 +29,9 @@ import { checkout, quote as quoteRoute } from '@/routes/pos';
 import { shift as shiftPage } from '@/routes/staff';
 import type {
     CartLine,
+    ChosenDiscount,
     LastOrder,
+    PosDiscount,
     PosCatalog,
     PosOrderType,
     PosPaymentMethod,
@@ -38,6 +43,8 @@ const props = defineProps<{
     canOpenShift: boolean;
     canSell: boolean;
     canVerifyEwallet: boolean;
+    canApproveDiscount: boolean;
+    discounts: PosDiscount[];
     catalog: PosCatalog | null;
     paymentMethods: PosPaymentMethod[];
     orderTypes: PosOrderType[];
@@ -184,12 +191,67 @@ function removeLine(index: number): void {
 
 function clearSale(): void {
     cart.value = [];
+    discount.value = null;
+    approver.value = null;
+    discountErrors.value = {};
     orderNotes.value = '';
     pickupAt.value = '';
     orderType.value = props.orderTypes[0]?.value ?? 'walk_in';
     lineErrors.value = {};
     banner.value = null;
 }
+
+// ---- Discount (D-146): one per order; a manager approves big ones ---------
+const discount = ref<ChosenDiscount | null>(null);
+const approver = ref<{ username: string; password: string } | null>(null);
+const discountOpen = ref(false);
+const approveOpen = ref(false);
+const discountErrors = ref<Record<string, string | undefined>>({});
+
+function discountPayload(withDetails: boolean) {
+    if (!discount.value) {
+        return null;
+    }
+    const keys = discount.value.lineKeys;
+    const lines =
+        keys === null
+            ? null
+            : cart.value
+                  .map((l, i) => (keys.includes(l.key) ? i : -1))
+                  .filter((i) => i >= 0);
+    if (!withDetails) {
+        return { id: discount.value.id, lines };
+    }
+
+    return {
+        id: discount.value.id,
+        lines,
+        reason: discount.value.reason || null,
+        beneficiary: discount.value.beneficiary,
+        approver: approver.value,
+    };
+}
+
+function applyDiscount(choice: ChosenDiscount): void {
+    discount.value = choice;
+    approver.value = null;
+    discountErrors.value = {};
+    void refreshQuote();
+}
+
+function removeDiscount(): void {
+    discount.value = null;
+    approver.value = null;
+    discountErrors.value = {};
+    void refreshQuote();
+}
+
+const needsApproval = computed(
+    () =>
+        !!quote.value?.discount_needs_approval &&
+        !props.canApproveDiscount &&
+        approver.value === null,
+);
 
 // ---- Server quote (FR-026): totals are never calculated here (D-034) ------
 const quote = ref<Quote | null>(null);
@@ -223,6 +285,8 @@ function applyErrors(errors: Record<string, string | string[]>): void {
             key === 'expected_total'
         ) {
             general = message;
+        } else if (key.startsWith('discount')) {
+            discountErrors.value[key] = message;
         }
     }
     lineErrors.value = lines;
@@ -245,6 +309,7 @@ async function refreshQuote(tendered: string | null = null): Promise<void> {
             quoteRoute().url,
             {
                 items: itemsPayload(),
+                discount: discountPayload(false),
                 payment:
                     tendered !== null && tendered !== ''
                         ? { amount_tendered: tendered }
@@ -254,9 +319,11 @@ async function refreshQuote(tendered: string | null = null): Promise<void> {
         );
         lineErrors.value = {};
         banner.value = null;
+        discountErrors.value = {};
     } catch (error) {
         if (error instanceof ValidationFailed) {
             quote.value = null;
+            discountErrors.value = {};
             applyErrors(error.errors);
         } else if (!(error instanceof DOMException)) {
             banner.value =
@@ -316,6 +383,7 @@ const canCheckout = computed(
         quote.value !== null &&
         !quoting.value &&
         Object.keys(lineErrors.value).length === 0 &&
+        !needsApproval.value &&
         (!selectedType.value?.needs_pickup || pickupAt.value !== ''),
 );
 
@@ -342,6 +410,7 @@ function submit(payment: { reference: string; verified: boolean }): void {
         notes: orderNotes.value.trim() || null,
         pickup_at: selectedType.value?.needs_pickup ? pickupAt.value : null,
         items: itemsPayload(),
+        discount: discountPayload(true),
         expected_total: quote.value.grand_total,
         payment: {
             method: payMethod.value.code,
@@ -350,7 +419,13 @@ function submit(payment: { reference: string; verified: boolean }): void {
             verified: isCash ? false : payment.verified,
         },
     };
-    const attempt = JSON.stringify(body);
+    // The approver's password never goes into the retry fingerprint.
+    const attempt = JSON.stringify({
+        ...body,
+        discount: body.discount
+            ? { ...body.discount, approver: body.discount.approver?.username }
+            : null,
+    });
     if (attempt !== lastAttempt) {
         idempotencyKey = crypto.randomUUID();
         lastAttempt = attempt;
@@ -370,7 +445,21 @@ function submit(payment: { reference: string; verified: boolean }): void {
             },
             onError: (errors) => {
                 paymentErrors.value = errors;
+                discountErrors.value = {};
                 applyErrors(errors);
+                if (errors['discount.approver']) {
+                    approver.value = null;
+                    payOpen.value = false;
+                    approveOpen.value = true;
+
+                    return;
+                }
+                if (Object.keys(errors).some((k) => k.startsWith('discount'))) {
+                    payOpen.value = false;
+                    discountOpen.value = true;
+
+                    return;
+                }
                 if (
                     Object.keys(errors).some((k) => !k.startsWith('payment.'))
                 ) {
@@ -417,7 +506,13 @@ function onKey(event: KeyboardEvent): void {
     const typing = (event.target as HTMLElement | null)?.closest(
         'input, textarea, select, [contenteditable]',
     );
-    if (payOpen.value || pickerOpen.value || completeOpen.value) {
+    if (
+        payOpen.value ||
+        pickerOpen.value ||
+        completeOpen.value ||
+        discountOpen.value ||
+        approveOpen.value
+    ) {
         return;
     }
     if (event.key === '/' && !typing) {
@@ -777,6 +872,83 @@ watch(
                     {{ banner }}
                 </p>
 
+                <div class="flex flex-wrap items-center gap-2">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        class="min-h-11"
+                        :disabled="!canSell || cart.length === 0"
+                        data-test="pos-discount"
+                        @click="discountOpen = true"
+                        ><BadgePercent aria-hidden="true" />
+                        {{ discount ? 'Change discount' : 'Discount' }}</Button
+                    >
+                    <Button
+                        v-if="needsApproval"
+                        size="sm"
+                        variant="secondary"
+                        class="min-h-11"
+                        data-test="pos-approve"
+                        @click="approveOpen = true"
+                        >Manager approval needed</Button
+                    >
+                    <span
+                        v-else-if="approver"
+                        class="text-xs text-muted-foreground"
+                        >Approved by {{ approver.username }}</span
+                    >
+                </div>
+                <p
+                    v-if="discount && discountErrors.discount"
+                    class="rounded-lg bg-red-100 px-3 py-2 text-sm text-red-900"
+                    role="alert"
+                >
+                    {{ discountErrors.discount }}
+                    <button
+                        type="button"
+                        class="ml-1 underline"
+                        @click="removeDiscount"
+                    >
+                        Remove discount
+                    </button>
+                </p>
+
+                <dl
+                    v-if="
+                        quote &&
+                        (Number(quote.discount_total) > 0 ||
+                            quote.taxes.length > 0)
+                    "
+                    class="grid grid-cols-[1fr_auto] gap-x-2 gap-y-0.5 text-sm"
+                    data-test="pos-breakdown"
+                >
+                    <dt class="text-muted-foreground">Subtotal</dt>
+                    <dd class="text-right tabular-nums">
+                        {{ formatMoney(quote.subtotal) }}
+                    </dd>
+                    <template v-if="quote.discount">
+                        <dt class="text-muted-foreground">
+                            {{ quote.discount.name }}
+                        </dt>
+                        <dd
+                            class="text-right text-red-700 tabular-nums"
+                            data-test="pos-discount-amount"
+                        >
+                            −{{ formatMoney(quote.discount.amount) }}
+                        </dd>
+                    </template>
+                    <template v-for="tax in quote.taxes" :key="tax.name">
+                        <dt class="text-muted-foreground">
+                            {{ tax.name }} {{ Number(tax.rate) }}%{{
+                                tax.inclusive ? ' (included)' : ''
+                            }}
+                        </dt>
+                        <dd class="text-right tabular-nums">
+                            {{ formatMoney(tax.amount) }}
+                        </dd>
+                    </template>
+                </dl>
+
                 <dl class="flex items-baseline justify-between">
                     <dt class="text-sm font-medium">Total</dt>
                     <dd
@@ -837,4 +1009,25 @@ watch(
         @confirm="submit"
     />
     <SaleCompleteDialog v-model:open="completeOpen" :order="lastOrder" />
+    <DiscountDialog
+        v-model:open="discountOpen"
+        :discounts="discounts"
+        :lines="
+            cart.map((l) => ({
+                key: l.key,
+                label: `${l.quantity} × ${lineLabel(l).name}${lineLabel(l).detail ? ` (${lineLabel(l).detail})` : ''}`,
+            }))
+        "
+        :current="discount"
+        :errors="discountErrors"
+        @apply="applyDiscount"
+        @remove="removeDiscount"
+    />
+    <ApproveDiscountDialog
+        v-model:open="approveOpen"
+        :name="quote?.discount?.name ?? null"
+        :amount="quote?.discount?.amount ?? null"
+        :error="discountErrors['discount.approver']"
+        @approve="(a) => (approver = a)"
+    />
 </template>

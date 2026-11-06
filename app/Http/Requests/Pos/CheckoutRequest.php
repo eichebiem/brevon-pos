@@ -2,6 +2,8 @@
 
 namespace App\Http\Requests\Pos;
 
+use App\Domain\Discounts\BeneficiaryInput;
+use App\Domain\Discounts\DiscountRequest;
 use App\Domain\Sales\CartLine;
 use App\Domain\Sales\CheckoutData;
 use App\Domain\Sales\PaymentInput;
@@ -51,6 +53,19 @@ class CheckoutRequest extends FormRequest
             'payment.amount_tendered' => ['nullable', ...$money],
             'payment.reference' => ['nullable', 'string', 'max:60'],
             'payment.verified' => ['boolean'],
+            'discount' => ['nullable', 'array'],
+            'discount.id' => ['required_with:discount', 'integer'],
+            'discount.lines' => ['nullable', 'array', 'max:100'],
+            'discount.lines.*' => ['integer', 'min:0'],
+            'discount.reason' => ['nullable', 'string', 'max:255'],
+            'discount.beneficiary' => ['nullable', 'array'],
+            'discount.beneficiary.type' => ['nullable', 'string', 'max:20'],
+            'discount.beneficiary.name' => ['nullable', 'string', 'max:150'],
+            'discount.beneficiary.card_number' => ['nullable', 'string', 'max:40'],
+            'discount.beneficiary.address' => ['nullable', 'string', 'max:255'],
+            'discount.approver' => ['nullable', 'array'],
+            'discount.approver.username' => ['nullable', 'string', 'max:100'],
+            'discount.approver.password' => ['nullable', 'string', 'max:255'],
         ];
     }
 
@@ -69,6 +84,31 @@ class CheckoutRequest extends FormRequest
             optionIds: array_map('intval', $item['option_ids'] ?? []),
             notes: self::clean($item['notes'] ?? null),
         ), $items);
+    }
+
+    /** The discount asked for, if any (D-146). Approver details are ignored by the quote. */
+    public function discount(): ?DiscountRequest
+    {
+        $id = $this->validated('discount.id');
+        if ($id === null) {
+            return null;
+        }
+        $lines = $this->validated('discount.lines');
+        $beneficiary = $this->validated('discount.beneficiary');
+
+        return new DiscountRequest(
+            discountId: (int) $id,
+            lineIndexes: is_array($lines) ? array_values(array_map('intval', $lines)) : null,
+            beneficiary: is_array($beneficiary) ? new BeneficiaryInput(
+                type: self::clean($beneficiary['type'] ?? null),
+                fullName: self::clean($beneficiary['name'] ?? null),
+                cardNumber: self::clean($beneficiary['card_number'] ?? null),
+                address: self::clean($beneficiary['address'] ?? null),
+            ) : null,
+            approverUsername: self::clean($this->validated('discount.approver.username')),
+            approverPassword: is_string($password = $this->validated('discount.approver.password')) && $password !== '' ? $password : null,
+            reason: self::clean($this->validated('discount.reason')),
+        );
     }
 
     public function toCheckoutData(): CheckoutData
@@ -91,6 +131,7 @@ class CheckoutRequest extends FormRequest
             // Entered in Manila time; stored in the app's timezone (Eloquent does not convert).
             pickupAt: $pickup === null ? null : CarbonImmutable::parse((string) $pickup, BusinessClock::timezone())->setTimezone((string) config('app.timezone')),
             expectedTotal: $expected === null ? null : Money::fromDecimal((string) $expected),
+            discount: $this->discount(),
         );
     }
 

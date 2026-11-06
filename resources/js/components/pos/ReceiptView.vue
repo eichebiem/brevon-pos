@@ -123,16 +123,42 @@ const paymentStatus: Record<string, string> = {
                 {{ formatMoney(receipt.order.subtotal) }}
             </dd>
             <template v-if="Number(receipt.order.discount_total) > 0">
-                <dt>Discount</dt>
+                <dt>
+                    {{ receipt.discount?.name ?? 'Discount' }}
+                    <template v-if="receipt.discount?.type === 'percentage'"
+                        >({{ Number(receipt.discount.value) }}%)</template
+                    >
+                </dt>
                 <dd class="text-right">
                     −{{ formatMoney(receipt.order.discount_total) }}
                 </dd>
+            </template>
+            <template v-for="(tax, i) in receipt.taxes" :key="i">
+                <dt>
+                    {{ tax.name }} {{ tax.rate }}%{{
+                        tax.inclusive ? ' (included)' : ''
+                    }}
+                </dt>
+                <dd class="text-right">{{ formatMoney(tax.amount) }}</dd>
             </template>
             <dt class="text-sm font-bold">TOTAL</dt>
             <dd class="text-right text-sm font-bold">
                 {{ formatMoney(receipt.order.grand_total) }}
             </dd>
         </dl>
+
+        <p
+            v-if="receipt.discount?.beneficiary"
+            class="mt-1"
+            data-test="receipt-beneficiary"
+        >
+            {{ receipt.discount.beneficiary.type_label }}:
+            {{ receipt.discount.beneficiary.name }} · ID
+            {{ receipt.discount.beneficiary.card_number }}
+        </p>
+        <p v-if="receipt.discount?.approved_by" class="mt-1">
+            Discount approved by {{ receipt.discount.approved_by }}
+        </p>
 
         <dl
             v-for="(payment, i) in receipt.payments"

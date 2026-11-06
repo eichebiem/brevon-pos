@@ -28,6 +28,7 @@ final class PermissionCatalog
         return [
             'Dashboard' => ['dashboard.view'],
             'Point of sale' => ['pos.access', 'pos.create-sale', 'pos.apply-discount', 'pos.override-price'],
+            'Discounts' => ['discounts.approve', 'discounts.view-beneficiary'],
             'Orders' => ['orders.view', 'orders.update-status', 'orders.cancel'],
             'Payments' => ['payments.record', 'payments.verify-ewallet'],
             'Refunds and voids' => ['refunds.request', 'refunds.approve', 'voids.approve'],
@@ -64,6 +65,7 @@ final class PermissionCatalog
             self::MANAGER => [
                 'dashboard.view',
                 'pos.access', 'pos.create-sale', 'pos.apply-discount',
+                'discounts.approve',
                 'orders.view', 'orders.update-status', 'orders.cancel',
                 'payments.record', 'payments.verify-ewallet',
                 'refunds.request', 'refunds.approve', 'voids.approve',
@@ -75,7 +77,8 @@ final class PermissionCatalog
                 'reports.sales', 'reports.inventory', 'reports.export',
             ],
             self::CASHIER => [
-                'pos.access', 'pos.create-sale',
+                // D-146: cashiers apply discounts; large ones need a manager.
+                'pos.access', 'pos.create-sale', 'pos.apply-discount',
                 'orders.view',
                 'payments.record',
                 'refunds.request',

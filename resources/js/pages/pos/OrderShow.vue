@@ -10,8 +10,13 @@ import { Button } from '@/components/ui/button';
 import { formatDateTime, formatMoney } from '@/lib/format';
 import { advance } from '@/routes/orders';
 import { verify } from '@/routes/payments';
-import { index, receipt as receiptRoute, reprint } from '@/routes/pos/orders';
-import type { Receipt } from '@/types/pos';
+import {
+    beneficiary as beneficiaryRoute,
+    index,
+    receipt as receiptRoute,
+    reprint,
+} from '@/routes/pos/orders';
+import type { Receipt, ReceiptBeneficiary } from '@/types/pos';
 
 type Workflow = {
     status: string;
@@ -36,9 +41,24 @@ type Workflow = {
     can_advance: boolean;
     can_cancel: boolean;
     can_verify: boolean;
+    can_view_beneficiary: boolean;
 };
 
 const props = defineProps<{ receipt: Receipt; workflow: Workflow }>();
+
+// D-148: full SC/PWD details only on request, and each look is audited.
+const fullBeneficiary = ref<ReceiptBeneficiary | null>(null);
+async function showBeneficiary(): Promise<void> {
+    const response = await fetch(beneficiaryRoute(props.receipt.order.id).url, {
+        headers: { Accept: 'application/json' },
+        credentials: 'same-origin',
+    });
+    if (response.ok) {
+        fullBeneficiary.value = (await response.json()) as ReceiptBeneficiary;
+    } else {
+        toast.error('Could not show the details.');
+    }
+}
 const printing = ref(false);
 const busy = ref(false);
 
@@ -162,6 +182,77 @@ const cancelOpen = ref(false);
                         @click="cancelOpen = true"
                         >Cancel order</Button
                     >
+                </section>
+
+                <section
+                    v-if="receipt.discount"
+                    class="rounded-xl border border-border bg-card p-4 text-sm"
+                    aria-labelledby="discount-heading"
+                    data-test="order-discount"
+                >
+                    <h2 id="discount-heading" class="font-semibold">
+                        Discount
+                    </h2>
+                    <p>
+                        {{ receipt.discount.name }}
+                        <template v-if="receipt.discount.code"
+                            >({{ receipt.discount.code }})</template
+                        >
+                        · −{{ formatMoney(receipt.discount.amount) }}
+                        <template v-if="receipt.discount.approved_by">
+                            · approved by
+                            {{ receipt.discount.approved_by }}</template
+                        >
+                    </p>
+                    <template v-if="receipt.discount.beneficiary">
+                        <dl
+                            class="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1"
+                        >
+                            <dt class="text-muted-foreground">For</dt>
+                            <dd>
+                                {{
+                                    (
+                                        fullBeneficiary ??
+                                        receipt.discount.beneficiary
+                                    ).type_label
+                                }}
+                            </dd>
+                            <dt class="text-muted-foreground">Name</dt>
+                            <dd data-test="beneficiary-name">
+                                {{
+                                    (
+                                        fullBeneficiary ??
+                                        receipt.discount.beneficiary
+                                    ).name
+                                }}
+                            </dd>
+                            <dt class="text-muted-foreground">ID number</dt>
+                            <dd>
+                                {{
+                                    (
+                                        fullBeneficiary ??
+                                        receipt.discount.beneficiary
+                                    ).card_number
+                                }}
+                            </dd>
+                            <template v-if="fullBeneficiary">
+                                <dt class="text-muted-foreground">Address</dt>
+                                <dd>{{ fullBeneficiary.address }}</dd>
+                            </template>
+                        </dl>
+                        <Button
+                            v-if="
+                                workflow.can_view_beneficiary &&
+                                !fullBeneficiary
+                            "
+                            variant="outline"
+                            size="sm"
+                            class="mt-2"
+                            data-test="show-beneficiary"
+                            @click="showBeneficiary"
+                            >Show full details (logged)</Button
+                        >
+                    </template>
                 </section>
 
                 <section

@@ -7,6 +7,7 @@ use App\Models\Branch;
 use App\Models\CashierShift;
 use App\Models\CashMovement;
 use App\Models\Category;
+use App\Models\Discount;
 use App\Models\Employee;
 use App\Models\GoodsReceipt;
 use App\Models\InventoryItem;
@@ -14,6 +15,7 @@ use App\Models\InventoryLot;
 use App\Models\InventoryMovement;
 use App\Models\OptionGroup;
 use App\Models\Order;
+use App\Models\OrderDiscount;
 use App\Models\Payment;
 use App\Models\PaymentMethod;
 use App\Models\Product;
@@ -26,6 +28,7 @@ use App\Models\Setting;
 use App\Models\StockAdjustment;
 use App\Models\StockTransfer;
 use App\Models\Supplier;
+use App\Models\TaxRule;
 use App\Models\Terminal;
 use App\Models\User;
 use App\Support\Database\DestructiveCommandGuard;
@@ -96,6 +99,9 @@ class AppServiceProvider extends ServiceProvider
             'inventory_lot' => InventoryLot::class,
             'recipe' => Recipe::class,
             'production_batch' => ProductionBatch::class,
+            'discount' => Discount::class,
+            'order_discount' => OrderDiscount::class,
+            'tax_rule' => TaxRule::class,
             'order' => Order::class,
             'payment' => Payment::class,
         ]);

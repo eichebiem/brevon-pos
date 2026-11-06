@@ -71,15 +71,67 @@ export type QuoteLine = {
     unit_total: string;
     options: { id: number; name: string; price_delta: string }[];
     line_total: string;
+    discount_amount: string;
+};
+
+export type QuoteTax = {
+    name: string;
+    rate: string;
+    inclusive: boolean;
+    amount: string;
 };
 
 export type Quote = {
     lines: QuoteLine[];
     subtotal: string;
     discount_total: string;
+    discount: {
+        id: number;
+        name: string;
+        lines: number[];
+        amount: string;
+    } | null;
+    discount_needs_approval: boolean;
     tax_total: string;
+    taxes: QuoteTax[];
     grand_total: string;
     change: string | null;
+};
+
+/** A discount the counter can offer (D-145). */
+export type PosDiscount = {
+    id: number;
+    name: string;
+    code: string | null;
+    type: 'percentage' | 'fixed';
+    value: string;
+    applies_to: string | null;
+    senior_pwd: boolean;
+    requires_approval: boolean;
+};
+
+export type Beneficiary = {
+    type: 'senior_citizen' | 'pwd' | '';
+    name: string;
+    card_number: string;
+    address: string;
+};
+
+/** The discount chosen for the sale on screen; line keys survive cart edits. */
+export type ChosenDiscount = {
+    id: number;
+    lineKeys: string[] | null;
+    beneficiary: Beneficiary | null;
+    reason: string;
+};
+
+export type ReceiptBeneficiary = {
+    type: string;
+    type_label: string;
+    name: string;
+    card_number: string;
+    address: string | null;
+    masked: boolean;
 };
 
 export type LastOrder = {
@@ -130,8 +182,25 @@ export type Receipt = {
         unit_price: string;
         option_total: string;
         line_total: string;
+        discount_amount: string;
         notes: string | null;
         options: { name: string; price_delta: string }[];
+    }[];
+    discount: {
+        name: string;
+        code: string | null;
+        type: string;
+        value: string;
+        amount: string;
+        approved_by: string | null;
+        beneficiary: ReceiptBeneficiary | null;
+    } | null;
+    taxes: {
+        name: string;
+        rate: string;
+        inclusive: boolean;
+        taxable_amount: string;
+        amount: string;
     }[];
     payments: {
         method: string | null;

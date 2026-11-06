@@ -2,9 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Discounts\DiscountPresets;
 use App\Domain\Sales\PosCatalog;
 use App\Domain\Shifts\ShiftService;
+use App\Enums\DiscountScope;
 use App\Enums\OrderType;
+use App\Models\Discount;
 use App\Models\PaymentMethod;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -18,7 +21,7 @@ use Inertia\Response;
  */
 class PosController extends Controller
 {
-    public function index(Request $request, ShiftService $shifts, PosCatalog $catalog): Response
+    public function index(Request $request, ShiftService $shifts, PosCatalog $catalog, DiscountPresets $presets): Response
     {
         /** @var User $user */
         $user = $request->user();
@@ -36,6 +39,22 @@ class PosController extends Controller
                     'type' => $m->type->value,
                     'requires_reference' => $m->requires_reference,
                 ])->all(),
+            // D-146: anyone selling may pick a discount; a manager approves when needed.
+            'canApproveDiscount' => $user->can('discounts.approve'),
+            'discounts' => $shift === null ? [] : $presets->offered()->with(['product:id,name', 'category:id,name'])->get()->map(fn (Discount $d) => [
+                'id' => $d->id,
+                'name' => $d->name,
+                'code' => $d->code,
+                'type' => $d->discount_type->value,
+                'value' => $d->value,
+                'applies_to' => match ($d->scope) {
+                    DiscountScope::Order => null,
+                    DiscountScope::Product => $d->product?->name,
+                    DiscountScope::Category => $d->category?->name,
+                },
+                'senior_pwd' => $d->isSeniorPwd(),
+                'requires_approval' => $d->requires_approval,
+            ])->all(),
             'orderTypes' => array_map(fn (OrderType $t) => ['value' => $t->value, 'label' => $t->label(), 'needs_pickup' => $t->needsPickupTime()], OrderType::cases()),
         ]);
     }

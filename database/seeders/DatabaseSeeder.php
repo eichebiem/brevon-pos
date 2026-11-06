@@ -23,6 +23,7 @@ class DatabaseSeeder extends Seeder
             LocationSeeder::class,
             CatalogReferenceSeeder::class,
             PaymentMethodSeeder::class,
+            DiscountSeeder::class,
             DefaultOwnersSeeder::class,
             LocalUsersSeeder::class,
             // The shop's menu, in every environment (D-101).

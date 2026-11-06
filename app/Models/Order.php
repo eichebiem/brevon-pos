@@ -9,6 +9,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use LogicException;
 
 /**
@@ -126,5 +127,21 @@ class Order extends Model
     public function statusHistory(): HasMany
     {
         return $this->hasMany(OrderStatusHistory::class)->orderBy('id');
+    }
+
+    /**
+     * @return HasOne<OrderDiscount, $this>
+     */
+    public function discount(): HasOne
+    {
+        return $this->hasOne(OrderDiscount::class);
+    }
+
+    /**
+     * @return HasMany<OrderTaxLine, $this>
+     */
+    public function taxLines(): HasMany
+    {
+        return $this->hasMany(OrderTaxLine::class);
     }
 }

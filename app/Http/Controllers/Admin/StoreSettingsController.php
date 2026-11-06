@@ -29,6 +29,7 @@ class StoreSettingsController extends Controller
             'remove_logo' => ['sometimes', 'boolean'],
             'cash_approval_over' => ['sometimes', 'required', 'decimal:0,2', 'min:0', 'max:999999.99'],
             'shift_review_variance_over' => ['sometimes', 'required', 'decimal:0,2', 'min:0', 'max:999999.99'],
+            'discount_approval_over' => ['sometimes', 'required', 'decimal:0,2', 'min:0', 'max:999999.99'],
         ]);
 
         /** @var User $actor */
@@ -39,6 +40,9 @@ class StoreSettingsController extends Controller
         }
         if (isset($validated['shift_review_variance_over'])) {
             $values['shift_review_variance_over'] = (string) $validated['shift_review_variance_over'];
+        }
+        if (isset($validated['discount_approval_over'])) {
+            $values['discount_approval_over'] = (string) $validated['discount_approval_over'];
         }
         $this->settings->update(
             $actor,

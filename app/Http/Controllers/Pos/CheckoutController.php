@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Pos;
 
+use App\Domain\Discounts\DiscountApproval;
 use App\Domain\Sales\CartPricer;
 use App\Domain\Sales\CheckoutService;
 use App\Domain\Sales\IdempotencyConflict;
@@ -23,7 +24,7 @@ use Inertia\Inertia;
 class CheckoutController extends Controller
 {
     /** Server-side totals for the cart on screen; nothing is saved (FR-026). */
-    public function quote(CheckoutRequest $request, CartPricer $pricer, ShiftService $shifts): JsonResponse
+    public function quote(CheckoutRequest $request, CartPricer $pricer, ShiftService $shifts, DiscountApproval $approvals): JsonResponse
     {
         /** @var User $user */
         $user = $request->user();
@@ -33,13 +34,15 @@ class CheckoutController extends Controller
             throw ValidationException::withMessages(['shift' => __('Open a shift before taking payments.')]);
         }
 
-        $cart = $pricer->price($shift->branch, $request->lines());
+        $cart = $pricer->price($shift->branch, $request->lines(), $request->discount());
         $tendered = $request->validated('payment.amount_tendered');
         $tendered = $tendered === null ? null : Money::fromDecimal((string) $tendered);
 
         // Change preview for the cash dialog; the browser never does money arithmetic (D-034).
         return response()->json([
             ...$cart->toArray(),
+            // Whether a manager has to approve the discount before payment (D-146).
+            'discount_needs_approval' => $cart->discount !== null && $approvals->needsApproval($user, $cart->discount->discount, $cart->discount->amount),
             'change' => $tendered === null || $tendered->lessThan($cart->grandTotal) ? null : $tendered->subtract($cart->grandTotal)->toDecimal(),
         ]);
     }

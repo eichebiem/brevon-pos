@@ -15,6 +15,7 @@ const props = defineProps<{
         receipt_footer: string | null;
         cash_approval_over: string;
         shift_review_variance_over: string;
+        discount_approval_over: string;
         currency: string;
         timezone: string;
     };
@@ -31,11 +32,13 @@ const form = useForm<{
     remove_logo: boolean;
     cash_approval_over: string;
     shift_review_variance_over: string;
+    discount_approval_over: string;
 }>({
     name: props.settings.name,
     receipt_footer: props.settings.receipt_footer ?? '',
     cash_approval_over: props.settings.cash_approval_over,
     shift_review_variance_over: props.settings.shift_review_variance_over,
+    discount_approval_over: props.settings.discount_approval_over,
     logo: null,
     remove_logo: false,
 });
@@ -198,6 +201,30 @@ function submit(): void {
                             :message="form.errors.shift_review_variance_over"
                         />
                     </div>
+                </div>
+            </fieldset>
+
+            <fieldset class="grid gap-4 border-t border-border pt-4">
+                <legend class="pt-4 text-sm font-semibold">Discounts</legend>
+                <div class="grid gap-2 sm:max-w-xs">
+                    <Label for="discount_approval_over"
+                        >Approve discounts over (₱)</Label
+                    >
+                    <Input
+                        id="discount_approval_over"
+                        v-model="form.discount_approval_over"
+                        inputmode="decimal"
+                        autocomplete="off"
+                        aria-describedby="discount-approval-help"
+                    />
+                    <p
+                        id="discount-approval-help"
+                        class="text-xs text-muted-foreground"
+                    >
+                        A discount larger than this needs a manager to approve
+                        it at the counter.
+                    </p>
+                    <InputError :message="form.errors.discount_approval_over" />
                 </div>
             </fieldset>
 

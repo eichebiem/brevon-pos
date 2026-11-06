@@ -2,6 +2,10 @@
 
 namespace App\Domain\Sales;
 
+use App\Domain\Discounts\AppliedDiscount;
+use App\Domain\Discounts\DiscountApproval;
+use App\Domain\Discounts\DiscountCalculator;
+use App\Domain\Discounts\DiscountRequest;
 use App\Domain\Inventory\InsufficientStock;
 use App\Domain\Inventory\InventoryLedger;
 use App\Domain\Inventory\StockChange;
@@ -11,6 +15,7 @@ use App\Domain\Shared\BusinessClock;
 use App\Domain\Shared\Money;
 use App\Domain\Shared\NumberSequence;
 use App\Domain\Shared\Quantity;
+use App\Enums\BeneficiaryType;
 use App\Enums\InventoryMovementType;
 use App\Enums\InventoryTrackingMode;
 use App\Enums\OrderPaymentStatus;
@@ -20,10 +25,14 @@ use App\Enums\PaymentStatus;
 use App\Enums\ProductType;
 use App\Models\Branch;
 use App\Models\CashierShift;
+use App\Models\Discount;
 use App\Models\Order;
+use App\Models\OrderDiscount;
+use App\Models\OrderDiscountBeneficiary;
 use App\Models\OrderItem;
 use App\Models\OrderItemOption;
 use App\Models\OrderStatusHistory;
+use App\Models\OrderTaxLine;
 use App\Models\Payment;
 use App\Models\PaymentMethod;
 use App\Models\User;
@@ -40,7 +49,8 @@ use Illuminate\Validation\ValidationException;
  * Location, terminal and shift come from the cashier's open shift (FR-012,
  * FR-106, D-060), and the location's operating period is re-checked inside
  * the transaction (FR-107). Rows are locked in one fixed order — shift,
- * payment method (GCash reference check), number sequence, stock balances —
+ * payment method (GCash reference check), discount (when it has a use
+ * limit), number sequence, stock balances —
  * so concurrent checkouts queue instead of deadlocking.
  */
 class CheckoutService
@@ -51,6 +61,8 @@ class CheckoutService
         private readonly InventoryLedger $ledger,
         private readonly AuditLogger $audit,
         private readonly RecipeBook $recipes,
+        private readonly DiscountCalculator $discounts,
+        private readonly DiscountApproval $approvals,
     ) {}
 
     public function checkout(User $cashier, CheckoutData $data): CheckoutResult
@@ -102,7 +114,8 @@ class CheckoutService
         }
 
         $this->assertOrderDetails($data);
-        $cart = $this->pricer->price($location, $data->lines);
+        $cart = $this->pricer->price($location, $data->lines, $data->discount);
+        $beneficiary = $cart->discount?->discount->isSeniorPwd() ? $this->discounts->beneficiary($data->discount?->beneficiary) : null;
 
         if ($data->expectedTotal !== null && ! $data->expectedTotal->equals($cart->grandTotal)) {
             throw ValidationException::withMessages(['expected_total' => __('Prices changed: the total is now :total. Review the order and try again.', ['total' => $cart->grandTotal->format()])]);
@@ -114,6 +127,7 @@ class CheckoutService
 
         $method = $this->lockMethod($data->payment);
         $payment = $this->preparePayment($cashier, $method, $data->payment, $cart->grandTotal);
+        $approver = $cart->discount === null || $data->discount === null ? null : $this->authoriseDiscount($cashier, $location, $cart->discount, $data->discount);
 
         $number = sprintf('%s-%s-%04d', $location->code, $today->format('Ymd'), $this->numbers->next($location, 'order', $today));
         $status = $this->initialStatus($data, $cart);
@@ -145,6 +159,8 @@ class CheckoutService
         ])->save();
 
         $this->saveLines($order, $cart);
+        $this->saveDiscount($order, $cart, $cashier, $approver, $beneficiary, $data->discount?->reason);
+        $this->saveTaxes($order, $cart);
         $this->recordStatus($order, null, OrderStatus::Confirmed, $cashier);
         if ($status === OrderStatus::Completed) {
             $this->recordStatus($order, OrderStatus::Confirmed, OrderStatus::Completed, $cashier);
@@ -296,7 +312,7 @@ class CheckoutService
 
     private function saveLines(Order $order, PricedCart $cart): void
     {
-        foreach ($cart->lines as $line) {
+        foreach ($cart->lines as $i => $line) {
             $item = new OrderItem;
             $item->forceFill([
                 'order_id' => $order->id,
@@ -309,6 +325,8 @@ class CheckoutService
                 'quantity' => $line->quantity->toString(),
                 'unit_price' => $line->unitPrice->toDecimal(),
                 'option_total' => $line->optionTotal->toDecimal(),
+                'discount_amount' => ($cart->lineDiscounts[$i] ?? Money::zero())->toDecimal(),
+                'tax_amount' => ($cart->lineTaxes[$i] ?? Money::zero())->toDecimal(),
                 'line_total' => $line->lineTotal->toDecimal(),
                 'notes' => $line->notes,
             ])->save();
@@ -323,6 +341,90 @@ class CheckoutService
                     'price_delta_snapshot' => $choice['option']->price_delta,
                 ])->save();
             }
+        }
+    }
+
+    /**
+     * D-145, D-146: a limited discount is locked (after the payment method,
+     * before the number sequence) and its uses counted again, then the
+     * approval is checked.
+     */
+    private function authoriseDiscount(User $cashier, Branch $location, AppliedDiscount $applied, DiscountRequest $request): ?User
+    {
+        if ($applied->discount->max_uses !== null) {
+            $locked = Discount::query()->whereKey($applied->discount->id)->lockForUpdate()->firstOrFail();
+            if ($this->discounts->usedUp($locked)) {
+                throw ValidationException::withMessages(['discount' => __(':name has been used up.', ['name' => $locked->name])]);
+            }
+        }
+
+        return $this->approvals->resolve($cashier, $location, $applied->discount, $applied->amount, $request);
+    }
+
+    /**
+     * FR-084, D-148: what was given, by whom and who approved it; SC/PWD
+     * details go only on their own encrypted row. The audit entry carries the
+     * masked details.
+     *
+     * @param  array{type: BeneficiaryType, full_name: string, card_number: string, address: string}|null  $beneficiary
+     */
+    private function saveDiscount(Order $order, PricedCart $cart, User $cashier, ?User $approver, ?array $beneficiary, ?string $reason): void
+    {
+        $applied = $cart->discount;
+        if ($applied === null) {
+            return;
+        }
+        $discount = $applied->discount;
+        $row = new OrderDiscount;
+        $row->forceFill([
+            'order_id' => $order->id,
+            'discount_id' => $discount->id,
+            'discount_name_snapshot' => $discount->name,
+            'discount_code_snapshot' => $discount->code,
+            'discount_type_snapshot' => $discount->discount_type,
+            'discount_value_snapshot' => $discount->value,
+            'discount_amount' => $applied->amount->toDecimal(),
+            'reason' => $reason,
+            'applied_by' => $cashier->id,
+            'approved_by' => $approver?->id,
+        ])->save();
+
+        $masked = null;
+        if ($beneficiary !== null) {
+            $person = new OrderDiscountBeneficiary;
+            $person->forceFill([
+                'order_discount_id' => $row->id,
+                'beneficiary_type' => $beneficiary['type'],
+                'full_name' => $beneficiary['full_name'],
+                'card_number' => $beneficiary['card_number'],
+                'address' => $beneficiary['address'],
+            ])->save();
+            $masked = ['type' => $beneficiary['type']->value, 'name' => $person->maskedName(), 'card_number' => $person->maskedCard()];
+        }
+
+        $this->audit->record('discount.applied', $row, null, [
+            'order_number' => $order->order_number,
+            'discount' => $discount->name,
+            'code' => $discount->code,
+            'amount' => $row->discount_amount,
+            'lines' => count($applied->lineIndexes),
+            'approved_by' => $approver?->username,
+            'beneficiary' => $masked,
+        ], $order->branch_id, $cashier);
+    }
+
+    private function saveTaxes(Order $order, PricedCart $cart): void
+    {
+        foreach ($cart->taxes as $tax) {
+            (new OrderTaxLine)->forceFill([
+                'order_id' => $order->id,
+                'tax_rule_id' => $tax->rule->id,
+                'tax_name_snapshot' => $tax->rule->name,
+                'tax_rate_snapshot' => $tax->rule->rate,
+                'inclusive_snapshot' => $tax->rule->inclusive,
+                'taxable_amount' => $tax->taxable->toDecimal(),
+                'tax_amount' => $tax->amount->toDecimal(),
+            ])->save();
         }
     }
 

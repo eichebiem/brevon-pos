@@ -15,6 +15,7 @@ use App\Models\Order;
 use App\Models\OrderStatusHistory;
 use App\Models\Payment;
 use App\Models\User;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -111,6 +112,7 @@ class OrderController extends Controller
                 'can_advance' => $user->can('orders.update-status') && $order->status->isActive() && $order->status !== OrderStatus::Pending,
                 'can_cancel' => $user->can('orders.cancel') && $order->status->isCancellable(),
                 'can_verify' => $user->can('payments.verify-ewallet') && $order->status !== OrderStatus::Cancelled,
+                'can_view_beneficiary' => $user->can('discounts.view-beneficiary') && $order->discount()->whereHas('beneficiary')->exists(),
             ],
         ]);
     }
@@ -124,6 +126,24 @@ class OrderController extends Controller
             'receipt' => $receipt->for($order),
             'autoPrint' => $request->boolean('auto'),
         ]);
+    }
+
+    /**
+     * D-068, D-148: full SC/PWD details for someone allowed to see them, on
+     * request only; every look is written to the audit log.
+     */
+    public function beneficiary(Request $request, Order $order, AuditLogger $audit): JsonResponse
+    {
+        $this->authorizeView($request, $order);
+        /** @var User $user */
+        $user = $request->user();
+        abort_unless($user->can('discounts.view-beneficiary'), 403);
+        $person = $order->discount?->beneficiary;
+        abort_if($person === null, 404);
+
+        $audit->record('discount.beneficiary_viewed', $order, null, ['order_number' => $order->order_number], $order->branch_id, $user);
+
+        return response()->json($person->forDisplay(true));
     }
 
     /** FR-034: a reprint is logged, and nothing else is created. */

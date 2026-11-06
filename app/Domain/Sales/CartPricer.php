@@ -4,7 +4,10 @@ namespace App\Domain\Sales;
 
 use App\Domain\Catalog\CatalogQuery;
 use App\Domain\Catalog\PriceResolver;
+use App\Domain\Discounts\DiscountCalculator;
+use App\Domain\Discounts\DiscountRequest;
 use App\Domain\Shared\Money;
+use App\Domain\Tax\TaxCalculator;
 use App\Enums\OptionSelectionType;
 use App\Models\Branch;
 use App\Models\OptionGroup;
@@ -20,7 +23,8 @@ use Illuminate\Validation\ValidationException;
  * (active, on the POS, in an active category, enabled here, finished stock
  * at a pop-up), the variant and options must be valid and active, and the
  * price is the one in force now. Line total = quantity × (unit price +
- * options), rounded half-up to the centavo (D-034). Errors are keyed
+ * options), rounded half-up to the centavo (D-034). A discount and any
+ * tax rules in effect are applied after (D-147, D-149). Errors are keyed
  * `items.{index}` so the POS can point at the line.
  */
 class CartPricer
@@ -30,12 +34,14 @@ class CartPricer
     public function __construct(
         private readonly CatalogQuery $catalog,
         private readonly PriceResolver $prices,
+        private readonly DiscountCalculator $discounts,
+        private readonly TaxCalculator $taxes,
     ) {}
 
     /**
      * @param  list<CartLine>  $lines
      */
-    public function price(Branch $location, array $lines): PricedCart
+    public function price(Branch $location, array $lines, ?DiscountRequest $discount = null): PricedCart
     {
         if ($lines === []) {
             throw ValidationException::withMessages(['items' => __('Add at least one item.')]);
@@ -69,10 +75,41 @@ class CartPricer
         }
 
         $subtotal = Money::sum(array_map(fn (PricedLine $l) => $l->lineTotal, $priced));
-        $discount = Money::zero();
-        $tax = Money::zero();
 
-        return new PricedCart($priced, $subtotal, $discount, $tax, $subtotal->subtract($discount)->add($tax));
+        // Discount (D-147), spread over the lines it covers.
+        $applied = $discount === null ? null : $this->discounts->apply($discount, $priced);
+        $lineDiscounts = array_fill(0, count($priced), Money::zero());
+        if ($applied !== null) {
+            $weights = [];
+            foreach ($applied->lineIndexes as $i) {
+                $weights[$i] = $priced[$i]->lineTotal;
+            }
+            foreach (DiscountCalculator::allocate($applied->amount, $weights) as $i => $part) {
+                $lineDiscounts[$i] = $part;
+            }
+        }
+        $discountTotal = $applied->amount ?? Money::zero();
+
+        // Tax on what is left after the discount (D-149), spread the same way.
+        $net = [];
+        foreach ($priced as $i => $line) {
+            $net[$i] = $line->lineTotal->subtract($lineDiscounts[$i]);
+        }
+        $taxes = $this->taxes->apply($subtotal->subtract($discountTotal));
+        $lineTaxes = array_fill(0, count($priced), Money::zero());
+        $taxTotal = Money::zero();
+        $added = Money::zero();
+        foreach ($taxes as $tax) {
+            foreach (DiscountCalculator::allocate($tax->amount, $net) as $i => $part) {
+                $lineTaxes[$i] = $lineTaxes[$i]->add($part);
+            }
+            $taxTotal = $taxTotal->add($tax->amount);
+            if (! $tax->rule->inclusive) {
+                $added = $added->add($tax->amount);
+            }
+        }
+
+        return new PricedCart($priced, $subtotal, $discountTotal, $taxTotal, $subtotal->subtract($discountTotal)->add($added), $applied, array_values($lineDiscounts), array_values($lineTaxes), $taxes);
     }
 
     private function line(Branch $location, ?Product $product, CartLine $line): PricedLine

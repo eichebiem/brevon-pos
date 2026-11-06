@@ -4,6 +4,7 @@ import {
     ChefHat,
     Coins,
     BadgeCheck,
+    BadgePercent,
     BookOpen,
     Boxes,
     Calculator,
@@ -12,6 +13,7 @@ import {
     CookingPot,
     Croissant,
     Factory,
+    Landmark,
     FileText,
     FolderTree,
     History,
@@ -54,12 +56,14 @@ import { index as itemsIndex } from '@/routes/admin/inventory/items';
 import { index as locationsIndex } from '@/routes/admin/locations';
 import { index as optionGroupsIndex } from '@/routes/admin/option-groups';
 import { index as paymentMethodsIndex } from '@/routes/admin/payment-methods';
+import { index as taxRulesIndex } from '@/routes/admin/tax-rules';
 import { index as productionIndex } from '@/routes/admin/production';
 import { index as productsIndex } from '@/routes/admin/products';
 import { index as purchaseOrdersIndex } from '@/routes/admin/purchase-orders';
 import { index as receiptsIndex } from '@/routes/admin/receipts';
 import { index as recipesIndex } from '@/routes/admin/recipes';
 import { edit as storeSettings } from '@/routes/admin/settings';
+import { index as discountsIndex } from '@/routes/admin/discounts';
 import { index as rolesIndex } from '@/routes/admin/roles';
 import { index as shiftsIndex } from '@/routes/admin/shifts';
 import { index as suppliersIndex } from '@/routes/admin/suppliers';
@@ -247,6 +251,18 @@ const administration = computed(() =>
             title: 'Payment methods',
             href: paymentMethodsIndex(),
             icon: Wallet,
+            permission: 'settings.manage',
+        },
+        {
+            title: 'Discounts',
+            href: discountsIndex(),
+            icon: BadgePercent,
+            permission: 'settings.manage',
+        },
+        {
+            title: 'Tax rules',
+            href: taxRulesIndex(),
+            icon: Landmark,
             permission: 'settings.manage',
         },
         {

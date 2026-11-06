@@ -7,6 +7,7 @@ use App\Models\Branch;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\OrderItemOption;
+use App\Models\OrderTaxLine;
 use App\Models\Payment;
 
 /**
@@ -27,7 +28,8 @@ class OrderReceipt
      */
     public function for(Order $order): array
     {
-        $order->loadMissing(['branch', 'terminal', 'creator', 'items.options', 'payments.method']);
+        $order->loadMissing(['branch', 'terminal', 'creator', 'items.options', 'payments.method', 'discount.beneficiary', 'discount.approver:id,name', 'taxLines']);
+        $discount = $order->discount;
         /** @var Branch $location */
         $location = $order->branch;
 
@@ -67,8 +69,26 @@ class OrderReceipt
                 'unit_price' => $item->unit_price,
                 'option_total' => $item->option_total,
                 'line_total' => $item->line_total,
+                'discount_amount' => $item->discount_amount,
                 'notes' => $item->notes,
                 'options' => $item->options->map(fn (OrderItemOption $o) => ['name' => $o->option_name_snapshot, 'price_delta' => $o->price_delta_snapshot])->all(),
+            ])->all(),
+            // D-148: beneficiary details are always masked on the receipt.
+            'discount' => $discount === null ? null : [
+                'name' => $discount->discount_name_snapshot,
+                'code' => $discount->discount_code_snapshot,
+                'type' => $discount->discount_type_snapshot->value,
+                'value' => $discount->discount_value_snapshot,
+                'amount' => $discount->discount_amount,
+                'approved_by' => $discount->approver?->name,
+                'beneficiary' => $discount->beneficiary?->forDisplay(false),
+            ],
+            'taxes' => $order->taxLines->map(fn (OrderTaxLine $t) => [
+                'name' => $t->tax_name_snapshot,
+                'rate' => rtrim(rtrim($t->tax_rate_snapshot, '0'), '.'),
+                'inclusive' => $t->inclusive_snapshot,
+                'taxable_amount' => $t->taxable_amount,
+                'amount' => $t->tax_amount,
             ])->all(),
             'payments' => $order->payments->map(fn (Payment $p) => [
                 'method' => $p->method?->name,
