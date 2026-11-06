@@ -36,6 +36,22 @@ export function formatMoney(value: string | null | undefined): string {
         : peso.format(Number(value));
 }
 
+const unitPeso = new Intl.NumberFormat('en-PH', {
+    style: 'currency',
+    currency: 'PHP',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 4,
+});
+
+/**
+ * A cost per unit, kept to 4 decimal places (e.g. ₱0.054 per gram). Display only.
+ */
+export function formatUnitCost(value: string | null | undefined): string {
+    return value === null || value === undefined || value === ''
+        ? '—'
+        : unitPeso.format(Number(value));
+}
+
 /** Native <select> styling shared by admin forms and filters. */
 export const selectClass =
     'h-9 rounded-md border border-input bg-card px-3 text-sm focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-50';

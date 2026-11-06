@@ -250,9 +250,54 @@ erDiagram
       bigint inventory_item_id FK
       decimal quantity
       decimal unit_cost }
+    suppliers { bigint id PK
+      varchar supplier_code UK "SUPnnn"
+      varchar name
+      boolean is_active }
+    purchase_orders { bigint id PK
+      bigint branch_id FK
+      bigint supplier_id FK
+      varchar po_number UK
+      varchar status
+      date expected_at
+      decimal subtotal
+      bigint approved_by FK
+      datetime cancelled_at "(+)"
+      bigint cancelled_by FK "(+)"
+      text cancel_reason "(+)" }
+    purchase_order_items { bigint purchase_order_id FK
+      bigint inventory_item_id FK
+      decimal quantity_ordered
+      decimal quantity_received
+      decimal unit_cost
+      decimal line_total }
+    goods_receipts { bigint id PK
+      bigint branch_id FK
+      bigint purchase_order_id FK "nullable"
+      bigint supplier_id FK "(+) nullable"
+      varchar receipt_number UK
+      bigint received_by FK
+      bigint over_receipt_approved_by FK "(+)" }
+    goods_receipt_items { bigint goods_receipt_id FK
+      bigint purchase_order_item_id FK
+      bigint inventory_item_id FK
+      bigint inventory_lot_id FK
+      decimal quantity_received
+      decimal unit_cost
+      varchar condition "accepted | damaged | expired" }
+    inventory_lots { bigint id PK
+      bigint branch_id FK
+      bigint inventory_item_id FK
+      varchar lot_number
+      date expires_at
+      decimal quantity_received
+      decimal quantity_remaining "FEFO estimate"
+      bigint supplier_id FK }
 ```
 
 Phase 7a constraints (D-131, D-133): CHECK `stock_adjustments.kind IN ('count','change')`, `status IN ('pending','posted','rejected')`; CHECK `variance_quantity = counted_quantity - system_quantity AND counted_quantity >= 0`; UNIQUE `(stock_adjustment_id, inventory_item_id)` and `(stock_transfer_id, inventory_item_id)`; CHECK `from_branch_id <> to_branch_id`, `quantity > 0`. Model guards: decided adjustments, their lines (except the cost stamped at posting) and every dispatch are never edited or deleted. `stock_transfers` is not in SRS §8.7 (schema addition from D-063).
+
+Phase 7b constraints (D-135–D-138, migration `2026_11_06_140000`): CHECK `purchase_orders.status IN ('draft','submitted','partially_received','received','cancelled')`, `subtotal >= 0`; CHECK order lines `quantity_ordered > 0`, `quantity_received >= 0`, costs/totals `>= 0`; UNIQUE `(purchase_order_id, inventory_item_id)`; CHECK `inventory_lots` `quantity_received > 0`, `0 <= quantity_remaining <= quantity_received`; CHECK receipt lines `quantity_received > 0` and `condition IN ('accepted','damaged','expired')`; INDEX `inventory_lots(branch_id, inventory_item_id, expires_at)` for first-expiring-first use. `inventory_movements.inventory_lot_id` (nullable FK) is set on receipt movements. Model guards: sent orders keep their lines (only `quantity_received` moves), received/cancelled orders and all receipts are immutable, a lot changes only its remaining quantity; nothing here is deleted. Morph aliases `supplier`, `purchase_order`, `goods_receipt`, `inventory_lot`.
 
 Invariant: for every (branch, item), `branch_inventory.quantity_on_hand = Σ inventory_movements.quantity_delta`. All writes go through one `InventoryLedger` service that locks the `branch_inventory` row (`FOR UPDATE`, rows locked in ascending item-id order to avoid deadlocks), checks negative stock, inserts the movement with `balance_after`, and updates the projection in the same transaction. Balances are per location, pop-ups included. `transfer_in`/`transfer_out` movement types are used only by the Phase 7 main → pop-up dispatch; rejected by the ledger before then (D-063). UNIQUE `branch_inventory(branch_id, inventory_item_id)`; INDEX `inventory_movements(branch_id, inventory_item_id, created_at)`, `purchase_orders(branch_id, status)`.
 
@@ -294,7 +339,7 @@ UNIQUE `recipes(product_id, version)`. Posting a batch: one transaction, status 
 4. number_sequences, branch_inventory, inventory_movements (no `inventory_lot_id` until Phase 7) — **Phase 4a (done)**, D-051/D-096
 5. payment_methods, cashier_shifts — **Phase 4a (done)**; orders, order_items, order_item_options, order_status_histories, payments — **Phase 4b (done)**
 6. cash_movements — **Phase 6 (done)**
-7. stock_adjustments(+items), stock_transfers(+items) — **Phase 7a (done)**; suppliers, inventory_lots, purchase_orders(+items), goods_receipts(+items) — Phase 7b
+7. stock_adjustments(+items), stock_transfers(+items) — **Phase 7a (done)**; suppliers, purchase_orders(+items), inventory_lots, goods_receipts(+items), inventory_movements.inventory_lot_id — **Phase 7b (done)**
 8. recipes, recipe_items, production_batches, production_batch_items, waste_records — Phase 8
 9. discounts, order_discounts, tax_rules, order_tax_lines, refunds, refund_items — Phase 9
 

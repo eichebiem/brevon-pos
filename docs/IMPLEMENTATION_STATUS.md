@@ -2,23 +2,23 @@
 
 Last updated: 2026-11-06 · Baseline: SRS **v1.1** (`docs/BREVON-SRS-v1.1.md`) · Prompt: `CLAUDE_CODE_PROMPT_BREVON_POS_v1.1.md` (v1.3)
 
-| Phase                                         | Status                                          | Notes                                                                     |
-| --------------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------- |
-| 0 — Discovery and technical plan              | ✅ Passed (docs only), re-baselined to SRS v1.1 | Approved 2026-11-05                                                       |
-| 1 — Project foundation                        | ✅ Passed                                       | Approved; committed by user as "Initial Commit"                           |
-| 2 — Authentication and access control         | ✅ Passed                                       | Approved; committed by user ("Done Phase 2")                              |
-| 3 — Catalog, settings and operating locations | ✅ Passed                                       | Approved; committed by user ("Done Phase 3")                              |
-| 4a — Ledger core and shift open               | ✅ Passed                                       | Approved; committed by user (with the seeder changes)                     |
-| 4b — Checkout backend                         | ✅ Passed                                       | Approved 2026-11-06                                                       |
-| 4c — Cashier UI and receipts                  | ✅ Passed                                       | Approved 2026-11-06 (with D-121, D-122)                                   |
-| 5 — Orders and preparation                    | ✅ Passed                                       | Approved 2026-11-06                                                       |
-| 6 — Cashier shifts and cash control           | ✅ Passed                                       | Approved 2026-11-06; two limits to confirm (D-127, D-128)                 |
-| 7a — Stock control                            | ✅ Passed — awaiting review                     | Counts/adjustments, waste, low stock, stock items, dispatch (D-131–D-134) |
-| 7b — Purchasing                               | ⏳ Not started                                  | Suppliers, POs, receiving, lots/expiry, valuation; OI-018 deferred        |
-| 8 — Recipes and production                    | ⏳ Not started                                  | Production at the permanent branch only                                   |
-| 9 — Refunds, discounts, tax configuration     | ⏳ Not started                                  | SC/PWD: name, card no., address; 12%, VAT disregarded (D-068)             |
-| 10 — Dashboards and reports                   | ⏳ Not started                                  | Location filters incl. closed pop-ups                                     |
-| 11 — Hardening and release readiness          | ⏳ Not started                                  |                                                                           |
+| Phase                                         | Status                                          | Notes                                                         |
+| --------------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------- |
+| 0 — Discovery and technical plan              | ✅ Passed (docs only), re-baselined to SRS v1.1 | Approved 2026-11-05                                           |
+| 1 — Project foundation                        | ✅ Passed                                       | Approved; committed by user as "Initial Commit"               |
+| 2 — Authentication and access control         | ✅ Passed                                       | Approved; committed by user ("Done Phase 2")                  |
+| 3 — Catalog, settings and operating locations | ✅ Passed                                       | Approved; committed by user ("Done Phase 3")                  |
+| 4a — Ledger core and shift open               | ✅ Passed                                       | Approved; committed by user (with the seeder changes)         |
+| 4b — Checkout backend                         | ✅ Passed                                       | Approved 2026-11-06                                           |
+| 4c — Cashier UI and receipts                  | ✅ Passed                                       | Approved 2026-11-06 (with D-121, D-122)                       |
+| 5 — Orders and preparation                    | ✅ Passed                                       | Approved 2026-11-06                                           |
+| 6 — Cashier shifts and cash control           | ✅ Passed                                       | Approved 2026-11-06; two limits to confirm (D-127, D-128)     |
+| 7a — Stock control                            | ✅ Passed                                       | Approved 2026-11-06 (D-131–D-134)                             |
+| 7b — Purchasing                               | ✅ Passed — awaiting review                     | Suppliers, POs, receiving, lots, stock value (D-135–D-139)    |
+| 8 — Recipes and production                    | ⏳ Not started                                  | Production at the permanent branch only                       |
+| 9 — Refunds, discounts, tax configuration     | ⏳ Not started                                  | SC/PWD: name, card no., address; 12%, VAT disregarded (D-068) |
+| 10 — Dashboards and reports                   | ⏳ Not started                                  | Location filters incl. closed pop-ups                         |
+| 11 — Hardening and release readiness          | ⏳ Not started                                  |                                                               |
 
 ## Phase 0 log
 
@@ -413,3 +413,39 @@ Still to confirm: boxes/combo at pop-ups (D-089), hot vs iced coffee prices. Pha
 - The user's `brevon_pos` needs `php artisan migrate` (Phase 4b tables, D-121, Phase 6 and Phase 7a).
 
 **Next step:** Phase 7b — purchasing, after user review.
+
+## Phase 7b log — Purchasing (2026-11-06)
+
+**Objective:** buy stock properly: suppliers, purchase orders a manager approves, deliveries received in full or in parts (with damaged goods and over-deliveries handled), lot and expiry tracking, and the value of stock on hand.
+**SRS IDs:** FR-056 (receiving), FR-058, FR-059, FR-060, FR-063, UC-006; T-INV-4, T-PO-1.
+
+**Implemented**
+
+- Schema (`2026_11_06_140000`): `suppliers`, `purchase_orders` / `purchase_order_items`, `goods_receipts` / `goods_receipt_items`, `inventory_lots`, and `inventory_movements.inventory_lot_id`. Additions to SRS §8.7: cancel fields on orders, `goods_receipts.supplier_id` and `over_receipt_approved_by`. CHECK rules on statuses, quantities, costs and conditions. Morph names `supplier`, `purchase_order`, `goods_receipt`, `inventory_lot`.
+- Domain: `SupplierService` (codes SUP001…), `PurchaseOrders` (draft, edit, approve-and-send, cancel), `GoodsReceiving` (one transaction per delivery: receipt, lots, `purchase_receipt` movements at the delivered cost, order quantities and status), `PurchaseItems` (only ingredients, packaging and retail items, only at the main branch), `Lots` (expiry flags). `InventoryLedger` now links receipt movements to their lot and uses lots up first-expiring-first when stock leaves (D-138).
+- HTTP / permissions: suppliers (`suppliers.manage`), purchase orders (view with any purchasing permission; drafts `purchase-orders.create`; send `purchase-orders.approve`; cancel a sent order needs approve), deliveries (`purchase-orders.receive` against an order, `inventory.receive` without one), Lots & expiry (`inventory.view`), Stock value (`reports.inventory`). Other locations answer 404.
+- UI: Suppliers list and form; Purchase orders list, form (pick items, live totals), detail (approve, receive, cancel with reason, deliveries); Deliveries list, receive form (from an order with "Everything due arrived", or without an order; damaged/expired, lot and expiry, accept extra), detail; Lots & expiry; Stock value; expiry alert on Stock on hand; sidebar "Purchasing" section. Unit costs now show up to 4 decimal places.
+- Docs: DECISIONS §Y (D-135–D-139), ERD §5, TEST_PLAN map, README.
+
+**Verification (all run 2026-11-06)**
+
+| Command                                                            | Result                   |
+| ------------------------------------------------------------------ | ------------------------ |
+| `composer check` → build, `vp check`, `vue-tsc`, Pint, Larastan L7 | all pass, 0 errors       |
+| → `php artisan test` (MySQL)                                       | **292 passed** (was 281) |
+
+**Manual checks (browser, scratch DB `brevon_pos_test`, signed in as `harris`):** created a supplier-backed order for 10,000 g flour at ₱0.05 and 2,000 g cream at ₱0.30 (total ₱1,100.00), approved it (Ordered); received 6,000 g flour and 1,000 g cream (lot L-01, expiring in 3 days) plus 200 g damaged cream (Partly received; stock on hand showed the expiry alert); received 4,000 g flour at ₱0.06 and 1,200 g cream — the extra was refused until "Accept more than ordered" was ticked and a note given (Received; "accepted by Harris" on the receipt). Stock value showed flour at ₱0.054 average (₱540.00) and a ₱1,200.00 total; Lots & expiry listed L-01 (Expiring soon) and L-02 (In date). No console errors. The user's `brevon_pos` was not touched.
+
+**Problems found and fixed during the phase**
+
+- Average costs per gram showed as ₱0.05 instead of ₱0.054 because money is shown to 2 places; costs per unit now show up to 4 places (stock, value, orders, deliveries, adjustments).
+- The over-delivery message showed "1000.000 g"; it now says "1,000 g".
+
+**Known issues / deferred**
+
+- To confirm with the owner: weighted average as the costing method (D-048, OI-014) and the 7-day "expiring soon" window (D-138). Lot quantities left are an estimate (stock is not picked by lot at the counter).
+- No negative-stock override in V1 (D-047 stays "blocked").
+- Still to confirm: the Phase 6 limits (₱500.00 approval, ₱0.00 review). D-101 client menu questions: raise again after Phase 9.
+- The user's `brevon_pos` needs `php artisan migrate` (Phase 4b tables, D-121, Phase 6, 7a and 7b).
+
+**Next step:** Phase 8 — recipes and production, after user review.

@@ -6,12 +6,16 @@ use App\Http\Controllers\Admin\Inventory\DispatchController;
 use App\Http\Controllers\Admin\Inventory\InventoryItemController;
 use App\Http\Controllers\Admin\Inventory\StockAdjustmentController;
 use App\Http\Controllers\Admin\Inventory\StockController;
+use App\Http\Controllers\Admin\Inventory\StockValueController;
 use App\Http\Controllers\Admin\Inventory\WasteController;
 use App\Http\Controllers\Admin\LocationController;
 use App\Http\Controllers\Admin\OptionGroupController;
 use App\Http\Controllers\Admin\PaymentMethodController;
 use App\Http\Controllers\Admin\ProductController;
 use App\Http\Controllers\Admin\ProductPriceController;
+use App\Http\Controllers\Admin\Purchasing\GoodsReceiptController;
+use App\Http\Controllers\Admin\Purchasing\PurchaseOrderController;
+use App\Http\Controllers\Admin\Purchasing\SupplierController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\ShiftReviewController;
 use App\Http\Controllers\Admin\StoreSettingsController;
@@ -191,6 +195,39 @@ Route::middleware(['auth'])->group(function () {
         Route::middleware('permission:inventory.approve-adjustment')->group(function () {
             Route::post('inventory/adjustments/{adjustment}/approve', [StockAdjustmentController::class, 'approve'])->name('inventory.adjustments.approve');
             Route::post('inventory/adjustments/{adjustment}/reject', [StockAdjustmentController::class, 'reject'])->name('inventory.adjustments.reject');
+        });
+
+        // Lots and stock value (FR-060, FR-063; D-138, D-139).
+        Route::get('inventory/lots', [StockValueController::class, 'lots'])->middleware('permission:inventory.view')->name('inventory.lots');
+        Route::get('inventory/valuation', [StockValueController::class, 'valuation'])->middleware('permission:reports.inventory')->name('inventory.valuation');
+
+        // Purchasing (FR-058, FR-059, UC-006; D-135–D-137).
+        Route::middleware('permission:suppliers.manage')->group(function () {
+            Route::get('suppliers', [SupplierController::class, 'index'])->name('suppliers.index');
+            Route::get('suppliers/create', [SupplierController::class, 'create'])->name('suppliers.create');
+            Route::post('suppliers', [SupplierController::class, 'store'])->name('suppliers.store');
+            Route::get('suppliers/{supplier}/edit', [SupplierController::class, 'edit'])->name('suppliers.edit');
+            Route::put('suppliers/{supplier}', [SupplierController::class, 'update'])->name('suppliers.update');
+        });
+        Route::middleware('permission:purchase-orders.create')->group(function () {
+            Route::get('purchase-orders/create', [PurchaseOrderController::class, 'create'])->name('purchase-orders.create');
+            Route::post('purchase-orders', [PurchaseOrderController::class, 'store'])->name('purchase-orders.store');
+            Route::get('purchase-orders/{order}/edit', [PurchaseOrderController::class, 'edit'])->name('purchase-orders.edit');
+            Route::put('purchase-orders/{order}', [PurchaseOrderController::class, 'update'])->name('purchase-orders.update');
+        });
+        Route::middleware('permission:purchase-orders.create|purchase-orders.approve|purchase-orders.receive')->group(function () {
+            Route::get('purchase-orders', [PurchaseOrderController::class, 'index'])->name('purchase-orders.index');
+            Route::get('purchase-orders/{order}', [PurchaseOrderController::class, 'show'])->name('purchase-orders.show');
+        });
+        // Cancelling a sent order also needs purchase-orders.approve (checked by PurchaseOrders::cancel).
+        Route::post('purchase-orders/{order}/cancel', [PurchaseOrderController::class, 'cancel'])->middleware('permission:purchase-orders.create|purchase-orders.approve')->name('purchase-orders.cancel');
+        Route::post('purchase-orders/{order}/submit', [PurchaseOrderController::class, 'submit'])->middleware('permission:purchase-orders.approve')->name('purchase-orders.submit');
+        // Against an order: purchase-orders.receive; without one: inventory.receive (checked in the controller).
+        Route::middleware('permission:purchase-orders.receive|inventory.receive')->group(function () {
+            Route::get('receipts', [GoodsReceiptController::class, 'index'])->name('receipts.index');
+            Route::get('receipts/create', [GoodsReceiptController::class, 'create'])->name('receipts.create');
+            Route::post('receipts', [GoodsReceiptController::class, 'store'])->name('receipts.store');
+            Route::get('receipts/{receipt}', [GoodsReceiptController::class, 'show'])->name('receipts.show');
         });
 
         // Shift review and corrections (FR-080–FR-082, D-128–D-130).

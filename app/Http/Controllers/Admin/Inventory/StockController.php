@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin\Inventory;
 
+use App\Domain\Inventory\Lots;
 use App\Domain\Inventory\OpeningStock;
 use App\Domain\Locations\LocationContext;
 use App\Domain\Shared\Quantity;
@@ -70,6 +71,7 @@ class StockController extends Controller
                 ->join('inventory_items', 'inventory_items.id', '=', 'branch_inventory.inventory_item_id')
                 ->where('inventory_items.reorder_level', '>', 0)
                 ->whereColumn('branch_inventory.quantity_on_hand', '<=', 'inventory_items.reorder_level')->count(),
+            'lots' => $location ? app(Lots::class)->counts($location) : ['expiring' => 0, 'expired' => 0],
             'awaitingOpening' => $location ? $this->opening->eligibleItems($location)->count() : 0,
         ]);
     }

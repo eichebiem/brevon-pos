@@ -16,6 +16,7 @@ use LogicException;
  * @property int $id
  * @property int $branch_id
  * @property int $inventory_item_id
+ * @property int|null $inventory_lot_id
  * @property InventoryMovementType $movement_type
  * @property string $quantity_delta
  * @property string|null $unit_cost

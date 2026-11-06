@@ -8,7 +8,9 @@ use App\Models\CashierShift;
 use App\Models\CashMovement;
 use App\Models\Category;
 use App\Models\Employee;
+use App\Models\GoodsReceipt;
 use App\Models\InventoryItem;
+use App\Models\InventoryLot;
 use App\Models\InventoryMovement;
 use App\Models\OptionGroup;
 use App\Models\Order;
@@ -17,9 +19,11 @@ use App\Models\PaymentMethod;
 use App\Models\Product;
 use App\Models\ProductPrice;
 use App\Models\ProductVariant;
+use App\Models\PurchaseOrder;
 use App\Models\Setting;
 use App\Models\StockAdjustment;
 use App\Models\StockTransfer;
+use App\Models\Supplier;
 use App\Models\Terminal;
 use App\Models\User;
 use App\Support\Database\DestructiveCommandGuard;
@@ -84,6 +88,10 @@ class AppServiceProvider extends ServiceProvider
             'cash_movement' => CashMovement::class,
             'stock_adjustment' => StockAdjustment::class,
             'stock_transfer' => StockTransfer::class,
+            'supplier' => Supplier::class,
+            'purchase_order' => PurchaseOrder::class,
+            'goods_receipt' => GoodsReceipt::class,
+            'inventory_lot' => InventoryLot::class,
             'order' => Order::class,
             'payment' => Payment::class,
         ]);

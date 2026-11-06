@@ -182,7 +182,8 @@ function submit(): void {
                     <span
                         >Record lot and expiry when received
                         <span class="block text-xs text-muted-foreground"
-                            >Used by receiving (coming next).</span
+                            >Receiving asks for a lot number or expiry
+                            date.</span
                         ></span
                     >
                 </label>

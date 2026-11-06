@@ -5,14 +5,19 @@ import {
     Coins,
     BadgeCheck,
     Boxes,
+    Calculator,
+    CalendarClock,
     ClipboardCheck,
     Croissant,
+    Factory,
+    FileText,
     FolderTree,
     History,
     LayoutGrid,
     ListPlus,
     MapPin,
     Package,
+    PackageCheck,
     ScrollText,
     Settings2,
     ShieldCheck,
@@ -40,7 +45,7 @@ import { usePermissions } from '@/composables/usePermissions';
 import { dashboard, landing } from '@/routes';
 import { index as auditIndex } from '@/routes/admin/audit';
 import { index as categoriesIndex } from '@/routes/admin/categories';
-import { movements, stock } from '@/routes/admin/inventory';
+import { lots, movements, stock, valuation } from '@/routes/admin/inventory';
 import { index as adjustmentsIndex } from '@/routes/admin/inventory/adjustments';
 import { index as dispatchesIndex } from '@/routes/admin/inventory/dispatches';
 import { index as itemsIndex } from '@/routes/admin/inventory/items';
@@ -48,9 +53,12 @@ import { index as locationsIndex } from '@/routes/admin/locations';
 import { index as optionGroupsIndex } from '@/routes/admin/option-groups';
 import { index as paymentMethodsIndex } from '@/routes/admin/payment-methods';
 import { index as productsIndex } from '@/routes/admin/products';
+import { index as purchaseOrdersIndex } from '@/routes/admin/purchase-orders';
+import { index as receiptsIndex } from '@/routes/admin/receipts';
 import { edit as storeSettings } from '@/routes/admin/settings';
 import { index as rolesIndex } from '@/routes/admin/roles';
 import { index as shiftsIndex } from '@/routes/admin/shifts';
+import { index as suppliersIndex } from '@/routes/admin/suppliers';
 import { index as usersIndex } from '@/routes/admin/users';
 import { index as pos } from '@/routes/pos';
 import { payments as gcashChecks, preparation, shift } from '@/routes/staff';
@@ -59,9 +67,11 @@ import type { NavItem } from '@/types';
 const { can } = usePermissions();
 
 // Links are hidden by permission for convenience only; every route is
-// enforced on the server (FR-007).
+// enforced on the server (FR-007). "a|b" means either permission.
 const visible = (items: NavItem[]) =>
-    items.filter((item) => !item.permission || can(item.permission));
+    items.filter(
+        (item) => !item.permission || item.permission.split('|').some(can),
+    );
 
 const operations = computed(() =>
     visible([
@@ -159,6 +169,42 @@ const inventory = computed(() =>
             icon: Boxes,
             permission: 'inventory.view',
         },
+        {
+            title: 'Lots & expiry',
+            href: lots(),
+            icon: CalendarClock,
+            permission: 'inventory.view',
+        },
+        {
+            title: 'Stock value',
+            href: valuation(),
+            icon: Calculator,
+            permission: 'reports.inventory',
+        },
+    ]),
+);
+
+const purchasing = computed(() =>
+    visible([
+        {
+            title: 'Purchase orders',
+            href: purchaseOrdersIndex(),
+            icon: FileText,
+            permission:
+                'purchase-orders.create|purchase-orders.approve|purchase-orders.receive',
+        },
+        {
+            title: 'Deliveries',
+            href: receiptsIndex(),
+            icon: PackageCheck,
+            permission: 'purchase-orders.receive|inventory.receive',
+        },
+        {
+            title: 'Suppliers',
+            href: suppliersIndex(),
+            icon: Factory,
+            permission: 'suppliers.manage',
+        },
     ]),
 );
 
@@ -230,6 +276,11 @@ const administration = computed(() =>
                 v-if="inventory.length"
                 label="Inventory"
                 :items="inventory"
+            />
+            <NavMain
+                v-if="purchasing.length"
+                label="Purchasing"
+                :items="purchasing"
             />
             <NavMain
                 v-if="administration.length"

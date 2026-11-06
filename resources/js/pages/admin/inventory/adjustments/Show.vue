@@ -5,7 +5,7 @@ import StatusBadge from '@/components/StatusBadge.vue';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
-import { formatDateTime, formatMoney, formatQuantity } from '@/lib/format';
+import { formatDateTime, formatQuantity, formatUnitCost } from '@/lib/format';
 import { approve, index, reject } from '@/routes/admin/inventory/adjustments';
 
 type Line = {
@@ -171,7 +171,7 @@ const signed = (value: string) =>
                             v-if="adjustment.status === 'posted'"
                             class="px-4 py-3 text-right tabular-nums"
                         >
-                            {{ formatMoney(line.unit_cost) }}
+                            {{ formatUnitCost(line.unit_cost) }}
                         </td>
                     </tr>
                 </tbody>
