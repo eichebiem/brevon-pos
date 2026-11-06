@@ -51,6 +51,8 @@ class HandleInertiaRequests extends Middleware
             ],
             // The signed-in cashier's open shift, shown in the POS header (D-060).
             'activeShift' => fn () => $this->activeShiftProps($request),
+            // Features kept for later (D-164); used only to hide links.
+            'features' => ['tax_rules' => (bool) config('brevon.features.tax_rules', false)],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
         ];
     }

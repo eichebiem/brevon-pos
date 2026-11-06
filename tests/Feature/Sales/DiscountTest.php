@@ -301,9 +301,15 @@ class DiscountTest extends TestCase
         $this->assertSame(['0.00', '112.00'], [Order::query()->sole()->tax_total, Order::query()->sole()->grand_total]);
         $this->assertSame(0, OrderTaxLine::query()->count());
 
-        // VAT 12% included in prices: 112 × 12 ÷ 112 = 12.00; the total does not change.
+        // Tax rules are a later feature (D-164): while off, even a rule left on charges nothing.
         $vat = new TaxRule;
         $vat->forceFill(['name' => 'VAT', 'rate' => '12.0000', 'inclusive' => true, 'effective_from' => now()->subDay()->toDateString(), 'is_active' => true])->save();
+        $this->sell($line, [])->assertSessionHasNoErrors();
+        $this->assertSame('0.00', Order::query()->latest('id')->firstOrFail()->tax_total);
+        $this->assertSame(0, OrderTaxLine::query()->count());
+
+        // Switched on: VAT 12% included in prices: 112 × 12 ÷ 112 = 12.00; the total does not change.
+        config(['brevon.features.tax_rules' => true]);
         $this->sell($line, [])->assertSessionHasNoErrors();
         $order = Order::query()->latest('id')->firstOrFail();
         $this->assertSame(['12.00', '112.00'], [$order->tax_total, $order->grand_total]);
@@ -374,8 +380,18 @@ class DiscountTest extends TestCase
         $staff->delete();
     }
 
+    public function test_tax_rules_are_a_later_feature_hidden_while_off(): void
+    {
+        $this->assertFalse(config('brevon.features.tax_rules'), 'off by default (D-164)');
+        $this->actingAs($this->owner)->get('/admin/tax-rules')->assertNotFound();
+        $this->actingAs($this->owner)->post('/admin/tax-rules', ['name' => 'VAT', 'rate' => '12', 'effective_from' => '2026-01-01'])->assertNotFound();
+        $this->assertSame(0, TaxRule::query()->count());
+        $this->actingAs($this->owner)->get('/admin/discounts')->assertInertia(fn (AssertableInertia $page) => $page->where('features.tax_rules', false));
+    }
+
     public function test_tax_rules_screen_validates_and_audits(): void
     {
+        config(['brevon.features.tax_rules' => true]);
         $this->actingAs($this->manager)->get('/admin/tax-rules')->assertForbidden();
         $this->actingAs($this->owner)->post('/admin/tax-rules', ['name' => 'VAT', 'rate' => '0', 'effective_from' => ''])->assertSessionHasErrors(['rate', 'effective_from']);
         $this->actingAs($this->owner)->post('/admin/tax-rules', ['name' => 'VAT', 'rate' => '12', 'inclusive' => true, 'effective_from' => '2026-01-01', 'effective_until' => '2025-12-31'])->assertSessionHasErrors('effective_until');

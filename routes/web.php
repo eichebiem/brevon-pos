@@ -155,11 +155,14 @@ Route::middleware(['auth'])->group(function () {
             Route::post('discounts', [DiscountController::class, 'store'])->name('discounts.store');
             Route::get('discounts/{discount}/edit', [DiscountController::class, 'edit'])->name('discounts.edit');
             Route::put('discounts/{discount}', [DiscountController::class, 'update'])->name('discounts.update');
-            Route::get('tax-rules', [TaxRuleController::class, 'index'])->name('tax-rules.index');
-            Route::get('tax-rules/create', [TaxRuleController::class, 'create'])->name('tax-rules.create');
-            Route::post('tax-rules', [TaxRuleController::class, 'store'])->name('tax-rules.store');
-            Route::get('tax-rules/{taxRule}/edit', [TaxRuleController::class, 'edit'])->name('tax-rules.edit');
-            Route::put('tax-rules/{taxRule}', [TaxRuleController::class, 'update'])->name('tax-rules.update');
+            // Tax rules are a later feature (D-164): 404 until switched on.
+            Route::middleware('feature:tax_rules')->group(function () {
+                Route::get('tax-rules', [TaxRuleController::class, 'index'])->name('tax-rules.index');
+                Route::get('tax-rules/create', [TaxRuleController::class, 'create'])->name('tax-rules.create');
+                Route::post('tax-rules', [TaxRuleController::class, 'store'])->name('tax-rules.store');
+                Route::get('tax-rules/{taxRule}/edit', [TaxRuleController::class, 'edit'])->name('tax-rules.edit');
+                Route::put('tax-rules/{taxRule}', [TaxRuleController::class, 'update'])->name('tax-rules.update');
+            });
         });
 
         // Catalog (FR-015–FR-021). Viewing needs products.view; each change its own permission.

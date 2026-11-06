@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Link } from '@inertiajs/vue3';
+import { Link, usePage } from '@inertiajs/vue3';
 import {
     ArrowLeftRight,
     ChartColumn,
@@ -84,9 +84,12 @@ const { can } = usePermissions();
 
 // Links are hidden by permission for convenience only; every route is
 // enforced on the server (FR-007). "a|b" means either permission.
+const page = usePage();
 const visible = (items: NavItem[]) =>
     items.filter(
-        (item) => !item.permission || item.permission.split('|').some(can),
+        (item) =>
+            (!item.feature || page.props.features?.[item.feature]) &&
+            (!item.permission || item.permission.split('|').some(can)),
     );
 
 const operations = computed(() =>
@@ -319,6 +322,7 @@ const administration = computed(() =>
             href: taxRulesIndex(),
             icon: Landmark,
             permission: 'settings.manage',
+            feature: 'tax_rules',
         },
         {
             title: 'Users',

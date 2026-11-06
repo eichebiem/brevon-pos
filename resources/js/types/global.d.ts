@@ -27,6 +27,7 @@ declare module '@inertiajs/core' {
                 location_code: string | null;
                 terminal: string | null;
             } | null;
+            features: { tax_rules: boolean };
             sidebarOpen: boolean;
             [key: string]: unknown;
         };

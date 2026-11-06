@@ -204,7 +204,7 @@ class SalesReportTest extends TestCase
         $this->assertStringContainsString('text/csv', (string) $response->headers->get('Content-Type'));
         $csv = $response->streamedContent();
         $lines = array_values(array_filter(explode("\n", trim(substr($csv, 3)))));
-        $this->assertSame('Product,Size,Category,"Gross sales",Discounts,Refunds,"Net sales",Tax,Orders,"Average order",Quantity', $lines[0]);
+        $this->assertSame('Product,Size,Category,"Gross sales",Discounts,Refunds,"Net sales",Orders,"Average order",Quantity', $lines[0]);
         $this->assertStringStartsWith('"Choco Custard",,', $lines[1]);
         $this->assertStringContainsString('88.00', $lines[1]);
         $this->assertStringStartsWith("\"'=HYPERLINK", $lines[2]);

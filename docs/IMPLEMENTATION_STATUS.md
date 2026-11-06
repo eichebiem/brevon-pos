@@ -20,7 +20,7 @@ Last updated: 2026-11-06 · Baseline: SRS **v1.1** (`docs/BREVON-SRS-v1.1.md`) �
 | 9b — Refunds and voids                        | ✅ Passed                                       | Approved 2026-11-06; refund approval limit ₱0.00 TBC                   |
 | 10a — Dashboard and sales reports             | ✅ Passed                                       | Approved 2026-11-06; definitions TBC (held for Phase 11)               |
 | 10b — Operational reports                     | 🟡 Finished — awaiting review                   | Six reports; CSV and Excel; print                                      |
-| 11 — Hardening and release readiness          | ⏳ Not started                                  |                                                                        |
+| 11 — Hardening and release readiness          | ⏳ Not started                                  | Includes 5 removals (D-165–D-169)                                      |
 
 ## Phase 0 log
 
@@ -606,4 +606,6 @@ Still to confirm: boxes/combo at pop-ups (D-089), hot vs iced coffee prices. Pha
 - NFR-009 (5 s) is not load-tested yet. Each report runs grouped SQL over indexed columns.
 - New dependency: `openspout/openspout`. Run `composer install` on the user's copy. Nothing to migrate.
 
-**Next step:** Phase 11 — after user review.
+**Change after review (2026-11-06): tax rules made a later feature (D-164).** The client does not need tax now. A new setting, `BREVON_FEATURE_TAX_RULES` (default off; `EnsureFeatureEnabled` middleware with the `feature:` alias), hides the Tax rules screen (404 and no sidebar link) and makes checkout ignore every tax rule. The sales report and its exports drop the Tax column. The code and tables stay for later. `composer check`: **341 passed**. Browser (scratch): no Tax rules link, `/admin/tax-rules` 404, sales report without tax text.
+
+**Next step:** Phase 11 — after user review. It includes removing tax (D-165), options & add-ons (D-166), lots & expiry (D-167), the GCash check (D-168) and preparation (D-169); plan in IMPLEMENTATION_PLAN.md.

@@ -11,6 +11,7 @@ use App\Domain\Reports\ReportTable;
 use App\Domain\Reports\SalesReport;
 use App\Domain\Shared\AuditLogger;
 use App\Domain\Shared\BusinessClock;
+use App\Domain\Tax\TaxCalculator;
 use App\Http\Controllers\Controller;
 use App\Models\Branch;
 use App\Models\Category;
@@ -142,7 +143,7 @@ class ReportController extends Controller
     private function salesTable(string $section, ReportFilters $f): ReportTable
     {
         $col = fn (string $k, string $l, string $t = 'text') => ReportTable::col($k, $l, $t);
-        $figures = [$col('gross', 'Gross sales', 'money'), $col('discounts', 'Discounts', 'money'), $col('refunds', 'Refunds', 'money'), $col('net', 'Net sales', 'money'), $col('tax', 'Tax', 'money'), $col('orders', 'Orders', 'int'), $col('average', 'Average order', 'money'), $col('quantity', 'Quantity', 'quantity')];
+        $figures = [$col('gross', 'Gross sales', 'money'), $col('discounts', 'Discounts', 'money'), $col('refunds', 'Refunds', 'money'), $col('net', 'Net sales', 'money'), ...(TaxCalculator::enabled() ? [$col('tax', 'Tax', 'money')] : []), $col('orders', 'Orders', 'int'), $col('average', 'Average order', 'money'), $col('quantity', 'Quantity', 'quantity')];
 
         return match ($section) {
             'periods' => new ReportTable($section, 'By period', [$col('period', 'Period'), $col('start', 'Starts', 'date'), ...$figures], $this->sales->byPeriod($f)),

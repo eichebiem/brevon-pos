@@ -26,12 +26,21 @@ class TaxCalculator
      */
     public function rulesInEffect(): Collection
     {
+        if (! self::enabled()) {
+            return new Collection;
+        }
         $today = BusinessClock::today()->toDateString();
 
         return TaxRule::query()->where('is_active', true)
             ->whereDate('effective_from', '<=', $today)
             ->where(fn ($q) => $q->whereNull('effective_until')->orWhereDate('effective_until', '>=', $today))
             ->orderBy('id')->get();
+    }
+
+    /** Tax rules are a later feature (D-164): while off, no rule applies, even one left switched on. */
+    public static function enabled(): bool
+    {
+        return (bool) config('brevon.features.tax_rules', false);
     }
 
     /**

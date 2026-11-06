@@ -15,7 +15,7 @@ Progress: [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md).
 > the value of stock at weighted average cost. Owners keep versioned recipes; bakers record doughnut batches
 > (ingredients out, good pieces in, rejects noted) and a manager posts them; drinks with a recipe take their
 > ingredients at the counter. Cashiers give preset discounts (big ones approved by a manager at the counter) and
-> the Senior Citizen / PWD discount with masked beneficiary details; a tax framework is ready but off. Completed
+> the Senior Citizen / PWD discount with masked beneficiary details; tax rules are a later feature, switched off (D-164). Completed
 > sales are refunded by item with a manager's approval (cash from the drawer, GCash with the reference sent back,
 > goods back in stock only when ticked); cancellations leave a void record. The dashboard shows sales, orders, average order and low stock; the sales
 > report breaks sales down by period, product, category, cashier and payment method, per location (closed pop-ups

@@ -191,8 +191,10 @@ const cell = (row: SalesFigures, key: keyof SalesFigures): string =>
                     <li>
                         <strong>Net sales</strong> = gross − discounts −
                         refunds. <strong>Average order</strong> = net sales ÷
-                        orders. Tax is not charged while no tax rule is on (tax
-                        shown: {{ formatMoney(summary.tax) }}).
+                        orders.<template v-if="$page.props.features?.tax_rules">
+                            Tax shown apart:
+                            {{ formatMoney(summary.tax) }}.</template
+                        >
                     </li>
                     <li>
                         <strong>Collected</strong> (below): payments received on

@@ -20,6 +20,15 @@ return [
     'currency_symbol' => '₱',
 
     // FR-062 / BR-013 / D-047: negative stock is blocked by default.
+    /*
+    | Features kept for a later release (D-164). Their code and tables stay;
+    | switched off, their screens answer 404 and they change nothing.
+    */
+    'features' => [
+        // Tax rules (FR-086, D-149): the client does not charge tax for now.
+        'tax_rules' => (bool) env('BREVON_FEATURE_TAX_RULES', false),
+    ],
+
     'allow_negative_stock' => (bool) env('BREVON_ALLOW_NEGATIVE_STOCK', false),
 
     // Local-only owner bootstrap for `php artisan brevon:create-owner` (D-022).
