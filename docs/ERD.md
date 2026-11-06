@@ -164,10 +164,30 @@ erDiagram
       decimal counted_cash
       decimal variance
       varchar status
-      tinyint open_guard "(+) 1 while open, NULL when closed" }
+      tinyint open_guard "(+) 1 while open, NULL when closed"
+      bigint approved_by FK "(+) reviewer, D-128"
+      datetime reviewed_at "(+) Phase 6"
+      text review_notes "(+) Phase 6" }
+    cash_movements { bigint id PK
+      bigint cashier_shift_id FK
+      bigint branch_id FK
+      varchar movement_type "cash_in, cash_out, cash_paid_out, cash_refund, correction"
+      decimal amount "positive; signed for corrections"
+      varchar corrects "(+) expected or counted, corrections only"
+      text reason
+      varchar status "pending, approved, rejected"
+      varchar reference_type
+      bigint reference_id
+      bigint created_by FK
+      bigint approved_by FK
+      datetime decided_at "(+)"
+      text decision_notes "(+)"
+      datetime created_at }
 ```
 
 Constraints (as built, D-094): UNIQUE `cashier_shifts(user_id, open_guard)` (at most one open shift per cashier anywhere); `business_date` DATE (Manila) added; UNIQUE `cashier_shifts(terminal_id, open_guard)` (at most one open shift per terminal, D-060); `terminal_id` required for new shifts and `branch_id` copied from the terminal; UNIQUE `cashier_shifts(branch_id, shift_number)`; INDEX `(branch_id, user_id, status)`.
+
+`cash_movements` (Phase 6, D-126–D-129): CHECK type and status values; CHECK `(movement_type = 'correction' AND amount <> 0 AND corrects IN ('expected','counted')) OR (movement_type <> 'correction' AND amount > 0 AND corrects IS NULL)`; INDEX `(cashier_shift_id, status)`, `(branch_id, created_at)`, `(reference_type, reference_id)`. No `updated_at`: rows change only from pending to a decision, then never again; never deleted. Corrected shift figures are calculated, not stored.
 
 ## 5. Inventory, purchasing
 
@@ -240,7 +260,7 @@ UNIQUE `recipes(product_id, version)`. Posting a batch: one transaction, status 
 3. settings, categories, units_of_measure, inventory_items, products (+inventory_item_id), product_variants, product_prices, product_branch, option_groups, product_option_group, product_options — **Phase 3 (done)** (units/inventory_items stubs needed for the product link; full inventory UI in Phase 7)
 4. number_sequences, branch_inventory, inventory_movements (no `inventory_lot_id` until Phase 7) — **Phase 4a (done)**, D-051/D-096
 5. payment_methods, cashier_shifts — **Phase 4a (done)**; orders, order_items, order_item_options, order_status_histories, payments — **Phase 4b (done)**
-6. cash_movements — Phase 6
+6. cash_movements — **Phase 6 (done)**
 7. suppliers, inventory_lots, stock_adjustments(+items), purchase_orders(+items), goods_receipts(+items) — Phase 7
 8. recipes, recipe_items, production_batches, production_batch_items, waste_records — Phase 8
 9. discounts, order_discounts, tax_rules, order_tax_lines, refunds, refund_items — Phase 9

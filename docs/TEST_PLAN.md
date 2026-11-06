@@ -118,6 +118,8 @@ ID format `T-<area>-<n>`; each maps to SRS requirements.
 - T-CSH-4 closed shift immutable; correction audited (FR-082)
 - T-CSH-5 cash movement requires reason; approval where configured (FR-076)
 
+**Phase 6 implementation map:** `tests/Feature/Shifts/ShiftCashTest.php` — T-CSH-1/2 (opening + cash sales + cash in − cash out − paid out; verified and pending GCash, and a cancelled cash sale, left out; summary figures), T-CSH-3 (difference without notes refused without revealing the amount; open-shift page has no expected figure; −12.50 stored), T-CSH-4 (closed shift guard; corrections by reviewers only, not on own or open shifts, audited, closing figures unchanged, corrected figures calculated), T-CSH-5 (reason/amount/type rules, drawer can't go below zero, over-limit outflow pending, pending blocks closing, cashiers can't approve, no self-approval, reject needs a note, rejected stays in the drawer, decided rows immutable, own shift only), review once with notes (D-128), limits from Store settings, manager closes a forgotten shift, other locations 404. `RouteAuthorizationTest` now covers `/admin/shifts`.
+
 ### Inventory & purchasing (Phase 7)
 
 - T-INV-4 receiving creates movements/lots; weighted-average cost updated

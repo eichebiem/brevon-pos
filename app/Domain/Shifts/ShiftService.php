@@ -6,9 +6,11 @@ use App\Domain\Shared\AuditLogger;
 use App\Domain\Shared\BusinessClock;
 use App\Domain\Shared\Money;
 use App\Domain\Shared\NumberSequence;
+use App\Enums\CashMovementStatus;
 use App\Enums\ShiftStatus;
 use App\Models\Branch;
 use App\Models\CashierShift;
+use App\Models\CashMovement;
 use App\Models\Terminal;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -126,8 +128,19 @@ class ShiftService
                 throw ValidationException::withMessages(['counted_cash' => __('This shift is already closed.')]);
             }
 
+            // D-127: every cash movement must be decided before the drawer is counted.
+            if (CashMovement::query()->where('cashier_shift_id', $shift->id)->where('status', CashMovementStatus::Pending)->exists()) {
+                throw ValidationException::withMessages(['counted_cash' => __('A cash movement is still waiting for approval. Ask a manager to approve or reject it first.')]);
+            }
+
             $expected = $this->expectedCash->for($shift);
             $variance = $countedCash->subtract($expected);
+
+            // D-128: the count is blind. A difference is never shown to the
+            // cashier; they recount or explain it in the closing notes.
+            if (! $variance->isZero() && ($notes === null || trim($notes) === '')) {
+                throw ValidationException::withMessages(['closing_notes' => __('The count does not match the drawer. Count the cash again, or explain the difference in the notes.')]);
+            }
 
             $shift->forceFill([
                 'status' => ShiftStatus::Closed,

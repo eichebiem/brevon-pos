@@ -103,6 +103,11 @@ final class Money implements JsonSerializable, Stringable
         return $total;
     }
 
+    public function absolute(): self
+    {
+        return new self(abs($this->minor), $this->currency);
+    }
+
     public function isZero(): bool
     {
         return $this->minor === 0;

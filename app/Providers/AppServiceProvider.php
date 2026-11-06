@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Models\AuditLog;
 use App\Models\Branch;
 use App\Models\CashierShift;
+use App\Models\CashMovement;
 use App\Models\Category;
 use App\Models\Employee;
 use App\Models\InventoryItem;
@@ -78,6 +79,7 @@ class AppServiceProvider extends ServiceProvider
             'payment_method' => PaymentMethod::class,
             'inventory_movement' => InventoryMovement::class,
             'cashier_shift' => CashierShift::class,
+            'cash_movement' => CashMovement::class,
             'order' => Order::class,
             'payment' => Payment::class,
         ]);

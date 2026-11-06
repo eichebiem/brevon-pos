@@ -3,6 +3,7 @@
 namespace App\Domain\Settings;
 
 use App\Domain\Shared\AuditLogger;
+use App\Domain\Shared\Money;
 use App\Models\Setting;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
@@ -21,6 +22,12 @@ class StoreSettings
         'store.name' => 'Brevon Doughnuts & Coffee',
         'store.logo_path' => null,
         'receipt.footer' => 'Thank you for choosing Brevon!',
+        // D-127 (TBC): cash out / paid out above this, by someone who cannot
+        // review shifts, waits for a manager's approval.
+        'cash.approval_over' => '500.00',
+        // D-128 (TBC): a closed shift whose difference is larger than this
+        // (either way) is listed as needing review. 0 = any difference.
+        'shift.review_variance_over' => '0.00',
     ];
 
     private const CACHE_KEY = 'brevon.store-settings';
@@ -63,13 +70,20 @@ class StoreSettings
             'name' => $this->get('store.name'),
             'logo_url' => $this->logoUrl(),
             'receipt_footer' => $this->get('receipt.footer'),
+            'cash_approval_over' => $this->get('cash.approval_over'),
+            'shift_review_variance_over' => $this->get('shift.review_variance_over'),
             'currency' => (string) config('brevon.currency'),
             'timezone' => (string) config('brevon.business_timezone'),
         ];
     }
 
+    public function money(string $key): Money
+    {
+        return Money::fromDecimal((string) ($this->get($key) ?? '0'));
+    }
+
     /**
-     * @param  array{name: string, receipt_footer: string|null}  $values
+     * @param  array{name: string, receipt_footer: string|null, cash_approval_over?: string, shift_review_variance_over?: string}  $values
      */
     public function update(User $actor, array $values, ?UploadedFile $logo = null, bool $removeLogo = false): void
     {
@@ -77,6 +91,11 @@ class StoreSettings
             'store.name' => $values['name'],
             'receipt.footer' => $values['receipt_footer'],
         ];
+        foreach (['cash_approval_over' => 'cash.approval_over', 'shift_review_variance_over' => 'shift.review_variance_over'] as $field => $key) {
+            if (isset($values[$field])) {
+                $changes[$key] = Money::fromDecimal($values[$field])->toDecimal();
+            }
+        }
 
         $oldLogo = $this->get('store.logo_path');
         if ($logo !== null) {

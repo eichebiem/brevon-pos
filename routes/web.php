@@ -9,6 +9,7 @@ use App\Http\Controllers\Admin\PaymentMethodController;
 use App\Http\Controllers\Admin\ProductController;
 use App\Http\Controllers\Admin\ProductPriceController;
 use App\Http\Controllers\Admin\RoleController;
+use App\Http\Controllers\Admin\ShiftReviewController;
 use App\Http\Controllers\Admin\StoreSettingsController;
 use App\Http\Controllers\Admin\TerminalController;
 use App\Http\Controllers\Admin\UserController;
@@ -18,6 +19,7 @@ use App\Http\Controllers\Orders\OrderStatusController;
 use App\Http\Controllers\Pos\CheckoutController;
 use App\Http\Controllers\Pos\OrderController as PosOrderController;
 use App\Http\Controllers\PosController;
+use App\Http\Controllers\Staff\CashMovementController;
 use App\Http\Controllers\Staff\PaymentCheckController;
 use App\Http\Controllers\Staff\PreparationController;
 use App\Http\Controllers\Staff\ShiftController;
@@ -56,6 +58,13 @@ Route::middleware(['auth'])->group(function () {
         ->middleware('permission:shifts.open')->name('staff.shift.open');
     Route::post('staff/shifts/{shift}/close', [ShiftController::class, 'close'])
         ->middleware('permission:shifts.close|shifts.review')->name('staff.shift.close');
+    // Drawer cash outside sales, and its approval (FR-076, D-127).
+    Route::post('shifts/{shift}/cash-movements', [CashMovementController::class, 'store'])
+        ->middleware('permission:cash-movements.create')->name('cash-movements.store');
+    Route::middleware('permission:shifts.review')->group(function () {
+        Route::post('cash-movements/{movement}/approve', [CashMovementController::class, 'approve'])->name('cash-movements.approve');
+        Route::post('cash-movements/{movement}/reject', [CashMovementController::class, 'reject'])->name('cash-movements.reject');
+    });
     // Preparation and order status (FR-046–FR-052, D-123–D-125).
     Route::get('staff/preparation', [PreparationController::class, 'index'])
         ->middleware('permission:orders.update-status')->name('staff.preparation');
@@ -153,6 +162,14 @@ Route::middleware(['auth'])->group(function () {
         Route::middleware('permission:inventory.adjust')->group(function () {
             Route::get('inventory/opening-stock', [StockController::class, 'openingForm'])->name('inventory.opening');
             Route::post('inventory/opening-stock', [StockController::class, 'storeOpening'])->name('inventory.opening.store');
+        });
+
+        // Shift review and corrections (FR-080–FR-082, D-128–D-130).
+        Route::middleware('permission:shifts.review')->group(function () {
+            Route::get('shifts', [ShiftReviewController::class, 'index'])->name('shifts.index');
+            Route::get('shifts/{shift}', [ShiftReviewController::class, 'show'])->name('shifts.show');
+            Route::post('shifts/{shift}/review', [ShiftReviewController::class, 'review'])->name('shifts.review');
+            Route::post('shifts/{shift}/corrections', [ShiftReviewController::class, 'correct'])->name('shifts.corrections');
         });
 
         Route::middleware('permission:audit.view')->group(function () {

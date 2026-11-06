@@ -29,7 +29,7 @@ class SalesAndShiftsTest extends TestCase
         $this->checkout($cashier, $this->payload([['product_id' => $doughnut->id, 'quantity' => 1]], ['method' => 'GCASH', 'reference' => 'REF12345']))->assertSessionHasNoErrors();
         $shift = $this->shiftOf($cashier);
 
-        $this->actingAs($cashier)->post("/staff/shifts/{$shift->id}/close", ['counted_cash' => '1090.00'])->assertSessionHasNoErrors();
+        $this->actingAs($cashier)->post("/staff/shifts/{$shift->id}/close", ['counted_cash' => '1090.00', 'closing_notes' => 'Found an extra 2.00'])->assertSessionHasNoErrors();
 
         $shift->refresh();
         // 1000 float + 88 cash sale; the 412 change and the 44 GCash sale are not drawer cash.

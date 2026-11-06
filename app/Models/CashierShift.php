@@ -7,12 +7,13 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use LogicException;
 
 /**
  * A cashier's shift on one terminal (FR-073). Location comes from the
- * terminal (D-060). A closed shift is immutable (FR-082); Phase 6 adds the
- * audited correction path.
+ * terminal (D-060). A closed shift is immutable (FR-082): later fixes are
+ * correction rows in cash_movements, and only the review stamp is added once.
  *
  * @property int $id
  * @property int $branch_id
@@ -30,6 +31,8 @@ use LogicException;
  * @property string|null $closing_notes
  * @property int|null $closed_by
  * @property int|null $approved_by
+ * @property CarbonImmutable|null $reviewed_at
+ * @property string|null $review_notes
  */
 class CashierShift extends Model
 {
@@ -42,13 +45,20 @@ class CashierShift extends Model
             'business_date' => 'date',
             'opened_at' => 'datetime',
             'closed_at' => 'datetime',
+            'reviewed_at' => 'datetime',
         ];
     }
 
     protected static function booted(): void
     {
         static::updating(function (CashierShift $shift) {
-            if ($shift->getOriginal('status') !== ShiftStatus::Open) {
+            if ($shift->getOriginal('status') === ShiftStatus::Open) {
+                return;
+            }
+            // FR-082: a closed shift is never edited. The one exception is the
+            // manager's review stamp, given once (D-128); fixes are correction rows.
+            $reviewOnly = array_diff(array_keys($shift->getDirty()), ['approved_by', 'reviewed_at', 'review_notes', 'updated_at']) === [];
+            if (! $reviewOnly || $shift->getOriginal('reviewed_at') !== null) {
                 throw new LogicException('A closed shift cannot be changed.');
             }
         });
@@ -99,5 +109,29 @@ class CashierShift extends Model
     public function closer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'closed_by');
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function reviewer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    /**
+     * @return HasMany<CashMovement, $this>
+     */
+    public function cashMovements(): HasMany
+    {
+        return $this->hasMany(CashMovement::class)->orderBy('id');
+    }
+
+    /**
+     * @return HasMany<Order, $this>
+     */
+    public function orders(): HasMany
+    {
+        return $this->hasMany(Order::class);
     }
 }

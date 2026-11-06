@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Staff;
 
 use App\Domain\Shared\Money;
 use App\Domain\Shifts\ShiftService;
+use App\Domain\Shifts\ShiftSummary;
+use App\Enums\CashMovementType;
 use App\Http\Controllers\Controller;
 use App\Models\CashierShift;
 use App\Models\Terminal;
@@ -16,7 +18,10 @@ use Inertia\Response;
 /** The cashier's own shift: open on a terminal, then close with a cash count (FR-073–FR-079). */
 class ShiftController extends Controller
 {
-    public function __construct(private readonly ShiftService $shifts) {}
+    public function __construct(
+        private readonly ShiftService $shifts,
+        private readonly ShiftSummary $summary,
+    ) {}
 
     public function show(Request $request): Response
     {
@@ -26,6 +31,10 @@ class ShiftController extends Controller
 
         return Inertia::render('pos/Shift', [
             'shift' => $current ? self::present($current) : null,
+            // The count stays blind (D-128): movements are listed, expected cash is not.
+            'movements' => $current ? $this->summary->movements($current) : [],
+            'movementTypes' => array_map(fn (CashMovementType $t) => ['value' => $t->value, 'label' => $t->label()], CashMovementType::manual()),
+            'canRecordCash' => $user->can('cash-movements.create'),
             'terminals' => $current ? [] : $this->shifts->availableTerminals($user)->map(fn (Terminal $t) => [
                 'id' => $t->id,
                 'code' => $t->terminal_code,
@@ -69,7 +78,8 @@ class ShiftController extends Controller
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Shift :number closed.', ['number' => $shift->shift_number])]);
 
-        return to_route('staff.shift');
+        // A manager closing someone else's forgotten shift goes back to its review page.
+        return $shift->user_id === $user->id ? to_route('staff.shift') : to_route('admin.shifts.show', $shift);
     }
 
     /**

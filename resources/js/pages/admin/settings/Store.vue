@@ -13,6 +13,8 @@ const props = defineProps<{
         name: string;
         logo_url: string | null;
         receipt_footer: string | null;
+        cash_approval_over: string;
+        shift_review_variance_over: string;
         currency: string;
         timezone: string;
     };
@@ -27,9 +29,13 @@ const form = useForm<{
     receipt_footer: string;
     logo: File | null;
     remove_logo: boolean;
+    cash_approval_over: string;
+    shift_review_variance_over: string;
 }>({
     name: props.settings.name,
     receipt_footer: props.settings.receipt_footer ?? '',
+    cash_approval_over: props.settings.cash_approval_over,
+    shift_review_variance_over: props.settings.shift_review_variance_over,
     logo: null,
     remove_logo: false,
 });
@@ -144,6 +150,56 @@ function submit(): void {
                 </p>
                 <InputError :message="form.errors.receipt_footer" />
             </div>
+
+            <fieldset class="grid gap-4 border-t border-border pt-4">
+                <legend class="pt-4 text-sm font-semibold">Cash drawer</legend>
+                <div class="grid gap-4 sm:grid-cols-2">
+                    <div class="grid gap-2">
+                        <Label for="cash_approval_over"
+                            >Approve cash out over (₱)</Label
+                        >
+                        <Input
+                            id="cash_approval_over"
+                            v-model="form.cash_approval_over"
+                            inputmode="decimal"
+                            autocomplete="off"
+                            aria-describedby="cash-approval-help"
+                        />
+                        <p
+                            id="cash-approval-help"
+                            class="text-xs text-muted-foreground"
+                        >
+                            Cash out or paid-outs above this, recorded by
+                            someone who does not review shifts, wait for a
+                            manager.
+                        </p>
+                        <InputError :message="form.errors.cash_approval_over" />
+                    </div>
+                    <div class="grid gap-2">
+                        <Label for="shift_review_variance_over"
+                            >Review shifts with a difference over (₱)</Label
+                        >
+                        <Input
+                            id="shift_review_variance_over"
+                            v-model="form.shift_review_variance_over"
+                            inputmode="decimal"
+                            autocomplete="off"
+                            aria-describedby="variance-help"
+                        />
+                        <p
+                            id="variance-help"
+                            class="text-xs text-muted-foreground"
+                        >
+                            Closed shifts whose cash is short or over by more
+                            than this are listed as needing review. 0.00 flags
+                            any difference.
+                        </p>
+                        <InputError
+                            :message="form.errors.shift_review_variance_over"
+                        />
+                    </div>
+                </div>
+            </fieldset>
 
             <dl
                 class="grid gap-3 border-t border-border pt-4 text-sm sm:grid-cols-2"

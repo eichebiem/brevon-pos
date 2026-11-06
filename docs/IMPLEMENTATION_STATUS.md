@@ -11,8 +11,8 @@ Last updated: 2026-11-06 · Baseline: SRS **v1.1** (`docs/BREVON-SRS-v1.1.md`) �
 | 4a — Ledger core and shift open               | ✅ Passed                                       | Approved; committed by user (with the seeder changes)                     |
 | 4b — Checkout backend                         | ✅ Passed                                       | Approved 2026-11-06                                                       |
 | 4c — Cashier UI and receipts                  | ✅ Passed                                       | Approved 2026-11-06 (with D-121, D-122)                                   |
-| 5 — Orders and preparation                    | ✅ Passed — awaiting user review                | Not committed                                                             |
-| 6 — Cashier shifts and cash control           | ⏳ Not started                                  |                                                                           |
+| 5 — Orders and preparation                    | ✅ Passed                                       | Approved 2026-11-06                                                       |
+| 6 — Cashier shifts and cash control           | ✅ Passed — awaiting user review                | Not committed; two limits to confirm (D-127, D-128)                       |
 | 7 — Inventory and purchasing                  | ⏳ Not started                                  | Includes main → pop-up doughnut dispatch (D-063); OI-018 deferred (FE-01) |
 | 8 — Recipes and production                    | ⏳ Not started                                  | Production at the permanent branch only                                   |
 | 9 — Refunds, discounts, tax configuration     | ⏳ Not started                                  | SC/PWD: name, card no., address; 12%, VAT disregarded (D-068)             |
@@ -339,3 +339,40 @@ Still to confirm: boxes/combo at pop-ups (D-089), hot vs iced coffee prices. Pha
 - Still to confirm: OI-002 (status flow), OI-005 (GCash reference format). D-101 client menu questions: raise again after Phase 9.
 
 **Next step:** Phase 6 — shifts and cash, after user review.
+
+## Phase 6 log — Cashier shifts and cash control (2026-11-06)
+
+**Objective:** every peso in the drawer is accounted for: cash added or taken out with a reason and approval where needed, a blind count at closing, a manager's sign-off, and corrections that never rewrite a closed shift.
+**SRS IDs:** FR-075–FR-082, BR-007, BR-008, UC-008.
+
+**Implemented**
+
+- Schema: `cash_movements` (CHECK rules, D-127/D-129); `cashier_shifts.reviewed_at`, `review_notes`. Morph name `cash_movement`.
+- Domain: `ExpectedCash` with components (D-126), `CashDrawer` (record, approve/reject, correct, review — shift row locked first), `ShiftSummary` (D-130). `ShiftService::close` refuses while a movement is pending, and refuses a mismatched count without notes without revealing the amount (D-128). Model guards: a decided movement and a closed shift cannot change (only the one-time review stamp).
+- Settings: Store settings › Cash drawer — "Approve cash out over" (₱500.00) and "Review shifts with a difference over" (₱0.00), both **to confirm with the owner**.
+- HTTP: `POST /shifts/{shift}/cash-movements` (`cash-movements.create`), `POST /cash-movements/{movement}/approve|reject`, `GET /admin/shifts`, `GET /admin/shifts/{shift}`, `POST /admin/shifts/{shift}/review|corrections` (`shifts.review`). Other locations answer 404. A manager closing someone else's shift returns to its summary page.
+- UI: "Cash in and out" on My shift (form when allowed, list with status, pending warning before closing); Shifts list (status / date filters, Needs review badge) and shift summary page (drawer figures, after-corrections box, non-cash totals, movements with Approve / Reject, close a forgotten shift, review, add a correction); sidebar "Shifts".
+- Docs: DECISIONS §W (D-126–D-130), ERD §4, TEST_PLAN map, README.
+
+**Verification (all run 2026-11-06)**
+
+| Command                                                            | Result                   |
+| ------------------------------------------------------------------ | ------------------------ |
+| `composer check` → build, `vp check`, `vue-tsc`, Pint, Larastan L7 | all pass, 0 errors       |
+| → `php artisan test` (MySQL)                                       | **271 passed** (was 258) |
+
+**Manual checks (browser, scratch DB `brevon_pos_test`, signed in as the scratch `cashier1` with the cash permission added, then `harris`):** a ₱600 cash out waited for approval and the close form refused while it was pending; Harris approved it from the shift page (expected cash ₱1,000 → ₱400); closed the shift with ₱395 and a note (−₱5.00, Needs review); added a +₱5.00 counted-cash correction (after corrections ₱0.00, closing figures unchanged); marked it reviewed; the settings page shows both limits. No console errors. The user's `brevon_pos` was not touched.
+
+**Problems found and fixed during the phase**
+
+- An older test closed a shift ₱2 over with no note; Phase 6 now refuses that, so the test gives a note.
+- On a narrow window the movement table pushed its card wider and hid Approve / Reject; the table now scrolls inside the card and the buttons sit under the status.
+
+**Known issues / deferred**
+
+- `cash_refund` movements are created by the Phase 9 refund workflow; cancellations already leave expected cash through the payment status.
+- Cashiers cannot record cash in/out by default (`cash-movements.create` is Owner/Admin/Manager); an Owner can add it to the Cashier role.
+- To confirm with the owner: the ₱500.00 approval limit and the ₱0.00 review limit. Still open: OI-002, OI-005. D-101 client menu questions: raise again after Phase 9.
+- The user's `brevon_pos` needs `php artisan migrate` (Phase 4b tables, D-121 and Phase 6).
+
+**Next step:** Phase 7 — inventory and purchasing, after user review.

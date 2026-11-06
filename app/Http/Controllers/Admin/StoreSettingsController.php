@@ -27,13 +27,22 @@ class StoreSettingsController extends Controller
             'receipt_footer' => ['nullable', 'string', 'max:500'],
             'logo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:1024'],
             'remove_logo' => ['sometimes', 'boolean'],
+            'cash_approval_over' => ['sometimes', 'required', 'decimal:0,2', 'min:0', 'max:999999.99'],
+            'shift_review_variance_over' => ['sometimes', 'required', 'decimal:0,2', 'min:0', 'max:999999.99'],
         ]);
 
         /** @var User $actor */
         $actor = $request->user();
+        $values = ['name' => (string) $validated['name'], 'receipt_footer' => $validated['receipt_footer'] ?? null];
+        if (isset($validated['cash_approval_over'])) {
+            $values['cash_approval_over'] = (string) $validated['cash_approval_over'];
+        }
+        if (isset($validated['shift_review_variance_over'])) {
+            $values['shift_review_variance_over'] = (string) $validated['shift_review_variance_over'];
+        }
         $this->settings->update(
             $actor,
-            ['name' => (string) $validated['name'], 'receipt_footer' => $validated['receipt_footer'] ?? null],
+            $values,
             $request->file('logo'),
             $request->boolean('remove_logo'),
         );

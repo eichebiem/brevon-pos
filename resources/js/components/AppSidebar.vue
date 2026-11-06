@@ -2,6 +2,7 @@
 import { Link } from '@inertiajs/vue3';
 import {
     ChefHat,
+    Coins,
     BadgeCheck,
     Croissant,
     FolderTree,
@@ -43,6 +44,7 @@ import { index as paymentMethodsIndex } from '@/routes/admin/payment-methods';
 import { index as productsIndex } from '@/routes/admin/products';
 import { edit as storeSettings } from '@/routes/admin/settings';
 import { index as rolesIndex } from '@/routes/admin/roles';
+import { index as shiftsIndex } from '@/routes/admin/shifts';
 import { index as usersIndex } from '@/routes/admin/users';
 import { index as pos } from '@/routes/pos';
 import { payments as gcashChecks, preparation, shift } from '@/routes/staff';
@@ -86,6 +88,12 @@ const operations = computed(() =>
             href: gcashChecks(),
             icon: BadgeCheck,
             permission: 'payments.verify-ewallet',
+        },
+        {
+            title: 'Shifts',
+            href: shiftsIndex(),
+            icon: Coins,
+            permission: 'shifts.review',
         },
     ]),
 );

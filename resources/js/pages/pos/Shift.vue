@@ -3,6 +3,8 @@ import { Head, Link, useForm } from '@inertiajs/vue3';
 import { ShoppingCart } from '@lucide/vue';
 import { computed, watch } from 'vue';
 import InputError from '@/components/InputError.vue';
+import CashMovementForm from '@/components/shifts/CashMovementForm.vue';
+import CashMovementList from '@/components/shifts/CashMovementList.vue';
 import StatusBadge from '@/components/StatusBadge.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +14,7 @@ import { usePermissions } from '@/composables/usePermissions';
 import { formatDateTime, formatMoney, selectClass } from '@/lib/format';
 import { index as pos } from '@/routes/pos';
 import { close, open } from '@/routes/staff/shift';
+import type { CashMovementRow, MovementType } from '@/types/shifts';
 
 type Shift = {
     id: number;
@@ -40,7 +43,14 @@ const props = defineProps<{
     shift: Shift | null;
     terminals: TerminalOption[];
     recent: Shift[];
+    movements: CashMovementRow[];
+    movementTypes: MovementType[];
+    canRecordCash: boolean;
 }>();
+
+const pendingCount = computed(
+    () => props.movements.filter((m) => m.status === 'pending').length,
+);
 
 const { can } = usePermissions();
 
@@ -147,6 +157,22 @@ const varianceTone = (value: string | null) =>
                 </Button>
             </div>
 
+            <!-- Cash added or taken out during the shift (FR-076) -->
+            <section
+                class="grid grid-cols-[minmax(0,1fr)] gap-4 border-t border-border pt-5"
+                aria-labelledby="cash-heading"
+            >
+                <h3 id="cash-heading" class="font-semibold">Cash in and out</h3>
+                <CashMovementForm
+                    v-if="canRecordCash"
+                    :shift-id="shift.id"
+                    :types="movementTypes"
+                />
+                <div class="rounded-lg border border-border">
+                    <CashMovementList :movements="movements" />
+                </div>
+            </section>
+
             <form
                 v-if="can('shifts.close')"
                 class="grid gap-4 border-t border-border pt-5"
@@ -157,7 +183,19 @@ const varianceTone = (value: string | null) =>
                 <h3 id="close-heading" class="font-semibold">Close shift</h3>
                 <p class="text-sm text-muted-foreground">
                     Count the cash in the drawer. The expected amount and the
-                    difference are shown after closing.
+                    difference are shown after closing. If your count does not
+                    match, you will be asked to count again or explain the
+                    difference.
+                </p>
+                <p
+                    v-if="pendingCount"
+                    class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950"
+                    role="status"
+                >
+                    {{ pendingCount }} cash
+                    {{ pendingCount === 1 ? 'movement is' : 'movements are' }}
+                    waiting for a manager. The shift can close once they are
+                    approved or rejected.
                 </p>
                 <div class="grid max-w-56 gap-2">
                     <Label for="counted_cash">Counted cash (₱)</Label>
@@ -171,7 +209,7 @@ const varianceTone = (value: string | null) =>
                     <InputError :message="closeForm.errors.counted_cash" />
                 </div>
                 <div class="grid gap-2">
-                    <Label for="closing_notes">Notes (optional)</Label>
+                    <Label for="closing_notes">Notes</Label>
                     <textarea
                         id="closing_notes"
                         v-model="closeForm.closing_notes"
