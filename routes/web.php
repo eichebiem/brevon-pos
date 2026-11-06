@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Reports\OperationsReports;
 use App\Http\Controllers\Admin\AuditLogController;
 use App\Http\Controllers\Admin\CategoryController;
 use App\Http\Controllers\Admin\DiscountController;
@@ -57,6 +58,13 @@ Route::middleware(['auth'])->group(function () {
         ->middleware('permission:reports.sales')->name('admin.reports.sales');
     Route::get('admin/reports/sales/export/{section}', [ReportController::class, 'exportSales'])
         ->middleware(['permission:reports.sales', 'permission:reports.export', 'throttle:30,1'])->name('admin.reports.sales.export');
+    // Operational reports (FR-093, FR-094, D-160–D-163); each report checks its own permission.
+    Route::get('admin/reports/{report}', [ReportController::class, 'operations'])
+        ->middleware('permission:reports.sales|reports.inventory')
+        ->whereIn('report', array_keys(OperationsReports::REPORTS))->name('admin.reports.show');
+    Route::get('admin/reports/{report}/export/{table}', [ReportController::class, 'exportOperations'])
+        ->middleware(['permission:reports.sales|reports.inventory', 'permission:reports.export', 'throttle:30,1'])
+        ->whereIn('report', array_keys(OperationsReports::REPORTS))->name('admin.reports.export');
     Route::get('pos', [PosController::class, 'index'])
         ->middleware('permission:pos.access')->name('pos.index');
     Route::post('pos/quote', [CheckoutController::class, 'quote'])

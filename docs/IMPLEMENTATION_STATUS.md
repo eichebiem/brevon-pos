@@ -18,8 +18,8 @@ Last updated: 2026-11-06 · Baseline: SRS **v1.1** (`docs/BREVON-SRS-v1.1.md`) �
 | 8 — Recipes and production                    | ✅ Passed                                       | Approved 2026-11-06; re-review at end of development (client feedback) |
 | 9a — Discounts and tax                        | ✅ Passed                                       | Approved 2026-11-06; SC/PWD off until accountant confirms              |
 | 9b — Refunds and voids                        | ✅ Passed                                       | Approved 2026-11-06; refund approval limit ₱0.00 TBC                   |
-| 10a — Dashboard and sales reports             | 🟡 Awaiting review                              | Definitions TBC with the accountant (OI-008)                           |
-| 10b — Operational reports                     | ⏳ Not started                                  | Refunds/voids/discounts, variance, stock, production, waste; XLSX      |
+| 10a — Dashboard and sales reports             | ✅ Passed                                       | Approved 2026-11-06; definitions TBC (held for Phase 11)               |
+| 10b — Operational reports                     | 🟡 Finished — awaiting review                   | Six reports; CSV and Excel; print                                      |
 | 11 — Hardening and release readiness          | ⏳ Not started                                  |                                                                        |
 
 ## Phase 0 log
@@ -578,4 +578,32 @@ Still to confirm: boxes/combo at pop-ups (D-089), hot vs iced coffee prices. Pha
 - Category reporting uses each product's current category.
 - Nothing to migrate on the user's `brevon_pos` for 10a (apart from 9b's migration if not run yet).
 
-**Next step:** Phase 10b — operational reports, after user review.
+**Next step:** Phase 10b — operational reports (approved 2026-11-06).
+
+## Phase 10b log — Operational reports (2026-11-06)
+
+**Objective:** finish the reporting module with the operational reports managers use to check the day: refunds and voids, discounts, cash differences, stock in and out, production and waste, with CSV and Excel export and print.
+**SRS IDs:** FR-093, FR-094, FR-096, FR-097, UC-009; T-RPT-1–T-RPT-3.
+
+**Implemented**
+
+- Domain `app/Domain/Reports`: `OperationsReports` (the six reports and their permissions, D-160–D-162), `ReportTable` (columns with types, rows, totals), `ReportExporter` (CSV with BOM and formula guard; XLSX via `openspout/openspout` ^5.13, text always as text cells, D-163). No schema change.
+- HTTP / UI: `/admin/reports/{report}` (one shared `Operations.vue` page: cards, notes, tables, CSV/Excel, print) and `/admin/reports/{report}/export/{table}` (needs `reports.export`, throttled, audited). The sales report's exports now offer Excel too. Six new sidebar entries under Reports.
+- Docs: DECISIONS §AD (D-160–D-163), TEST_PLAN map, README.
+
+**Verification (all run 2026-11-06)**
+
+| Command                                                            | Result                   |
+| ------------------------------------------------------------------ | ------------------------ |
+| `composer check` → build, `vp check`, `vue-tsc`, Pint, Larastan L7 | all pass, 0 errors       |
+| → `php artisan test` (MySQL)                                       | **340 passed** (was 334) |
+
+**Manual checks (browser, scratch DB `brevon_pos_test`):** signed in as `harris` after a ₱176.00 cash sale by `cashier1` (opening stock 12 each). Stock in & out: 14 items, 16 movements; Chocolate Sprinkles 0 → 12 received → 3 sold → 9, the others 12. The Excel export downloaded (correct content type, file name and zip signature). The discounts page showed its empty state ("No discounts in these dates", ₱0.00). Refunds, cash differences, production, waste and sales all loaded without errors. There were no console errors. The user's `brevon_pos` was not touched.
+
+**Known issues / deferred**
+
+- Waste is valued at today's average cost (D-162).
+- NFR-009 (5 s) is not load-tested yet. Each report runs grouped SQL over indexed columns.
+- New dependency: `openspout/openspout`. Run `composer install` on the user's copy. Nothing to migrate.
+
+**Next step:** Phase 11 — after user review.

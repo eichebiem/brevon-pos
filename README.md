@@ -4,7 +4,7 @@ Point of Sale and Store Management System for **Brevon Doughnuts & Coffee**.
 Requirements: [`docs/BREVON-SRS-v1.1.md`](docs/BREVON-SRS-v1.1.md) (SRS v1.1, prepared by Harris).
 Progress: [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md).
 
-> **Status:** Phase 10a (dashboard and sales reports). Staff sign-in, users, roles, audit log, catalog and prices, store
+> **Status:** Phase 10b (operational reports). Staff sign-in, users, roles, audit log, catalog and prices, store
 > settings, payment methods, pop-up locations, terminals, opening stock, stock on hand/movements and cashier shifts
 > work. Cashiers sell from the POS screen and print 80 mm order receipts; preparation staff work orders through
 > New → Preparing → Ready → Handed over; managers cancel orders with a reason and confirm GCash transfers.
@@ -19,7 +19,8 @@ Progress: [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md).
 > sales are refunded by item with a manager's approval (cash from the drawer, GCash with the reference sent back,
 > goods back in stock only when ticked); cancellations leave a void record. The dashboard shows sales, orders, average order and low stock; the sales
 > report breaks sales down by period, product, category, cashier and payment method, per location (closed pop-ups
-> included), with CSV export.
+> included). Operational reports cover refunds and voids, discounts given, cash differences, stock in and out,
+> production and waste. Every report table exports to CSV or Excel and prints.
 > Receipts produced by this system are **not** BIR-accredited official receipts/invoices (SRS FR-087).
 
 ## Stack

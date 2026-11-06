@@ -55,8 +55,8 @@ const query = computed(() =>
         Object.entries(props.filters).filter(([, v]) => v !== null && v !== ''),
     ),
 );
-const csv = (section: string): string =>
-    exportMethod(section, { query: query.value }).url;
+const csv = (section: string, format: 'csv' | 'xlsx' = 'csv'): string =>
+    exportMethod(section, { query: { ...query.value, format } }).url;
 
 const locationLabel = computed(() =>
     props.filters.location === 'all'
@@ -246,6 +246,15 @@ const cell = (row: SalesFigures, key: keyof SalesFigures): string =>
                             ><Download aria-hidden="true" /> CSV</a
                         ></Button
                     >
+                    <Button
+                        v-if="canExport"
+                        variant="outline"
+                        size="sm"
+                        as-child
+                        ><a :href="csv('periods', 'xlsx')"
+                            ><Download aria-hidden="true" /> Excel</a
+                        ></Button
+                    >
                 </div>
             </div>
             <div class="overflow-x-auto">
@@ -317,6 +326,16 @@ const cell = (row: SalesFigures, key: keyof SalesFigures): string =>
                         class="print:hidden"
                         ><a :href="csv('products')"
                             ><Download aria-hidden="true" /> CSV</a
+                        ></Button
+                    >
+                    <Button
+                        v-if="canExport"
+                        variant="outline"
+                        size="sm"
+                        as-child
+                        class="print:hidden"
+                        ><a :href="csv('products', 'xlsx')"
+                            ><Download aria-hidden="true" /> Excel</a
                         ></Button
                     >
                 </div>
@@ -392,6 +411,16 @@ const cell = (row: SalesFigures, key: keyof SalesFigures): string =>
                                 ><Download aria-hidden="true" /> CSV</a
                             ></Button
                         >
+                        <Button
+                            v-if="canExport"
+                            variant="outline"
+                            size="sm"
+                            as-child
+                            class="print:hidden"
+                            ><a :href="csv('categories', 'xlsx')"
+                                ><Download aria-hidden="true" /> Excel</a
+                            ></Button
+                        >
                     </div>
                     <table class="w-full text-left text-sm">
                         <thead class="bg-secondary text-secondary-foreground">
@@ -451,6 +480,16 @@ const cell = (row: SalesFigures, key: keyof SalesFigures): string =>
                             class="print:hidden"
                             ><a :href="csv('cashiers')"
                                 ><Download aria-hidden="true" /> CSV</a
+                            ></Button
+                        >
+                        <Button
+                            v-if="canExport"
+                            variant="outline"
+                            size="sm"
+                            as-child
+                            class="print:hidden"
+                            ><a :href="csv('cashiers', 'xlsx')"
+                                ><Download aria-hidden="true" /> Excel</a
                             ></Button
                         >
                     </div>
@@ -523,6 +562,16 @@ const cell = (row: SalesFigures, key: keyof SalesFigures): string =>
                     class="print:hidden"
                     ><a :href="csv('payments')"
                         ><Download aria-hidden="true" /> CSV</a
+                    ></Button
+                >
+                <Button
+                    v-if="canExport"
+                    variant="outline"
+                    size="sm"
+                    as-child
+                    class="print:hidden"
+                    ><a :href="csv('payments', 'xlsx')"
+                        ><Download aria-hidden="true" /> Excel</a
                     ></Button
                 >
             </div>

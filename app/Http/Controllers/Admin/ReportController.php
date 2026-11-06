@@ -3,8 +3,11 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Domain\Reports\Dashboard;
+use App\Domain\Reports\OperationsReports;
+use App\Domain\Reports\ReportExporter;
 use App\Domain\Reports\ReportFilters;
 use App\Domain\Reports\ReportScope;
+use App\Domain\Reports\ReportTable;
 use App\Domain\Reports\SalesReport;
 use App\Domain\Shared\AuditLogger;
 use App\Domain\Shared\BusinessClock;
@@ -64,55 +67,90 @@ class ReportController extends Controller
         ]);
     }
 
-    /** FR-096: one section of the sales report as CSV, audited. */
-    public function exportSales(Request $request, string $section, AuditLogger $audit): StreamedResponse
+    /** FR-096: one section of the sales report as CSV or XLSX, audited. */
+    public function exportSales(Request $request, string $section, ReportExporter $exporter, AuditLogger $audit): StreamedResponse
     {
         abort_unless(in_array($section, self::SECTIONS, true), 404);
+        $format = $this->format($request);
         $user = $this->user($request);
         $filters = $this->scope->filters($request, $user);
-        [$header, $rows] = $this->table($section, $filters);
 
-        $audit->record('report.exported', $user, null, ['report' => "sales.{$section}", ...$filters->toQuery()], actor: $user);
+        $audit->record('report.exported', $user, null, ['report' => "sales.{$section}", 'format' => $format, ...$filters->toQuery()], actor: $user);
 
-        $name = sprintf('brevon-sales-%s-%s-to-%s.csv', $section, $filters->from->toDateString(), $filters->to->toDateString());
+        return $exporter->download($this->salesTable($section, $filters), $format, sprintf('brevon-sales-%s-%s-to-%s', $section, $filters->from->toDateString(), $filters->to->toDateString()));
+    }
 
-        return response()->streamDownload(function () use ($header, $rows) {
-            $out = fopen('php://output', 'w');
-            if ($out === false) {
-                return;
-            }
-            fwrite($out, "\xEF\xBB\xBF"); // UTF-8 BOM so Excel shows ₱ and ñ correctly
-            fputcsv($out, $header, escape: '');
-            foreach ($rows as $row) {
-                fputcsv($out, array_map(fn ($v) => self::safeCell($v), $row), escape: '');
-            }
-            fclose($out);
-        }, $name, ['Content-Type' => 'text/csv; charset=UTF-8']);
+    /** FR-093, FR-094: refunds and voids, discounts, cash differences, stock, production, waste. */
+    public function operations(Request $request, string $report, OperationsReports $reports): Response
+    {
+        $definition = $this->definition($request, $report);
+        $user = $this->user($request);
+        $filters = $this->scope->filters($request, $user);
+        $built = $reports->build($report, $filters);
+        $options = $this->options($user);
+
+        return Inertia::render('admin/reports/Operations', [
+            'report' => ['key' => $report, 'title' => $definition['title'], 'filters' => $definition['filters']],
+            'filters' => $filters->toQuery(),
+            'options' => [
+                'locations' => $options['locations'],
+                'cashiers' => in_array('cashier', $definition['filters'], true) ? $options['cashiers'] : null,
+                'payment_methods' => in_array('payment_method', $definition['filters'], true) ? $options['payment_methods'] : null,
+            ],
+            'cards' => $built['cards'],
+            'notes' => $built['notes'],
+            'tables' => array_map(fn (ReportTable $t) => $t->toArray(), $built['tables']),
+            'canExport' => $user->can('reports.export'),
+        ]);
+    }
+
+    public function exportOperations(Request $request, string $report, string $table, OperationsReports $reports, ReportExporter $exporter, AuditLogger $audit): StreamedResponse
+    {
+        $this->definition($request, $report);
+        abort_unless($this->user($request)->can('reports.export'), 403);
+        $format = $this->format($request);
+        $user = $this->user($request);
+        $filters = $this->scope->filters($request, $user);
+        $found = collect($reports->build($report, $filters)['tables'])->first(fn (ReportTable $t) => $t->key === $table);
+        abort_if($found === null, 404);
+
+        $audit->record('report.exported', $user, null, ['report' => "{$report}.{$table}", 'format' => $format, ...$filters->toQuery()], actor: $user);
+
+        return $exporter->download($found, $format, sprintf('brevon-%s-%s-%s-to-%s', $report, $table, $filters->from->toDateString(), $filters->to->toDateString()));
     }
 
     /**
-     * @return array{0: list<string>, 1: list<list<string|int|null>>}
+     * @return array{title: string, permission: string, filters: list<string>}
      */
-    private function table(string $section, ReportFilters $f): array
+    private function definition(Request $request, string $report): array
     {
-        $figures = ['Gross sales', 'Discounts', 'Refunds', 'Net sales', 'Tax', 'Orders', 'Average order', 'Quantity'];
-        $values = fn (array $r) => [$r['gross'], $r['discounts'], $r['refunds'], $r['net'], $r['tax'], $r['orders'], $r['average'], $r['quantity']];
+        $definition = OperationsReports::REPORTS[$report] ?? null;
+        abort_if($definition === null, 404);
+        abort_unless($this->user($request)->can($definition['permission']), 403);
 
-        return match ($section) {
-            'periods' => [['Period', 'Starts', ...$figures], array_map(fn (array $r) => [$r['period'], $r['start'], ...$values($r)], $this->sales->byPeriod($f))],
-            'products' => [['Product', 'Size', 'Category', ...$figures], array_map(fn (array $r) => [$r['name'], $r['variant'], $r['category'], ...$values($r)], $this->sales->byProduct($f))],
-            'categories' => [['Category', ...$figures], array_map(fn (array $r) => [$r['name'], ...$values($r)], $this->sales->byCategory($f))],
-            'cashiers' => [['Cashier', 'Shifts', ...$figures], array_map(fn (array $r) => [$r['name'], $r['shifts'], ...$values($r)], $this->sales->byCashier($f))],
-            default => [['Payment method', 'Payments', 'Received', 'Waiting for check', 'Refunds', 'Given back', 'Net collected'], array_map(fn (array $r) => [$r['method'], $r['payments'], $r['received'], $r['waiting'], $r['refunds'], $r['given_back'], $r['net']], $this->sales->collections($f)['rows'])],
-        };
+        return $definition;
     }
 
-    /** Stops a spreadsheet from running a cell as a formula (CSV injection). */
-    private static function safeCell(mixed $value): string
+    private function format(Request $request): string
     {
-        $text = (string) ($value ?? '');
+        $format = $request->query('format', 'csv');
+        abort_unless(in_array($format, ['csv', 'xlsx'], true), 404);
 
-        return $text !== '' && ! is_numeric($text) && in_array($text[0], ['=', '+', '-', '@', "\t", "\r"], true) ? "'".$text : $text;
+        return (string) $format;
+    }
+
+    private function salesTable(string $section, ReportFilters $f): ReportTable
+    {
+        $col = fn (string $k, string $l, string $t = 'text') => ReportTable::col($k, $l, $t);
+        $figures = [$col('gross', 'Gross sales', 'money'), $col('discounts', 'Discounts', 'money'), $col('refunds', 'Refunds', 'money'), $col('net', 'Net sales', 'money'), $col('tax', 'Tax', 'money'), $col('orders', 'Orders', 'int'), $col('average', 'Average order', 'money'), $col('quantity', 'Quantity', 'quantity')];
+
+        return match ($section) {
+            'periods' => new ReportTable($section, 'By period', [$col('period', 'Period'), $col('start', 'Starts', 'date'), ...$figures], $this->sales->byPeriod($f)),
+            'products' => new ReportTable($section, 'By product', [$col('name', 'Product'), $col('variant', 'Size'), $col('category', 'Category'), ...$figures], $this->sales->byProduct($f)),
+            'categories' => new ReportTable($section, 'By category', [$col('name', 'Category'), ...$figures], $this->sales->byCategory($f)),
+            'cashiers' => new ReportTable($section, 'By cashier', [$col('name', 'Cashier'), $col('shifts', 'Shifts', 'int'), ...$figures], $this->sales->byCashier($f)),
+            default => new ReportTable($section, 'By payment method', [$col('method', 'Payment method'), $col('payments', 'Payments', 'int'), $col('received', 'Received', 'money'), $col('waiting', 'Waiting for check', 'money'), $col('refunds', 'Refunds', 'int'), $col('given_back', 'Given back', 'money'), $col('net', 'Net collected', 'money')], $this->sales->collections($f)['rows']),
+        };
     }
 
     /**

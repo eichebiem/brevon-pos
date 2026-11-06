@@ -41,3 +41,32 @@ export type CollectionRow = {
     given_back: string;
     net: string;
 };
+
+export type ReportColumn = {
+    key: string;
+    label: string;
+    type:
+        | 'text'
+        | 'money'
+        | 'quantity'
+        | 'int'
+        | 'percent'
+        | 'date'
+        | 'datetime';
+};
+
+export type ReportTableData = {
+    key: string;
+    title: string;
+    columns: ReportColumn[];
+    rows: Record<string, string | number | null>[];
+    totals: Record<string, string | number | null> | null;
+    empty: string;
+};
+
+export type ReportCard = {
+    label: string;
+    value: string;
+    type: ReportColumn['type'];
+    note?: string;
+};

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
 import {
+    ArrowLeftRight,
     ChartColumn,
     ChefHat,
     Coins,
@@ -28,7 +29,9 @@ import {
     ShieldCheck,
     ShoppingCart,
     Timer,
+    Trash2,
     Truck,
+    Undo2,
     Users,
     Wallet,
 } from '@lucide/vue';
@@ -63,7 +66,10 @@ import { index as productsIndex } from '@/routes/admin/products';
 import { index as purchaseOrdersIndex } from '@/routes/admin/purchase-orders';
 import { index as receiptsIndex } from '@/routes/admin/receipts';
 import { index as recipesIndex } from '@/routes/admin/recipes';
-import { sales as salesReport } from '@/routes/admin/reports';
+import {
+    sales as salesReport,
+    show as showReport,
+} from '@/routes/admin/reports';
 import { edit as storeSettings } from '@/routes/admin/settings';
 import { index as discountsIndex } from '@/routes/admin/discounts';
 import { index as rolesIndex } from '@/routes/admin/roles';
@@ -242,6 +248,42 @@ const reports = computed(() =>
             href: salesReport(),
             icon: ChartColumn,
             permission: 'reports.sales',
+        },
+        {
+            title: 'Refunds & voids',
+            href: showReport('refunds'),
+            icon: Undo2,
+            permission: 'reports.sales',
+        },
+        {
+            title: 'Discounts given',
+            href: showReport('discounts'),
+            icon: BadgePercent,
+            permission: 'reports.sales',
+        },
+        {
+            title: 'Cash differences',
+            href: showReport('cash-variance'),
+            icon: Coins,
+            permission: 'reports.sales',
+        },
+        {
+            title: 'Stock in & out',
+            href: showReport('stock-movements'),
+            icon: ArrowLeftRight,
+            permission: 'reports.inventory',
+        },
+        {
+            title: 'Production report',
+            href: showReport('production'),
+            icon: Factory,
+            permission: 'reports.inventory',
+        },
+        {
+            title: 'Waste & rejects',
+            href: showReport('waste'),
+            icon: Trash2,
+            permission: 'reports.inventory',
         },
     ]),
 );
