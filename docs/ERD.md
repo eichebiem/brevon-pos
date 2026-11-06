@@ -306,20 +306,19 @@ Invariant: for every (branch, item), `branch_inventory.quantity_on_hand = Σ inv
 ```mermaid
 erDiagram
     products ||--o{ recipes : versions
+    product_variants |o--o{ recipes : "size (drinks)"
     recipes ||--|{ recipe_items : ""
     inventory_items ||--o{ recipe_items : ingredient
     units_of_measure ||--o{ recipe_items : ""
-    branches ||--o{ production_batches : ""
+    branches ||--o{ production_batches : "main branch"
     products ||--o{ production_batches : ""
     recipes ||--o{ production_batches : "version used"
     production_batches ||--o{ production_batch_items : consumption
     inventory_items ||--o{ production_batch_items : ""
-    production_batches |o--o{ waste_records : ""
-    inventory_items |o--o{ waste_records : ""
-    products |o--o{ waste_records : ""
+    production_batches ||--o{ inventory_movements : "reference"
 ```
 
-UNIQUE `recipes(product_id, version)`. Posting a batch: one transaction, status `draft → posted` guarded by `WHERE status='draft'` (prevents double posting), ingredient movements `production_consumption`, output movement `production_output` on the product's finished-good item.
+UNIQUE `recipes(product_id, variant_key, version)`, where `variant_key` is generated as `COALESCE(product_variant_id, 0)` (0 = every size). Recipes and recipe lines are never edited or deleted; saving makes a new version (D-140). `production_batches`: `planned_quantity`, `actual_quantity` (good), `rejected_quantity` + `reject_reason`, `status` draft/posted/cancelled, `unit_cost` (per good piece, nullable), `posted_by/at`, `cancelled_by/at`, `cancel_reason`; CHECK planned > 0 and good + rejected > 0. `production_batch_items`: `quantity_consumed`, `unit_cost_snapshot` (set when posted). Posting a batch: one transaction on the locked draft row, ingredient movements `production_consumption`, output movement `production_output` on the product's finished-good item (D-142). The SRS `waste_records` table is not created: batch rejects and `waste` movements cover FR-070 (D-143).
 
 ## 7. Audit and system
 

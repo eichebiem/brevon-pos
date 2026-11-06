@@ -2,23 +2,23 @@
 
 Last updated: 2026-11-06 · Baseline: SRS **v1.1** (`docs/BREVON-SRS-v1.1.md`) · Prompt: `CLAUDE_CODE_PROMPT_BREVON_POS_v1.1.md` (v1.3)
 
-| Phase                                         | Status                                          | Notes                                                         |
-| --------------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------- |
-| 0 — Discovery and technical plan              | ✅ Passed (docs only), re-baselined to SRS v1.1 | Approved 2026-11-05                                           |
-| 1 — Project foundation                        | ✅ Passed                                       | Approved; committed by user as "Initial Commit"               |
-| 2 — Authentication and access control         | ✅ Passed                                       | Approved; committed by user ("Done Phase 2")                  |
-| 3 — Catalog, settings and operating locations | ✅ Passed                                       | Approved; committed by user ("Done Phase 3")                  |
-| 4a — Ledger core and shift open               | ✅ Passed                                       | Approved; committed by user (with the seeder changes)         |
-| 4b — Checkout backend                         | ✅ Passed                                       | Approved 2026-11-06                                           |
-| 4c — Cashier UI and receipts                  | ✅ Passed                                       | Approved 2026-11-06 (with D-121, D-122)                       |
-| 5 — Orders and preparation                    | ✅ Passed                                       | Approved 2026-11-06                                           |
-| 6 — Cashier shifts and cash control           | ✅ Passed                                       | Approved 2026-11-06; two limits to confirm (D-127, D-128)     |
-| 7a — Stock control                            | ✅ Passed                                       | Approved 2026-11-06 (D-131–D-134)                             |
-| 7b — Purchasing                               | ✅ Passed — awaiting review                     | Suppliers, POs, receiving, lots, stock value (D-135–D-139)    |
-| 8 — Recipes and production                    | ⏳ Not started                                  | Production at the permanent branch only                       |
-| 9 — Refunds, discounts, tax configuration     | ⏳ Not started                                  | SC/PWD: name, card no., address; 12%, VAT disregarded (D-068) |
-| 10 — Dashboards and reports                   | ⏳ Not started                                  | Location filters incl. closed pop-ups                         |
-| 11 — Hardening and release readiness          | ⏳ Not started                                  |                                                               |
+| Phase                                         | Status                                          | Notes                                                                 |
+| --------------------------------------------- | ----------------------------------------------- | --------------------------------------------------------------------- |
+| 0 — Discovery and technical plan              | ✅ Passed (docs only), re-baselined to SRS v1.1 | Approved 2026-11-05                                                   |
+| 1 — Project foundation                        | ✅ Passed                                       | Approved; committed by user as "Initial Commit"                       |
+| 2 — Authentication and access control         | ✅ Passed                                       | Approved; committed by user ("Done Phase 2")                          |
+| 3 — Catalog, settings and operating locations | ✅ Passed                                       | Approved; committed by user ("Done Phase 3")                          |
+| 4a — Ledger core and shift open               | ✅ Passed                                       | Approved; committed by user (with the seeder changes)                 |
+| 4b — Checkout backend                         | ✅ Passed                                       | Approved 2026-11-06                                                   |
+| 4c — Cashier UI and receipts                  | ✅ Passed                                       | Approved 2026-11-06 (with D-121, D-122)                               |
+| 5 — Orders and preparation                    | ✅ Passed                                       | Approved 2026-11-06                                                   |
+| 6 — Cashier shifts and cash control           | ✅ Passed                                       | Approved 2026-11-06; two limits to confirm (D-127, D-128)             |
+| 7a — Stock control                            | ✅ Passed                                       | Approved 2026-11-06 (D-131–D-134)                                     |
+| 7b — Purchasing                               | ✅ Passed                                       | Approved 2026-11-06; re-review at end of development (client changes) |
+| 8 — Recipes and production                    | 🟡 Awaiting review                              | D-140–D-144; costing method TBC (OI-014)                              |
+| 9 — Refunds, discounts, tax configuration     | ⏳ Not started                                  | SC/PWD: name, card no., address; 12%, VAT disregarded (D-068)         |
+| 10 — Dashboards and reports                   | ⏳ Not started                                  | Location filters incl. closed pop-ups                                 |
+| 11 — Hardening and release readiness          | ⏳ Not started                                  |                                                                       |
 
 ## Phase 0 log
 
@@ -449,3 +449,40 @@ Still to confirm: boxes/combo at pop-ups (D-089), hot vs iced coffee prices. Pha
 - The user's `brevon_pos` needs `php artisan migrate` (Phase 4b tables, D-121, Phase 6, 7a and 7b).
 
 **Next step:** Phase 8 — recipes and production, after user review.
+
+## Phase 8 log — Recipes and production (2026-11-06)
+
+**Objective:** say what each doughnut and drink uses, record batches of doughnuts made at the main branch (ingredients out, good pieces in, rejects noted), and take drink ingredients out of stock when drinks are sold.
+**SRS IDs:** FR-064–FR-072; T-PRD-B1–B6.
+
+**Implemented**
+
+- Schema (`2026_11_06_150000`): `recipes` (versioned; `product_variant_id` + generated `variant_key` for size recipes, a schema addition), `recipe_items`, `production_batches` (reject quantity and reason, cancel fields, cost per piece), `production_batch_items`. CHECK rules on versions, quantities, wastage and statuses. Morph names `recipe`, `production_batch`. `waste_records` is not created (D-143).
+- Domain: `RecipeBook` (which products and items can have recipes, the recipe in use for a product and size, saving a new version, ingredients for a quantity with wastage and rounding), `ProductionBatches` (draft, edit, post in one ledger call with cost snapshots, cancel). `CheckoutService` now takes recipe-at-sale drink ingredients at checkout (D-141).
+- HTTP / permissions: Recipes (`recipes.manage`), Production (view with `production.create` or `production.post`; drafts `production.create`; post `production.post`). Batches at other locations answer 404. "Save and post" runs in one transaction.
+- UI: Recipes list (with a "Without a recipe only" filter), recipe history per product (each version and its lines, a button per size for drinks), recipe form; Production list, batch form (ingredient use worked out live from the recipe for good + rejected pieces, with on-hand shown and short items in red), batch detail (post, edit, cancel with reason, costs once posted); sidebar "Production" section.
+- Docs: DECISIONS §Z (D-140–D-144), ERD §6, TEST_PLAN map, README.
+
+**Verification (all run 2026-11-06)**
+
+| Command                                                            | Result                   |
+| ------------------------------------------------------------------ | ------------------------ |
+| `composer check` → build, `vp check`, `vue-tsc`, Pint, Larastan L7 | all pass, 0 errors       |
+| → `php artisan test` (MySQL)                                       | **306 passed** (was 292) |
+
+**Manual checks (browser, scratch DB `brevon_pos_test`, signed in as `harris`):** with 5,000 g flour at ₱0.05 and 30 eggs at ₱9.00 in stock, added a Choco Custard recipe (makes 12 pc: flour 1,000 g + 5% wastage, 4 eggs) — saved as version 1. New batch: planned 12, good 10, rejected 2 (Burnt); the form showed 1,050 g flour and 4 eggs; "Save and post" posted BRV01-20261106-PB01 with a cost of ₱8.85 per piece. A second batch of 100 was refused with "Not enough Bread flour in stock: 3,950 g on hand, 8,750 g needed" and left no draft; the Production list showed the one posted batch. No console errors. The user's `brevon_pos` was not touched.
+
+**Problems found and fixed during the phase**
+
+- "Save and post" first created the draft and posted it separately, so a failed post left a draft behind (and a retry made a duplicate); both now run in one transaction.
+- The not-enough message showed "3950.000"; it now says "3,950 g".
+- Editing a draft brought back every saved amount as a manual change, so changing the good count no longer recalculated; amounts equal to the recipe are now left to the recipe.
+
+**Known issues / deferred**
+
+- Add-on options (extra shot, oat milk) do not take ingredients in V1 (D-141). Drinks without a recipe take nothing until one is entered.
+- Doughnut cost covers ingredients only, at weighted average (OI-014 still to confirm).
+- Still to confirm: Phase 6 limits (₱500.00 approval, ₱0.00 review), the 7-day expiry window. Re-review Phase 7 at the end of development (client changes). D-101 client menu questions: raise again after Phase 9.
+- The user's `brevon_pos` needs `php artisan migrate` (Phase 4b tables, D-121, Phase 6, 7a, 7b and 8).
+
+**Next step:** Phase 9 — refunds, discounts and tax configuration, after user review.

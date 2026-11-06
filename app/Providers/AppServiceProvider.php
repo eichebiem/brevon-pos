@@ -17,9 +17,11 @@ use App\Models\Order;
 use App\Models\Payment;
 use App\Models\PaymentMethod;
 use App\Models\Product;
+use App\Models\ProductionBatch;
 use App\Models\ProductPrice;
 use App\Models\ProductVariant;
 use App\Models\PurchaseOrder;
+use App\Models\Recipe;
 use App\Models\Setting;
 use App\Models\StockAdjustment;
 use App\Models\StockTransfer;
@@ -92,6 +94,8 @@ class AppServiceProvider extends ServiceProvider
             'purchase_order' => PurchaseOrder::class,
             'goods_receipt' => GoodsReceipt::class,
             'inventory_lot' => InventoryLot::class,
+            'recipe' => Recipe::class,
+            'production_batch' => ProductionBatch::class,
             'order' => Order::class,
             'payment' => Payment::class,
         ]);

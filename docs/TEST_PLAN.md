@@ -144,6 +144,8 @@ ID format `T-<area>-<n>`; each maps to SRS requirements.
 - T-PRD-B5 recipe_at_sale beverage deducts ingredients at sale (FR-072)
 - T-PRD-B6 rejects/waste recorded separately (FR-070)
 
+**Phase 8 implementation map:** `tests/Feature/Production/ProductionTest.php` — T-PRD-B1 (12 pieces: flour 1000 g × 1.05 = 1050 g, 4 eggs, 10 good added; 3 movements referencing the batch; cost per piece 8.85; snapshots; reconcile), ingredient use changed per item and unknown cost leaves the piece cost unknown, T-PRD-B2 (not enough flour: save-and-post leaves no draft; posting a draft fails with nothing moved), T-PRD-B3 (posts once; posted batches cannot be edited or cancelled; model guard), drafts edited (ingredients worked out again) and cancelled with a reason, T-PRD-B6 (reject reason required; whole batch rejected uses ingredients and adds nothing), recipe versioning (old version closed, batches keep theirs, never deleted), recipe line rules, T-PRD-B4 (doughnut sale takes only the doughnut), T-PRD-B5 (drink takes ingredients at checkout, size recipe first; short milk refuses the sale; cancelling returns them; no recipe takes nothing), permissions (prep drafts, manager posts, only Owner/Admin edit recipes), main branch only (404), pages render. `RouteAuthorizationTest` now covers recipes and production.
+
 ### Refunds/discounts/tax (Phase 9)
 
 - T-RFD-1 refund ≤ remaining refundable amount/qty; cumulative partial refunds (invariant 8)

@@ -12,6 +12,8 @@ use App\Http\Controllers\Admin\LocationController;
 use App\Http\Controllers\Admin\OptionGroupController;
 use App\Http\Controllers\Admin\PaymentMethodController;
 use App\Http\Controllers\Admin\ProductController;
+use App\Http\Controllers\Admin\Production\ProductionBatchController;
+use App\Http\Controllers\Admin\Production\RecipeController;
 use App\Http\Controllers\Admin\ProductPriceController;
 use App\Http\Controllers\Admin\Purchasing\GoodsReceiptController;
 use App\Http\Controllers\Admin\Purchasing\PurchaseOrderController;
@@ -229,6 +231,26 @@ Route::middleware(['auth'])->group(function () {
             Route::post('receipts', [GoodsReceiptController::class, 'store'])->name('receipts.store');
             Route::get('receipts/{receipt}', [GoodsReceiptController::class, 'show'])->name('receipts.show');
         });
+
+        // Recipes and production (FR-064–FR-072; D-140–D-143).
+        Route::middleware('permission:recipes.manage')->group(function () {
+            Route::get('recipes', [RecipeController::class, 'index'])->name('recipes.index');
+            Route::get('recipes/{product}', [RecipeController::class, 'show'])->name('recipes.show');
+            Route::get('recipes/{product}/new-version', [RecipeController::class, 'create'])->name('recipes.create');
+            Route::post('recipes/{product}', [RecipeController::class, 'store'])->name('recipes.store');
+        });
+        Route::middleware('permission:production.create')->group(function () {
+            Route::get('production/create', [ProductionBatchController::class, 'create'])->name('production.create');
+            Route::post('production', [ProductionBatchController::class, 'store'])->name('production.store');
+            Route::get('production/{batch}/edit', [ProductionBatchController::class, 'edit'])->name('production.edit');
+            Route::put('production/{batch}', [ProductionBatchController::class, 'update'])->name('production.update');
+            Route::post('production/{batch}/cancel', [ProductionBatchController::class, 'cancel'])->name('production.cancel');
+        });
+        Route::middleware('permission:production.create|production.post')->group(function () {
+            Route::get('production', [ProductionBatchController::class, 'index'])->name('production.index');
+            Route::get('production/{batch}', [ProductionBatchController::class, 'show'])->name('production.show');
+        });
+        Route::post('production/{batch}/post', [ProductionBatchController::class, 'post'])->middleware('permission:production.post')->name('production.post');
 
         // Shift review and corrections (FR-080–FR-082, D-128–D-130).
         Route::middleware('permission:shifts.review')->group(function () {

@@ -4,10 +4,12 @@ import {
     ChefHat,
     Coins,
     BadgeCheck,
+    BookOpen,
     Boxes,
     Calculator,
     CalendarClock,
     ClipboardCheck,
+    CookingPot,
     Croissant,
     Factory,
     FileText,
@@ -52,9 +54,11 @@ import { index as itemsIndex } from '@/routes/admin/inventory/items';
 import { index as locationsIndex } from '@/routes/admin/locations';
 import { index as optionGroupsIndex } from '@/routes/admin/option-groups';
 import { index as paymentMethodsIndex } from '@/routes/admin/payment-methods';
+import { index as productionIndex } from '@/routes/admin/production';
 import { index as productsIndex } from '@/routes/admin/products';
 import { index as purchaseOrdersIndex } from '@/routes/admin/purchase-orders';
 import { index as receiptsIndex } from '@/routes/admin/receipts';
+import { index as recipesIndex } from '@/routes/admin/recipes';
 import { edit as storeSettings } from '@/routes/admin/settings';
 import { index as rolesIndex } from '@/routes/admin/roles';
 import { index as shiftsIndex } from '@/routes/admin/shifts';
@@ -184,6 +188,23 @@ const inventory = computed(() =>
     ]),
 );
 
+const production = computed(() =>
+    visible([
+        {
+            title: 'Production',
+            href: productionIndex(),
+            icon: CookingPot,
+            permission: 'production.create|production.post',
+        },
+        {
+            title: 'Recipes',
+            href: recipesIndex(),
+            icon: BookOpen,
+            permission: 'recipes.manage',
+        },
+    ]),
+);
+
 const purchasing = computed(() =>
     visible([
         {
@@ -276,6 +297,11 @@ const administration = computed(() =>
                 v-if="inventory.length"
                 label="Inventory"
                 :items="inventory"
+            />
+            <NavMain
+                v-if="production.length"
+                label="Production"
+                :items="production"
             />
             <NavMain
                 v-if="purchasing.length"

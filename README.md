@@ -4,7 +4,7 @@ Point of Sale and Store Management System for **Brevon Doughnuts & Coffee**.
 Requirements: [`docs/BREVON-SRS-v1.1.md`](docs/BREVON-SRS-v1.1.md) (SRS v1.1, prepared by Harris).
 Progress: [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md).
 
-> **Status:** Phase 7 (inventory and purchasing). Staff sign-in, users, roles, audit log, catalog and prices, store
+> **Status:** Phase 8 (recipes and production). Staff sign-in, users, roles, audit log, catalog and prices, store
 > settings, payment methods, pop-up locations, terminals, opening stock, stock on hand/movements and cashier shifts
 > work. Cashiers sell from the POS screen and print 80 mm order receipts; preparation staff work orders through
 > New → Preparing → Ready → Handed over; managers cancel orders with a reason and confirm GCash transfers.
@@ -12,8 +12,9 @@ Progress: [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md).
 > managers review shifts and add corrections without changing the closed figures. Staff count stock, adjust
 > it (with approval), write off waste, see low-stock alerts and dispatch doughnuts from the main branch to pop-ups.
 > Managers order from suppliers, receive deliveries in full or in parts with lot and expiry dates, and see
-> the value of stock at weighted average cost. The dashboard is still a
-> labelled shell.
+> the value of stock at weighted average cost. Owners keep versioned recipes; bakers record doughnut batches
+> (ingredients out, good pieces in, rejects noted) and a manager posts them; drinks with a recipe take their
+> ingredients at the counter. The dashboard is still a labelled shell.
 > Receipts produced by this system are **not** BIR-accredited official receipts/invoices (SRS FR-087).
 
 ## Stack
