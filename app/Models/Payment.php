@@ -42,6 +42,12 @@ class Payment extends Model
 
     protected static function booted(): void
     {
+        // FR-043: what was paid is never rewritten; only its status (and who checked it) moves.
+        static::updating(function (Payment $payment) {
+            if (array_diff(array_keys($payment->getDirty()), ['status', 'verified_by', 'verified_at', 'updated_at']) !== []) {
+                throw new LogicException('A payment record is never rewritten; record a refund instead.');
+            }
+        });
         static::deleting(fn () => throw new LogicException('Payments are never deleted.'));
     }
 

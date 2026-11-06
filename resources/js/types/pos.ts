@@ -210,6 +210,46 @@ export type Receipt = {
         reference_number: string | null;
         status: string;
     }[];
+    refunds: { refund_number: string; amount: string; at: string }[];
+};
+
+export type RefundRecord = {
+    refund_number: string;
+    kind: 'refund' | 'void';
+    kind_label: string;
+    amount: string;
+    method: string | null;
+    reference_number: string | null;
+    reason: string;
+    by: string | null;
+    approved_by: string | null;
+    at: string;
+    items: {
+        name: string | null;
+        variant: string | null;
+        quantity: string;
+        amount: string;
+        return_to_stock: boolean;
+    }[];
+};
+
+export type RefundForm = {
+    method: string | null;
+    is_cash: boolean;
+    requires_reference: boolean;
+    has_drawer: boolean;
+    can_approve: boolean;
+    approval_over: string;
+    refunded: string;
+    lines: {
+        id: number;
+        name: string;
+        variant: string | null;
+        sold: string;
+        remaining_quantity: string;
+        remaining_amount: string;
+        can_return_to_stock: boolean;
+    }[];
 };
 
 export type PrepCard = {

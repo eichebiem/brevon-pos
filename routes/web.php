@@ -28,6 +28,7 @@ use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\LocationSwitchController;
 use App\Http\Controllers\Orders\OrderStatusController;
+use App\Http\Controllers\Orders\RefundController;
 use App\Http\Controllers\Pos\CheckoutController;
 use App\Http\Controllers\Pos\OrderController as PosOrderController;
 use App\Http\Controllers\PosController;
@@ -85,6 +86,9 @@ Route::middleware(['auth'])->group(function () {
         ->middleware('permission:orders.update-status')->name('orders.advance');
     Route::post('orders/{order}/cancel', [OrderStatusController::class, 'cancel'])
         ->middleware('permission:orders.cancel')->name('orders.cancel');
+    // Refunds of completed sales (FR-042–FR-045, D-150–D-155).
+    Route::post('orders/{order}/refunds', [RefundController::class, 'store'])
+        ->middleware(['permission:refunds.request', 'throttle:30,1'])->name('orders.refunds.store');
 
     // GCash checks (BR-019, D-124).
     Route::middleware('permission:payments.verify-ewallet')->group(function () {

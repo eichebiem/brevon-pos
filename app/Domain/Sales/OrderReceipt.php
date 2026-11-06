@@ -3,12 +3,14 @@
 namespace App\Domain\Sales;
 
 use App\Domain\Settings\StoreSettings;
+use App\Enums\RefundKind;
 use App\Models\Branch;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\OrderItemOption;
 use App\Models\OrderTaxLine;
 use App\Models\Payment;
+use App\Models\Refund;
 
 /**
  * Everything printed on an order receipt (FR-033, FR-034), read only from
@@ -28,7 +30,7 @@ class OrderReceipt
      */
     public function for(Order $order): array
     {
-        $order->loadMissing(['branch', 'terminal', 'creator', 'items.options', 'payments.method', 'discount.beneficiary', 'discount.approver:id,name', 'taxLines']);
+        $order->loadMissing(['branch', 'terminal', 'creator', 'items.options', 'payments.method', 'discount.beneficiary', 'discount.approver:id,name', 'taxLines', 'refunds']);
         $discount = $order->discount;
         /** @var Branch $location */
         $location = $order->branch;
@@ -90,6 +92,12 @@ class OrderReceipt
                 'taxable_amount' => $t->taxable_amount,
                 'amount' => $t->tax_amount,
             ])->all(),
+            // D-155: refunds of a completed sale are printed under the payment.
+            'refunds' => $order->refunds->where('kind', RefundKind::Refund)->map(fn (Refund $r) => [
+                'refund_number' => $r->refund_number,
+                'amount' => $r->amount,
+                'at' => ($r->processed_at ?? $r->created_at)->toIso8601String(),
+            ])->values()->all(),
             'payments' => $order->payments->map(fn (Payment $p) => [
                 'method' => $p->method?->name,
                 'amount' => $p->amount,

@@ -16,8 +16,8 @@ Last updated: 2026-11-06 · Baseline: SRS **v1.1** (`docs/BREVON-SRS-v1.1.md`) �
 | 7a — Stock control                            | ✅ Passed                                       | Approved 2026-11-06 (D-131–D-134)                                      |
 | 7b — Purchasing                               | ✅ Passed                                       | Approved 2026-11-06; re-review at end of development (client changes)  |
 | 8 — Recipes and production                    | ✅ Passed                                       | Approved 2026-11-06; re-review at end of development (client feedback) |
-| 9a — Discounts and tax                        | 🟡 Awaiting review                              | D-145–D-149; SC/PWD seeded off until accountant confirms               |
-| 9b — Refunds and voids                        | ⏳ Not started                                  | Works from discounted line amounts                                     |
+| 9a — Discounts and tax                        | ✅ Passed                                       | Approved 2026-11-06; SC/PWD off until accountant confirms              |
+| 9b — Refunds and voids                        | 🟡 Awaiting review                              | Refund approval limit ₱0.00 TBC                                        |
 | 10 — Dashboards and reports                   | ⏳ Not started                                  | Location filters incl. closed pop-ups                                  |
 | 11 — Hardening and release readiness          | ⏳ Not started                                  |                                                                        |
 
@@ -518,3 +518,34 @@ Still to confirm: boxes/combo at pop-ups (D-089), hot vs iced coffee prices. Pha
 - Still to confirm: Phase 6 limits (₱500.00, ₱0.00), the 7-day expiry window. Re-review Phases 7 and 8 at the end of development. D-101 client menu questions: raise after Phase 9 (9b).
 
 **Next step:** Phase 9b — refunds and voids, after user review.
+
+## Phase 9b log — Refunds and voids (2026-11-06)
+
+**Objective:** give money back on completed sales under control (by item, approved, traceable, drawer and stock correct), and give cancellations a void record. This finishes Phase 9.
+**SRS IDs:** FR-041–FR-045, FR-077, BR-005, BR-008, UC-005; T-RFD-1–T-RFD-4.
+
+**Implemented**
+
+- Schema (`2026_11_06_170000`): `refunds` (+ `kind`, `cashier_shift_id`, `reference_number`) and `refund_items` per SRS §8.4, CHECK rules, morph name `refund`. Store setting "Refunds without approval up to" (₱0.00).
+- Domain: `Refundables` / `RefundableLine` (what is left per line, D-151), `RefundApproval` (manager sign-in at the counter, rate limited), `RefundService` (refund of a completed order; void record for cancellations), `CashDrawer::giveRefund` (cash refund movement), `RefundPanel` (order page). `OrderWorkflow::cancel` writes void records. `ExpectedCash` and the shift summary count refunded payments as taken and subtract cash refunds. Payments now refuse any change except status and checking.
+- HTTP / UI: `POST /orders/{order}/refunds` (`refunds.request`); "Refund" button and dialog on the order page (steppers per item, "Everything left", "Put back in stock" for ready-made items, reason, GCash reference, manager approval box, live total); "Refunds and voids" list; receipts list refunds and print "REFUNDED IN FULL".
+- Docs: DECISIONS §AB (D-150–D-155), ERD §3, TEST_PLAN map, README.
+
+**Verification (all run 2026-11-06)**
+
+| Command                                                            | Result                   |
+| ------------------------------------------------------------------ | ------------------------ |
+| `composer check` → build, `vp check`, `vue-tsc`, Pint, Larastan L7 | all pass, 0 errors       |
+| → `php artisan test` (MySQL)                                       | **329 passed** (was 321) |
+
+**Manual checks (browser, scratch DB `brevon_pos_test`):** as `cashier1`, a completed cash sale of 3 Chocolate Sprinkles and 1 Strawberry Sprinkles (₱176.00). Refund dialog: one Chocolate Sprinkles = ₱44.00, the manager approval box appeared, "Put back in stock" ticked, `harris` approved. The order page listed "Refund BRV01-20261106-R0001 −₱44.00 · Cash, approved by Harris, back in stock"; the receipt showed "Partly refunded" and the refund line. Expected drawer cash ₱1,132.00 (1,000 + 176 − 44); one `return_in` and one `cash_refund` linked to the refund. No app errors in the console. The user's `brevon_pos` was not touched.
+
+**Known issues / deferred**
+
+- `DiscountSeeder` had been changed after 9a to seed SC/PWD switched on; on the user's instruction it is back to off (D-148), which fixed the one failing 9a test.
+- To confirm with the owner: the ₱0.00 refund approval limit (OI-011); refunds of cash go out of the refunder's own drawer.
+- Refunds are by item and quantity only (no typed-in amounts or goodwill refunds); one payment per order, so one method per refund. Cancellations before 9b have no void record. Refund and void reports come with reporting (Phase 10).
+- On the user's `brevon_pos`: run `php artisan migrate`. Refund permissions were already seeded in Phase 2.
+- Still to confirm: Phase 6 limits (₱500.00, ₱0.00), the 7-day expiry window, the 9a items. Re-review Phases 7 and 8 at the end of development.
+
+**Next step:** Phase 10 (reports), after user review — and the D-101 client menu questions now that Phase 9 is done.

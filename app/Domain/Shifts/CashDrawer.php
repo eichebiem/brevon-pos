@@ -9,6 +9,7 @@ use App\Enums\CashMovementStatus;
 use App\Enums\CashMovementType;
 use App\Models\CashierShift;
 use App\Models\CashMovement;
+use App\Models\Refund;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -201,6 +202,37 @@ class CashDrawer
 
             return $shift;
         });
+    }
+
+    /**
+     * Cash handed back on a refund (FR-077, D-153): an approved cash refund
+     * movement on the refunder's open shift, linked to the refund. The caller
+     * has already locked the shift row inside its transaction.
+     */
+    public function giveRefund(User $actor, CashierShift $shift, Money $amount, Refund $refund): CashMovement
+    {
+        if (! $shift->isOpen()) {
+            throw ValidationException::withMessages(['refund' => __('Shift :number is closed.', ['number' => $shift->shift_number])]);
+        }
+        $this->assertDrawerCovers($shift, $amount, 'refund');
+
+        $movement = new CashMovement;
+        $movement->forceFill([
+            'cashier_shift_id' => $shift->id,
+            'branch_id' => $shift->branch_id,
+            'movement_type' => CashMovementType::Refund,
+            'amount' => $amount->toDecimal(),
+            'reason' => __('Refund :number', ['number' => $refund->refund_number]),
+            'status' => CashMovementStatus::Approved,
+            'reference_type' => $refund->getMorphClass(),
+            'reference_id' => $refund->id,
+            'approved_by' => $refund->approved_by,
+            'decided_at' => now(),
+            'created_by' => $actor->id,
+            'created_at' => now(),
+        ])->save();
+
+        return $movement;
     }
 
     private function lockOpen(CashierShift $shift, string $field): CashierShift

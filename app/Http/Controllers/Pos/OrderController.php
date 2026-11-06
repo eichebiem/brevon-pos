@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Pos;
 
 use App\Domain\Locations\LocationContext;
+use App\Domain\Refunds\RefundPanel;
 use App\Domain\Sales\OrderReceipt;
 use App\Domain\Shared\AuditLogger;
 use App\Domain\Shared\BusinessClock;
@@ -76,7 +77,7 @@ class OrderController extends Controller
         ]);
     }
 
-    public function show(Request $request, Order $order, OrderReceipt $receipt): Response
+    public function show(Request $request, Order $order, OrderReceipt $receipt, RefundPanel $refunds): Response
     {
         $this->authorizeView($request, $order);
         /** @var User $user */
@@ -113,6 +114,8 @@ class OrderController extends Controller
                 'can_cancel' => $user->can('orders.cancel') && $order->status->isCancellable(),
                 'can_verify' => $user->can('payments.verify-ewallet') && $order->status !== OrderStatus::Cancelled,
                 'can_view_beneficiary' => $user->can('discounts.view-beneficiary') && $order->discount()->whereHas('beneficiary')->exists(),
+                'refunds' => $refunds->history($order),
+                'refund' => $refunds->form($user, $order),
             ],
         ]);
     }

@@ -16,6 +16,7 @@ const props = defineProps<{
         cash_approval_over: string;
         shift_review_variance_over: string;
         discount_approval_over: string;
+        refund_approval_over: string;
         currency: string;
         timezone: string;
     };
@@ -33,12 +34,14 @@ const form = useForm<{
     cash_approval_over: string;
     shift_review_variance_over: string;
     discount_approval_over: string;
+    refund_approval_over: string;
 }>({
     name: props.settings.name,
     receipt_footer: props.settings.receipt_footer ?? '',
     cash_approval_over: props.settings.cash_approval_over,
     shift_review_variance_over: props.settings.shift_review_variance_over,
     discount_approval_over: props.settings.discount_approval_over,
+    refund_approval_over: props.settings.refund_approval_over,
     logo: null,
     remove_logo: false,
 });
@@ -225,6 +228,30 @@ function submit(): void {
                         it at the counter.
                     </p>
                     <InputError :message="form.errors.discount_approval_over" />
+                </div>
+            </fieldset>
+
+            <fieldset class="grid gap-4 border-t border-border pt-4">
+                <legend class="pt-4 text-sm font-semibold">Refunds</legend>
+                <div class="grid gap-2 sm:max-w-xs">
+                    <Label for="refund_approval_over"
+                        >Refunds without approval up to (₱)</Label
+                    >
+                    <Input
+                        id="refund_approval_over"
+                        v-model="form.refund_approval_over"
+                        inputmode="decimal"
+                        autocomplete="off"
+                        aria-describedby="refund-approval-help"
+                    />
+                    <p
+                        id="refund-approval-help"
+                        class="text-xs text-muted-foreground"
+                    >
+                        A refund larger than this needs a manager to approve it
+                        at the counter. 0.00 means every refund is approved.
+                    </p>
+                    <InputError :message="form.errors.refund_approval_over" />
                 </div>
             </fieldset>
 

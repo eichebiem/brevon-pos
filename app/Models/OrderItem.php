@@ -55,6 +55,22 @@ class OrderItem extends Model
     }
 
     /**
+     * @return BelongsTo<ProductVariant, $this>
+     */
+    public function variant(): BelongsTo
+    {
+        return $this->belongsTo(ProductVariant::class, 'variant_id');
+    }
+
+    /**
+     * @return HasMany<RefundItem, $this>
+     */
+    public function refundItems(): HasMany
+    {
+        return $this->hasMany(RefundItem::class);
+    }
+
+    /**
      * @return HasMany<OrderItemOption, $this>
      */
     public function options(): HasMany

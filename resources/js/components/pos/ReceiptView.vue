@@ -9,6 +9,7 @@ const paymentStatus: Record<string, string> = {
     pending: 'Waiting for verification',
     failed: 'Not received',
     refunded: 'Refunded',
+    partially_refunded: 'Partly refunded',
 };
 </script>
 
@@ -39,6 +40,13 @@ const paymentStatus: Record<string, string> = {
                 data-test="receipt-cancelled"
             >
                 CANCELLED — REFUNDED
+            </p>
+            <p
+                v-else-if="receipt.order.status === 'refunded'"
+                class="mt-1 border border-black py-1 text-sm font-bold"
+                data-test="receipt-refunded"
+            >
+                REFUNDED IN FULL
             </p>
         </header>
 
@@ -186,6 +194,17 @@ const paymentStatus: Record<string, string> = {
                 <dd class="text-right">
                     {{ paymentStatus[payment.status] ?? payment.status }}
                 </dd>
+            </template>
+        </dl>
+
+        <dl
+            v-if="receipt.refunds.length"
+            class="mt-1 grid grid-cols-[1fr_auto] gap-x-2 border-t border-dashed border-black pt-1"
+            data-test="receipt-refunds"
+        >
+            <template v-for="r in receipt.refunds" :key="r.refund_number">
+                <dt>Refund {{ r.refund_number }}</dt>
+                <dd class="text-right">−{{ formatMoney(r.amount) }}</dd>
             </template>
         </dl>
 

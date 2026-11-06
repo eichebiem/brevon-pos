@@ -4,6 +4,7 @@ namespace App\Domain\Orders;
 
 use App\Domain\Inventory\InventoryLedger;
 use App\Domain\Inventory\StockChange;
+use App\Domain\Refunds\RefundService;
 use App\Domain\Shared\AuditLogger;
 use App\Domain\Shared\Quantity;
 use App\Enums\InventoryMovementType;
@@ -31,6 +32,7 @@ class OrderWorkflow
     public function __construct(
         private readonly InventoryLedger $ledger,
         private readonly AuditLogger $audit,
+        private readonly RefundService $refunds,
     ) {}
 
     /**
@@ -98,6 +100,10 @@ class OrderWorkflow
                 ], $order->branch_id, $actor);
             }
 
+            // D-154: each payment handed back gets a void record, so voids and
+            // refunds are reported from one place (BR-005).
+            $voids = array_map(fn (Payment $p) => $this->refunds->recordVoid($actor, $order, $p, $reason, $returnStock)->refund_number, $payments);
+
             $returned = $returnStock ? $this->returnStock($actor, $order, $reason) : [];
 
             $from = $order->status;
@@ -115,6 +121,7 @@ class OrderWorkflow
                 'reason' => $reason,
                 'refunded' => array_map(fn (Payment $p) => ['method' => $p->method?->name, 'amount' => $p->amount], $payments),
                 'stock_returned' => $returned,
+                'void_numbers' => $voids,
             ], $order->branch_id, $actor);
 
             return $order;

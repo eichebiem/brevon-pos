@@ -4,6 +4,7 @@ import { ArrowLeft, Printer } from '@lucide/vue';
 import { ref } from 'vue';
 import { toast } from 'vue-sonner';
 import CancelOrderDialog from '@/components/orders/CancelOrderDialog.vue';
+import RefundDialog from '@/components/orders/RefundDialog.vue';
 import ReceiptView from '@/components/pos/ReceiptView.vue';
 import StatusBadge from '@/components/StatusBadge.vue';
 import { Button } from '@/components/ui/button';
@@ -16,7 +17,12 @@ import {
     receipt as receiptRoute,
     reprint,
 } from '@/routes/pos/orders';
-import type { Receipt, ReceiptBeneficiary } from '@/types/pos';
+import type {
+    Receipt,
+    ReceiptBeneficiary,
+    RefundForm,
+    RefundRecord,
+} from '@/types/pos';
 
 type Workflow = {
     status: string;
@@ -42,6 +48,8 @@ type Workflow = {
     can_cancel: boolean;
     can_verify: boolean;
     can_view_beneficiary: boolean;
+    refunds: RefundRecord[];
+    refund: RefundForm | null;
 };
 
 const props = defineProps<{ receipt: Receipt; workflow: Workflow }>();
@@ -111,6 +119,10 @@ function post(url: string, data: Record<string, string> = {}): void {
 }
 
 const cancelOpen = ref(false);
+const refundOpen = ref(false);
+const canRefund = (): boolean =>
+    props.workflow.refund !== null &&
+    props.workflow.refund.lines.some((l) => Number(l.remaining_quantity) > 0);
 </script>
 
 <template>
@@ -157,7 +169,8 @@ const cancelOpen = ref(false);
                 <section
                     v-if="
                         (workflow.can_advance && workflow.next_status) ||
-                        workflow.can_cancel
+                        workflow.can_cancel ||
+                        canRefund()
                     "
                     class="flex flex-wrap gap-2 rounded-xl border border-border bg-card p-4"
                     aria-label="Order actions"
@@ -182,6 +195,77 @@ const cancelOpen = ref(false);
                         @click="cancelOpen = true"
                         >Cancel order</Button
                     >
+                    <Button
+                        v-if="canRefund()"
+                        variant="outline"
+                        class="min-h-11 text-red-700"
+                        data-test="order-refund"
+                        @click="refundOpen = true"
+                        >Refund</Button
+                    >
+                </section>
+
+                <section
+                    v-if="workflow.refunds.length"
+                    class="rounded-xl border border-border bg-card p-4 text-sm"
+                    aria-labelledby="refunds-heading"
+                    data-test="order-refunds"
+                >
+                    <h2 id="refunds-heading" class="mb-2 font-semibold">
+                        Refunds and voids
+                    </h2>
+                    <ul class="grid gap-3">
+                        <li
+                            v-for="r in workflow.refunds"
+                            :key="r.refund_number"
+                            class="border-b border-border pb-3 last:border-0 last:pb-0"
+                        >
+                            <p
+                                class="flex flex-wrap justify-between gap-x-4 font-medium"
+                            >
+                                <span
+                                    >{{ r.kind_label }}
+                                    <span class="font-mono">{{
+                                        r.refund_number
+                                    }}</span></span
+                                >
+                                <span
+                                    >−{{ formatMoney(r.amount) }} ·
+                                    {{ r.method }}</span
+                                >
+                            </p>
+                            <p class="text-muted-foreground">
+                                {{ r.by }}
+                                <template
+                                    v-if="
+                                        r.approved_by && r.approved_by !== r.by
+                                    "
+                                >
+                                    · approved by {{ r.approved_by }}</template
+                                >
+                                · {{ formatDateTime(r.at) }}
+                                <template v-if="r.reference_number">
+                                    · ref
+                                    <span class="font-mono">{{
+                                        r.reference_number
+                                    }}</span></template
+                                >
+                            </p>
+                            <p>Reason: {{ r.reason }}</p>
+                            <ul class="mt-1 text-muted-foreground">
+                                <li v-for="(item, i) in r.items" :key="i">
+                                    {{ Number(item.quantity) }} × {{ item.name
+                                    }}<template v-if="item.variant">
+                                        ({{ item.variant }})</template
+                                    >
+                                    · {{ formatMoney(item.amount) }}
+                                    <template v-if="item.return_to_stock">
+                                        · back in stock</template
+                                    >
+                                </li>
+                            </ul>
+                        </li>
+                    </ul>
                 </section>
 
                 <section
@@ -338,5 +422,14 @@ const cancelOpen = ref(false);
             order_number: receipt.order.order_number,
             grand_total: receipt.order.grand_total,
         }"
+    />
+    <RefundDialog
+        v-if="workflow.refund"
+        v-model:open="refundOpen"
+        :order="{
+            id: receipt.order.id,
+            order_number: receipt.order.order_number,
+        }"
+        :refund="workflow.refund"
     />
 </template>

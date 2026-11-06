@@ -30,6 +30,9 @@ class StoreSettings
         'shift.review_variance_over' => '0.00',
         // D-146 (TBC): a discount larger than this needs a manager's approval.
         'discount.approval_over' => '100.00',
+        // D-152 (TBC): a refund up to this amount goes through without a
+        // manager. 0 = every refund needs one.
+        'refund.approval_over' => '0.00',
     ];
 
     private const CACHE_KEY = 'brevon.store-settings';
@@ -75,6 +78,7 @@ class StoreSettings
             'cash_approval_over' => $this->get('cash.approval_over'),
             'shift_review_variance_over' => $this->get('shift.review_variance_over'),
             'discount_approval_over' => $this->get('discount.approval_over'),
+            'refund_approval_over' => $this->get('refund.approval_over'),
             'currency' => (string) config('brevon.currency'),
             'timezone' => (string) config('brevon.business_timezone'),
         ];
@@ -86,7 +90,7 @@ class StoreSettings
     }
 
     /**
-     * @param  array{name: string, receipt_footer: string|null, cash_approval_over?: string, shift_review_variance_over?: string, discount_approval_over?: string}  $values
+     * @param  array{name: string, receipt_footer: string|null, cash_approval_over?: string, shift_review_variance_over?: string, discount_approval_over?: string, refund_approval_over?: string}  $values
      */
     public function update(User $actor, array $values, ?UploadedFile $logo = null, bool $removeLogo = false): void
     {
@@ -94,7 +98,7 @@ class StoreSettings
             'store.name' => $values['name'],
             'receipt.footer' => $values['receipt_footer'],
         ];
-        foreach (['cash_approval_over' => 'cash.approval_over', 'shift_review_variance_over' => 'shift.review_variance_over', 'discount_approval_over' => 'discount.approval_over'] as $field => $key) {
+        foreach (['cash_approval_over' => 'cash.approval_over', 'shift_review_variance_over' => 'shift.review_variance_over', 'discount_approval_over' => 'discount.approval_over', 'refund_approval_over' => 'refund.approval_over'] as $field => $key) {
             if (isset($values[$field])) {
                 $changes[$key] = Money::fromDecimal($values[$field])->toDecimal();
             }

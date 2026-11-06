@@ -5,6 +5,7 @@ namespace App\Domain\Shifts;
 use App\Domain\Shared\Money;
 use App\Enums\CashMovementStatus;
 use App\Enums\CashMovementType;
+use App\Enums\OrderStatus;
 use App\Enums\PaymentMethodType;
 use App\Enums\PaymentStatus;
 use App\Models\CashierShift;
@@ -18,7 +19,9 @@ use App\Models\Payment;
  *
  * Cash sales are verified cash payments on the shift's orders, counted at
  * the amount applied (change handed back is already excluded, BR-006);
- * payments refunded by a cancellation are no longer in the drawer. Only
+ * payments refunded by a cancellation are no longer in the drawer. A
+ * refund of a completed sale (Phase 9b) leaves the sale where it was and
+ * takes the cash out as a cash refund on the drawer that paid it (D-153). Only
  * approved movements count; pending ones wait for a manager (D-127).
  * GCash and other non-cash payments never count. Corrections to a closed
  * shift are reported beside the closing figures, never folded in here.
@@ -44,9 +47,9 @@ class ExpectedCash
     public function components(CashierShift $shift): array
     {
         $sales = Payment::query()
-            ->where('status', PaymentStatus::Verified)
+            ->whereIn('status', PaymentStatus::taken())
             ->whereHas('method', fn ($q) => $q->where('type', PaymentMethodType::Cash))
-            ->whereHas('order', fn ($q) => $q->where('cashier_shift_id', $shift->id))
+            ->whereHas('order', fn ($q) => $q->where('cashier_shift_id', $shift->id)->where('status', '!=', OrderStatus::Cancelled))
             ->pluck('amount');
 
         /** @var array<string, list<string>> $movements */

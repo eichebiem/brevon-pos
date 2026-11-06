@@ -24,6 +24,7 @@ use App\Models\ProductPrice;
 use App\Models\ProductVariant;
 use App\Models\PurchaseOrder;
 use App\Models\Recipe;
+use App\Models\Refund;
 use App\Models\Setting;
 use App\Models\StockAdjustment;
 use App\Models\StockTransfer;
@@ -104,6 +105,7 @@ class AppServiceProvider extends ServiceProvider
             'tax_rule' => TaxRule::class,
             'order' => Order::class,
             'payment' => Payment::class,
+            'refund' => Refund::class,
         ]);
 
         DB::prohibitDestructiveCommands(

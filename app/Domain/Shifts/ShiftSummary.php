@@ -80,7 +80,7 @@ class ShiftSummary
         $cancelledCash = Money::sum(Payment::query()
             ->where('status', PaymentStatus::Refunded)
             ->whereHas('method', fn ($q) => $q->where('type', PaymentMethodType::Cash))
-            ->whereHas('order', fn ($q) => $q->where('cashier_shift_id', $shift->id))
+            ->whereHas('order', fn ($q) => $q->where('cashier_shift_id', $shift->id)->where('status', OrderStatus::Cancelled))
             ->pluck('amount')->map(fn (string $a) => Money::fromDecimal($a)));
 
         $orders = Order::query()->where('cashier_shift_id', $shift->id);
@@ -118,14 +118,14 @@ class ShiftSummary
     private function nonCash(CashierShift $shift): array
     {
         $payments = Payment::query()
-            ->whereIn('status', [PaymentStatus::Verified, PaymentStatus::Pending])
+            ->whereIn('status', [...PaymentStatus::taken(), PaymentStatus::Pending])
             ->whereHas('method', fn ($q) => $q->where('type', '!=', PaymentMethodType::Cash))
-            ->whereHas('order', fn ($q) => $q->where('cashier_shift_id', $shift->id))
+            ->whereHas('order', fn ($q) => $q->where('cashier_shift_id', $shift->id)->where('status', '!=', OrderStatus::Cancelled))
             ->with('method:id,name')
             ->get(['id', 'payment_method_id', 'amount', 'status']);
 
         return array_values($payments->groupBy(fn (Payment $p) => $p->method->name)->map(function ($rows, $method) {
-            $verified = $rows->where('status', PaymentStatus::Verified);
+            $verified = $rows->whereIn('status', PaymentStatus::taken());
             $pending = $rows->where('status', PaymentStatus::Pending);
 
             return [
