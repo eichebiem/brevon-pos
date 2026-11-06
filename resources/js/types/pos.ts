@@ -142,3 +142,31 @@ export type Receipt = {
         status: string;
     }[];
 };
+
+export type PrepCard = {
+    id: number;
+    order_number: string;
+    short_number: string;
+    order_type: string;
+    status: 'confirmed' | 'preparing' | 'ready';
+    next_status: string | null;
+    payment_status: string;
+    created_at: string;
+    pickup_at: string | null;
+    notes: string | null;
+    items: {
+        name: string;
+        variant: string | null;
+        quantity: string;
+        notes: string | null;
+        made_to_order: boolean;
+        options: string[];
+    }[];
+};
+
+export type PrepBoard = {
+    new: PrepCard[];
+    preparing: PrepCard[];
+    ready: PrepCard[];
+    scheduled: PrepCard[];
+};

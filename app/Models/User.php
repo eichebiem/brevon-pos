@@ -84,6 +84,12 @@ class User extends Authenticatable
         return $this->is_active && $this->deleted_at === null;
     }
 
+    /** Is the user assigned to this location? Orders elsewhere are hidden from them (FR-104). */
+    public function worksAt(int $branchId): bool
+    {
+        return $this->branches()->whereKey($branchId)->exists();
+    }
+
     public function isOwner(): bool
     {
         return $this->hasRole(self::OWNER_ROLE);

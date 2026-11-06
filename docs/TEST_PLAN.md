@@ -103,6 +103,8 @@ ID format `T-<area>-<n>`; each maps to SRS requirements.
 
 ### Orders & preparation (Phase 5)
 
+**Phase 5 implementation map:** `tests/Feature/Orders/OrderWorkflowTest.php` — T-ORD-1 (one step at a time with actor; nothing after completed; stale second tap changes nothing), T-ORD-2 (preparation staff advance but cannot cancel or check payments; cashiers cannot advance or cancel), T-ORD-3 (reason required; cash refunded out of expected cash; stock returned or kept out by choice; completed orders and cash from closed shifts refused; GCash after close allowed; history note and audit), T-ORD-4 (board shows only this location's active orders; other location's order 404; Scheduled vs New by pickup time), GCash Received / Not received (D-124), order page actions per role. `RouteAuthorizationTest` now covers `/pos/orders` and `/staff/payments`.
+
 - T-ORD-1 allowed/forbidden transitions; history rows with actor (FR-046, FR-051)
 - T-ORD-2 prep staff can update status, cannot cancel (FR-048)
 - T-ORD-3 cancellation requires reason + permission (FR-052, FR-041)

@@ -2,6 +2,7 @@
 import { Link } from '@inertiajs/vue3';
 import {
     ChefHat,
+    BadgeCheck,
     Croissant,
     FolderTree,
     History,
@@ -44,7 +45,7 @@ import { edit as storeSettings } from '@/routes/admin/settings';
 import { index as rolesIndex } from '@/routes/admin/roles';
 import { index as usersIndex } from '@/routes/admin/users';
 import { index as pos } from '@/routes/pos';
-import { preparation, shift } from '@/routes/staff';
+import { payments as gcashChecks, preparation, shift } from '@/routes/staff';
 import type { NavItem } from '@/types';
 
 const { can } = usePermissions();
@@ -79,6 +80,12 @@ const operations = computed(() =>
             href: preparation(),
             icon: ChefHat,
             permission: 'orders.update-status',
+        },
+        {
+            title: 'GCash to check',
+            href: gcashChecks(),
+            icon: BadgeCheck,
+            permission: 'payments.verify-ewallet',
         },
     ]),
 );

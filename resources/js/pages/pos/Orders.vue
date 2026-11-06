@@ -45,7 +45,7 @@ const statusTone: Record<
     ['success' | 'warning' | 'neutral' | 'danger' | 'info', string]
 > = {
     completed: ['success', 'Completed'],
-    confirmed: ['info', 'In preparation'],
+    confirmed: ['info', 'New'],
     preparing: ['info', 'Preparing'],
     ready: ['info', 'Ready'],
     cancelled: ['danger', 'Cancelled'],

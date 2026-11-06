@@ -14,9 +14,12 @@ use App\Http\Controllers\Admin\TerminalController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\LocationSwitchController;
+use App\Http\Controllers\Orders\OrderStatusController;
 use App\Http\Controllers\Pos\CheckoutController;
 use App\Http\Controllers\Pos\OrderController as PosOrderController;
 use App\Http\Controllers\PosController;
+use App\Http\Controllers\Staff\PaymentCheckController;
+use App\Http\Controllers\Staff\PreparationController;
 use App\Http\Controllers\Staff\ShiftController;
 use Illuminate\Support\Facades\Route;
 
@@ -53,8 +56,20 @@ Route::middleware(['auth'])->group(function () {
         ->middleware('permission:shifts.open')->name('staff.shift.open');
     Route::post('staff/shifts/{shift}/close', [ShiftController::class, 'close'])
         ->middleware('permission:shifts.close|shifts.review')->name('staff.shift.close');
-    Route::inertia('staff/preparation', 'staff/Preparation')
+    // Preparation and order status (FR-046–FR-052, D-123–D-125).
+    Route::get('staff/preparation', [PreparationController::class, 'index'])
         ->middleware('permission:orders.update-status')->name('staff.preparation');
+    Route::post('orders/{order}/advance', [OrderStatusController::class, 'advance'])
+        ->middleware('permission:orders.update-status')->name('orders.advance');
+    Route::post('orders/{order}/cancel', [OrderStatusController::class, 'cancel'])
+        ->middleware('permission:orders.cancel')->name('orders.cancel');
+
+    // GCash checks (BR-019, D-124).
+    Route::middleware('permission:payments.verify-ewallet')->group(function () {
+        Route::get('staff/payments', [PaymentCheckController::class, 'index'])->name('staff.payments');
+        Route::post('payments/{payment}/verify', [PaymentCheckController::class, 'verify'])->name('payments.verify');
+        Route::post('payments/{payment}/reject', [PaymentCheckController::class, 'reject'])->name('payments.reject');
+    });
 
     Route::prefix('admin')->name('admin.')->group(function () {
         Route::middleware('permission:users.manage')->group(function () {

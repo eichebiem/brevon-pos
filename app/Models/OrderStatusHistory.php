@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\OrderStatus;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use LogicException;
 
 /**
@@ -33,5 +34,13 @@ class OrderStatusHistory extends Model
     {
         static::updating(fn () => throw new LogicException('Status history is append-only.'));
         static::deleting(fn () => throw new LogicException('Status history is append-only.'));
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function actor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'changed_by');
     }
 }

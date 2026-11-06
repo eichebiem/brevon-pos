@@ -7,7 +7,8 @@ defineProps<{ receipt: Receipt }>();
 const paymentStatus: Record<string, string> = {
     verified: 'Paid',
     pending: 'Waiting for verification',
-    failed: 'Failed',
+    failed: 'Not received',
+    refunded: 'Refunded',
 };
 </script>
 
@@ -31,6 +32,13 @@ const paymentStatus: Record<string, string> = {
             </p>
             <p class="mt-2 border-y border-dashed border-black py-1 font-bold">
                 {{ receipt.title }}
+            </p>
+            <p
+                v-if="receipt.order.status === 'cancelled'"
+                class="mt-1 border border-black py-1 text-sm font-bold"
+                data-test="receipt-cancelled"
+            >
+                CANCELLED — REFUNDED
             </p>
         </header>
 

@@ -7,8 +7,13 @@ use App\Domain\Sales\OrderReceipt;
 use App\Domain\Shared\AuditLogger;
 use App\Domain\Shared\BusinessClock;
 use App\Domain\Shifts\ShiftService;
+use App\Enums\OrderStatus;
+use App\Enums\PaymentMethodType;
+use App\Enums\PaymentStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
+use App\Models\OrderStatusHistory;
+use App\Models\Payment;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -73,8 +78,41 @@ class OrderController extends Controller
     public function show(Request $request, Order $order, OrderReceipt $receipt): Response
     {
         $this->authorizeView($request, $order);
+        /** @var User $user */
+        $user = $request->user();
+        $order->load(['statusHistory.actor:id,name', 'payments.method:id,name,type', 'canceller:id,name']);
 
-        return Inertia::render('pos/OrderShow', ['receipt' => $receipt->for($order)]);
+        return Inertia::render('pos/OrderShow', [
+            'receipt' => $receipt->for($order),
+            'workflow' => [
+                'status' => $order->status->value,
+                'status_label' => $order->status->label(),
+                'next_status' => $order->status->isActive() ? $order->status->next()?->value : null,
+                'payment_status' => $order->payment_status->value,
+                'cancellation' => $order->cancelled_at === null ? null : [
+                    'at' => $order->cancelled_at->toIso8601String(),
+                    'by' => $order->canceller?->name,
+                    'reason' => $order->cancellation_reason,
+                ],
+                'history' => $order->statusHistory->map(fn (OrderStatusHistory $h) => [
+                    'from' => $h->from_status?->label(),
+                    'to' => $h->to_status->label(),
+                    'by' => $h->actor?->name,
+                    'at' => $h->created_at->toIso8601String(),
+                    'notes' => $h->notes,
+                ])->all(),
+                'pending_payments' => $order->payments->where('status', PaymentStatus::Pending)->map(fn (Payment $p) => [
+                    'id' => $p->id,
+                    'method' => $p->method?->name,
+                    'amount' => $p->amount,
+                    'reference_number' => $p->reference_number,
+                ])->values()->all(),
+                'has_cash' => $order->payments->contains(fn (Payment $p) => $p->method?->type === PaymentMethodType::Cash),
+                'can_advance' => $user->can('orders.update-status') && $order->status->isActive() && $order->status !== OrderStatus::Pending,
+                'can_cancel' => $user->can('orders.cancel') && $order->status->isCancellable(),
+                'can_verify' => $user->can('payments.verify-ewallet') && $order->status !== OrderStatus::Cancelled,
+            ],
+        ]);
     }
 
     /** The printable 80 mm receipt. `?auto=1` prints at once (right after a sale). */
@@ -105,6 +143,6 @@ class OrderController extends Controller
         /** @var User $user */
         $user = $request->user();
 
-        abort_unless($user->branches()->whereKey($order->branch_id)->exists(), 404);
+        abort_unless($user->worksAt($order->branch_id), 404);
     }
 }

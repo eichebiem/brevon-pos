@@ -97,6 +97,14 @@ class Order extends Model
     }
 
     /**
+     * @return BelongsTo<User, $this>
+     */
+    public function canceller(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'cancelled_by');
+    }
+
+    /**
      * @return HasMany<OrderItem, $this>
      */
     public function items(): HasMany

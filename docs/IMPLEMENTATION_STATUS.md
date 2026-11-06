@@ -10,8 +10,8 @@ Last updated: 2026-11-06 · Baseline: SRS **v1.1** (`docs/BREVON-SRS-v1.1.md`) �
 | 3 — Catalog, settings and operating locations | ✅ Passed                                       | Approved; committed by user ("Done Phase 3")                              |
 | 4a — Ledger core and shift open               | ✅ Passed                                       | Approved; committed by user (with the seeder changes)                     |
 | 4b — Checkout backend                         | ✅ Passed                                       | Approved 2026-11-06                                                       |
-| 4c — Cashier UI and receipts                  | ✅ Passed — awaiting user review                | Not committed                                                             |
-| 5 — Orders and preparation                    | ⏳ Not started                                  |                                                                           |
+| 4c — Cashier UI and receipts                  | ✅ Passed                                       | Approved 2026-11-06 (with D-121, D-122)                                   |
+| 5 — Orders and preparation                    | ✅ Passed — awaiting user review                | Not committed                                                             |
 | 6 — Cashier shifts and cash control           | ⏳ Not started                                  |                                                                           |
 | 7 — Inventory and purchasing                  | ⏳ Not started                                  | Includes main → pop-up doughnut dispatch (D-063); OI-018 deferred (FE-01) |
 | 8 — Recipes and production                    | ⏳ Not started                                  | Production at the permanent branch only                                   |
@@ -305,3 +305,37 @@ Still to confirm: boxes/combo at pop-ups (D-089), hot vs iced coffee prices. Pha
 - Still to confirm: OI-002, OI-005. D-101 client menu questions: raise again after Phase 9.
 
 **Next step:** Phase 5 — orders and preparation, after user review.
+
+## Phase 5 log — Orders and preparation (2026-11-06)
+
+**Objective:** after the sale, staff can see what to make, move orders through preparation, cancel with a reason, and confirm GCash transfers.
+**SRS IDs:** FR-039 (GCash verification), FR-041, FR-045, FR-046–FR-052, BR-019; UC-005 step 52 (stock back only when sellable).
+
+**Implemented**
+
+- Domain: `OrderWorkflow` (advance one step, cancel with refund and optional stock return, verify / reject a GCash payment — all under an order row lock), `PreparationBoard` (D-125). `OrderStatus` gained labels and the one-step `next()`. `User::worksAt()`.
+- HTTP: `GET /staff/preparation`, `POST /orders/{order}/advance` (`orders.update-status`), `POST /orders/{order}/cancel` (`orders.cancel`), `GET /staff/payments`, `POST /payments/{payment}/verify|reject` (`payments.verify-ewallet`). Other locations' orders and payments answer 404.
+- UI: preparation screen (three columns + Scheduled, auto-refresh, cancel from a card's menu), "GCash to check" page, order page with status, actions and history, shared cancel dialog, "CANCELLED — REFUNDED" on the receipt, Home button on the preparation header for managers, sidebar link.
+- Docs: DECISIONS §V (D-123–D-125), TEST_PLAN map, README.
+
+**Verification (all run 2026-11-06)**
+
+| Command                                                            | Result                   |
+| ------------------------------------------------------------------ | ------------------------ |
+| `composer check` → build, `vp check`, `vue-tsc`, Pint, Larastan L7 | all pass, 0 errors       |
+| → `php artisan test` (MySQL)                                       | **258 passed** (was 248) |
+
+**Manual checks (browser, scratch DB `brevon_pos_test`, 1280×800, signed in as `harris`):** four test sales; the ready-made one completed at checkout and stayed off the board; two orders under New, the 4-hours-ahead pickup under Scheduled; Start preparing moved #0001 to Preparing; #0003 cancelled from its card with a reason (toast, history note, refunded, receipt marked cancelled); the GCash payment confirmed from "GCash to check" and the list emptied. The user's `brevon_pos` was not touched.
+
+**Problems found and fixed during the phase**
+
+- The Scheduled section overlapped the columns on the preparation screen; fixed the layout.
+- Receipts printed the payment state "refunded" in lowercase and did not say the order was cancelled; fixed.
+
+**Known issues / deferred**
+
+- Refund records, refunds of completed orders and of cash from closed shifts: Phase 9 (D-123). Cash handed back is reflected only through the expected-cash total until cash movements arrive in Phase 6.
+- No sound or notification for new orders; the screen refreshes every 8 seconds.
+- Still to confirm: OI-002 (status flow), OI-005 (GCash reference format). D-101 client menu questions: raise again after Phase 9.
+
+**Next step:** Phase 6 — shifts and cash, after user review.

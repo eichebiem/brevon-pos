@@ -1,13 +1,19 @@
 <script setup lang="ts">
 import { Link, router, usePage } from '@inertiajs/vue3';
-import { LogOut } from '@lucide/vue';
+import { House, LogOut } from '@lucide/vue';
 import { computed } from 'vue';
 import AppLogoIcon from '@/components/AppLogoIcon.vue';
 import { Toaster } from '@/components/ui/sonner';
-import { logout } from '@/routes';
+import { usePermissions } from '@/composables/usePermissions';
+import { landing, logout } from '@/routes';
 
 const page = usePage();
 const user = computed(() => page.props.auth.user);
+const { can } = usePermissions();
+// Managers also use this screen; give them a way back to the rest of the app.
+const hasOtherScreens = computed(
+    () => can('dashboard.view') || can('pos.access'),
+);
 </script>
 
 <template>
@@ -28,6 +34,14 @@ const user = computed(() => page.props.auth.user);
             </div>
             <div class="ml-auto flex items-center gap-3">
                 <span class="hidden text-sm sm:inline">{{ user.name }}</span>
+                <Link
+                    v-if="hasOtherScreens"
+                    :href="landing()"
+                    class="inline-flex min-h-11 items-center gap-2 rounded-lg border border-brevon-gold/50 px-4 text-sm font-medium hover:bg-brevon-navy-dark"
+                >
+                    <House class="size-4" aria-hidden="true" />
+                    Home
+                </Link>
                 <Link
                     :href="logout()"
                     as="button"
