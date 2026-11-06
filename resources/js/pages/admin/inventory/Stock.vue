@@ -1,13 +1,22 @@
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3';
-import { History, PackagePlus, Search } from '@lucide/vue';
+import {
+    ClipboardCheck,
+    History,
+    PackagePlus,
+    Search,
+    Trash2,
+    Truck,
+} from '@lucide/vue';
 import { ref } from 'vue';
 import StatusBadge from '@/components/StatusBadge.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { usePermissions } from '@/composables/usePermissions';
 import { formatDateTime, formatMoney, formatQuantity } from '@/lib/format';
-import { movements, opening, stock } from '@/routes/admin/inventory';
+import { movements, opening, stock, waste } from '@/routes/admin/inventory';
+import { create as newAdjustment } from '@/routes/admin/inventory/adjustments';
+import { create as newDispatch } from '@/routes/admin/inventory/dispatches';
 
 type Row = {
     id: number;
@@ -18,12 +27,15 @@ type Row = {
     reorder_level: string;
     average_unit_cost: string | null;
     updated_at: string | null;
+    low: boolean;
 };
 
 const props = defineProps<{
     site: { id: number; code: string; name: string } | null;
     rows: Row[];
     search: string | null;
+    lowOnly: boolean;
+    lowCount: number;
     awaitingOpening: number;
 }>();
 
@@ -33,17 +45,23 @@ defineOptions({
 
 const { can } = usePermissions();
 const query = ref(props.search ?? '');
+const lowOnly = ref(props.lowOnly);
 
 function applySearch(): void {
-    router.get(stock().url, query.value ? { search: query.value } : {}, {
-        preserveState: true,
-        replace: true,
-    });
+    router.get(
+        stock().url,
+        {
+            ...(query.value ? { search: query.value } : {}),
+            ...(lowOnly.value ? { low: 1 } : {}),
+        },
+        { preserveState: true, replace: true },
+    );
 }
 
-const isLow = (row: Row) =>
-    Number(row.reorder_level) > 0 &&
-    Number(row.on_hand) <= Number(row.reorder_level);
+function showLow(): void {
+    lowOnly.value = true;
+    applySearch();
+}
 </script>
 
 <template>
@@ -73,6 +91,31 @@ const isLow = (row: Row) =>
                         ><History aria-hidden="true" /> Stock movements</Link
                     >
                 </Button>
+                <template v-if="can('inventory.adjust') && site">
+                    <Button variant="outline" as-child>
+                        <Link
+                            :href="
+                                newAdjustment({
+                                    query: { kind: 'count', location: site.id },
+                                })
+                            "
+                            data-test="stock-count-link"
+                            ><ClipboardCheck aria-hidden="true" /> Count
+                            stock</Link
+                        >
+                    </Button>
+                    <Button variant="outline" as-child>
+                        <Link :href="waste({ query: { location: site.id } })"
+                            ><Trash2 aria-hidden="true" /> Record waste</Link
+                        >
+                    </Button>
+                    <Button variant="outline" as-child>
+                        <Link :href="newDispatch()"
+                            ><Truck aria-hidden="true" /> Dispatch to
+                            pop-up</Link
+                        >
+                    </Button>
+                </template>
                 <Button
                     v-if="can('inventory.adjust') && awaitingOpening > 0"
                     as-child
@@ -96,6 +139,20 @@ const isLow = (row: Row) =>
             from production, sales and adjustments.
         </p>
 
+        <p
+            v-if="lowCount > 0 && !lowOnly"
+            class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950"
+            role="status"
+            data-test="low-stock-alert"
+        >
+            {{ lowCount }}
+            {{ lowCount === 1 ? 'item is' : 'items are' }} at or below the
+            reorder level.
+            <Button size="sm" variant="outline" @click="showLow"
+                >Show low stock</Button
+            >
+        </p>
+
         <form
             class="flex flex-wrap items-end gap-3 rounded-xl border border-border bg-card p-4"
             role="search"
@@ -113,6 +170,14 @@ const isLow = (row: Row) =>
                     <Input id="search" v-model="query" class="pl-8" />
                 </div>
             </div>
+            <label class="flex h-9 items-center gap-2 text-sm">
+                <input
+                    v-model="lowOnly"
+                    type="checkbox"
+                    class="size-4 accent-brevon-navy"
+                />
+                Low stock only
+            </label>
             <Button type="submit">Search</Button>
         </form>
 
@@ -149,7 +214,14 @@ const isLow = (row: Row) =>
                             colspan="4"
                             class="px-4 py-10 text-center text-muted-foreground"
                         >
-                            No stock recorded at this location yet.
+                            <template v-if="lowOnly"
+                                >Nothing is at or below its reorder
+                                level.</template
+                            >
+                            <template v-else
+                                >No stock recorded at this location
+                                yet.</template
+                            >
                         </td>
                     </tr>
                     <tr
@@ -169,10 +241,16 @@ const isLow = (row: Row) =>
                             }}</span>
                             {{ row.unit }}
                             <StatusBadge
-                                v-if="isLow(row)"
+                                v-if="row.low"
                                 tone="warning"
                                 class="ml-2"
                                 >Low</StatusBadge
+                            >
+                            <span
+                                v-if="Number(row.reorder_level) > 0"
+                                class="block text-xs text-muted-foreground"
+                                >reorder at
+                                {{ formatQuantity(row.reorder_level) }}</span
                             >
                         </td>
                         <td class="px-4 py-3 text-right tabular-nums">

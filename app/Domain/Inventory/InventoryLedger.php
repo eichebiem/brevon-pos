@@ -29,12 +29,39 @@ class InventoryLedger
      */
     public function post(User $actor, array $changes): array
     {
+        return $this->write($actor, $changes, allowTransfers: false);
+    }
+
+    /**
+     * Transfer movements, only for a dispatch document (D-063, D-133): the
+     * out and in legs are written in the same transaction.
+     *
+     * @param  list<StockChange>  $changes
+     * @return list<InventoryMovement>
+     */
+    public function postTransfer(User $actor, array $changes): array
+    {
+        foreach ($changes as $change) {
+            if (! $change->type->isTransfer() || $change->reference?->getMorphClass() !== 'stock_transfer') {
+                throw new LogicException('Transfer movements must belong to a dispatch.');
+            }
+        }
+
+        return $this->write($actor, $changes, allowTransfers: true);
+    }
+
+    /**
+     * @param  list<StockChange>  $changes
+     * @return list<InventoryMovement>
+     */
+    private function write(User $actor, array $changes, bool $allowTransfers): array
+    {
         if ($changes === []) {
             return [];
         }
 
         foreach ($changes as $change) {
-            $this->assertAllowed($change);
+            $this->assertAllowed($change, $allowTransfers);
         }
 
         return DB::transaction(function () use ($actor, $changes) {
@@ -116,11 +143,11 @@ class InventoryLedger
         ])->values();
     }
 
-    private function assertAllowed(StockChange $change): void
+    private function assertAllowed(StockChange $change, bool $allowTransfers): void
     {
-        if ($change->type->isTransfer()) {
-            // D-063: transfers between locations arrive with the Phase 7 dispatch workflow.
-            throw new LogicException('Stock transfers between locations are not available yet.');
+        if ($change->type->isTransfer() && ! $allowTransfers) {
+            // D-063: stock only moves between locations through a dispatch document.
+            throw new LogicException('Stock transfers between locations need a dispatch.');
         }
 
         if (! $change->quantity->isPositive()) {

@@ -131,6 +131,8 @@ ID format `T-<area>-<n>`; each maps to SRS requirements.
 - T-TRF-2 dispatch only from the permanent branch, only finished-good doughnut items, only to an operational pop-up; any other direction rejected
 - T-TRF-3 beverage / `recipe_at_sale` products cannot be enabled at a pop-up
 
+**Phase 7a implementation map:** `tests/Feature/Inventory/StockControlTest.php` — T-INV-5 (reason and quantity rules; pending until approved; difference posts on top of sales made meanwhile; approver's own posts at once; no self-approval; reject needs a note; approval below zero refused; decided adjustments immutable; reconcile), T-INV-6 (waste with reason, not more than on hand, audited; cashier forbidden; ended pop-up with stock can write it off, then disappears), T-INV-7 (low count and filter), T-TRF-1 (out + in at main's average cost, numbering, refused dispatch writes nothing, reconcile), T-TRF-2 (only assigned active pop-ups, not main or ended; doughnuts only; ledger refuses stray transfers), stock items (D-134), location scoping (404). T-TRF-3 is covered by the Phase 3 availability tests. `RouteAuthorizationTest` now covers items, adjustments and dispatches. T-INV-4 and T-PO-1 come with 7b.
+
 ### Production (Phase 8)
 
 - T-PRD-B1 posting consumes ingredients × (1 + wastage) and adds output atomically (FR-068, FR-069)

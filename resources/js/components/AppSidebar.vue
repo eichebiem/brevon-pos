@@ -4,6 +4,8 @@ import {
     ChefHat,
     Coins,
     BadgeCheck,
+    Boxes,
+    ClipboardCheck,
     Croissant,
     FolderTree,
     History,
@@ -16,6 +18,7 @@ import {
     ShieldCheck,
     ShoppingCart,
     Timer,
+    Truck,
     Users,
     Wallet,
 } from '@lucide/vue';
@@ -38,6 +41,9 @@ import { dashboard, landing } from '@/routes';
 import { index as auditIndex } from '@/routes/admin/audit';
 import { index as categoriesIndex } from '@/routes/admin/categories';
 import { movements, stock } from '@/routes/admin/inventory';
+import { index as adjustmentsIndex } from '@/routes/admin/inventory/adjustments';
+import { index as dispatchesIndex } from '@/routes/admin/inventory/dispatches';
+import { index as itemsIndex } from '@/routes/admin/inventory/items';
 import { index as locationsIndex } from '@/routes/admin/locations';
 import { index as optionGroupsIndex } from '@/routes/admin/option-groups';
 import { index as paymentMethodsIndex } from '@/routes/admin/payment-methods';
@@ -133,6 +139,24 @@ const inventory = computed(() =>
             title: 'Stock movements',
             href: movements(),
             icon: History,
+            permission: 'inventory.view',
+        },
+        {
+            title: 'Counts & adjustments',
+            href: adjustmentsIndex(),
+            icon: ClipboardCheck,
+            permission: 'inventory.adjust',
+        },
+        {
+            title: 'Dispatches',
+            href: dispatchesIndex(),
+            icon: Truck,
+            permission: 'inventory.view',
+        },
+        {
+            title: 'Stock items',
+            href: itemsIndex(),
+            icon: Boxes,
             permission: 'inventory.view',
         },
     ]),

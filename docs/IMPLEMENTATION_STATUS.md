@@ -12,8 +12,9 @@ Last updated: 2026-11-06 · Baseline: SRS **v1.1** (`docs/BREVON-SRS-v1.1.md`) �
 | 4b — Checkout backend                         | ✅ Passed                                       | Approved 2026-11-06                                                       |
 | 4c — Cashier UI and receipts                  | ✅ Passed                                       | Approved 2026-11-06 (with D-121, D-122)                                   |
 | 5 — Orders and preparation                    | ✅ Passed                                       | Approved 2026-11-06                                                       |
-| 6 — Cashier shifts and cash control           | ✅ Passed — awaiting user review                | Not committed; two limits to confirm (D-127, D-128)                       |
-| 7 — Inventory and purchasing                  | ⏳ Not started                                  | Includes main → pop-up doughnut dispatch (D-063); OI-018 deferred (FE-01) |
+| 6 — Cashier shifts and cash control           | ✅ Passed                                       | Approved 2026-11-06; two limits to confirm (D-127, D-128)                 |
+| 7a — Stock control                            | ✅ Passed — awaiting review                     | Counts/adjustments, waste, low stock, stock items, dispatch (D-131–D-134) |
+| 7b — Purchasing                               | ⏳ Not started                                  | Suppliers, POs, receiving, lots/expiry, valuation; OI-018 deferred        |
 | 8 — Recipes and production                    | ⏳ Not started                                  | Production at the permanent branch only                                   |
 | 9 — Refunds, discounts, tax configuration     | ⏳ Not started                                  | SC/PWD: name, card no., address; 12%, VAT disregarded (D-068)             |
 | 10 — Dashboards and reports                   | ⏳ Not started                                  | Location filters incl. closed pop-ups                                     |
@@ -376,3 +377,39 @@ Still to confirm: boxes/combo at pop-ups (D-089), hot vs iced coffee prices. Pha
 - The user's `brevon_pos` needs `php artisan migrate` (Phase 4b tables, D-121 and Phase 6).
 
 **Next step:** Phase 7 — inventory and purchasing, after user review.
+
+## Phase 7a log — Stock control (2026-11-06)
+
+**Objective:** stock stays right between deliveries: counts and adjustments (approved where needed), waste write-offs, low-stock alerts, the stock items list, and sending doughnuts from the main branch to a pop-up. Phase 7 is split like Phase 4; purchasing is 7b.
+**SRS IDs:** FR-083–FR-088 (counts, adjustments, waste, low stock), T-TRF-1/T-TRF-2 (dispatch, D-063), T-INV-1–T-INV-3.
+
+**Implemented**
+
+- Schema: `stock_adjustments` / `stock_adjustment_items` (kind count/change, pending → posted/rejected, system/counted/variance quantities, unit cost), `stock_transfers` / `stock_transfer_items`. Morph names `stock_adjustment`, `stock_transfer`. Model guards: posted/rejected rows and transfers never change; deletes refused.
+- Domain: `StockAdjustments` (create, approve/reject with no self-approval, post the **variance** so sales made while waiting are kept, D-131), `StockWaste`, `StockDispatch` (transfer out/in pair at main's average cost through the new `InventoryLedger::postTransfer`, D-133), `StockLocations` (ended pop-ups with leftover stock can still count or write off, D-132), `InventoryItemService` (linked finished-stock items: only reorder level, perishable and lot tracking can change; unit locked once there is history), `QuantityInput`.
+- HTTP / permissions: stock items (`inventory.view` / `inventory.adjust`), counts and adjustments (`inventory.adjust`, approve/reject `inventory.approve-adjustment`), waste (`inventory.adjust`), dispatches (`inventory.view`, create `inventory.adjust`). Other locations answer 404.
+- UI: Stock on hand — Count / Record waste / Dispatch buttons, low-stock alert, "Low stock only" filter, "reorder at" line; Counts & adjustments list, form and detail (Approve / Reject); Record waste; Stock items list and form; Dispatches list, form and detail; sidebar links.
+- Docs: DECISIONS §X (D-131–D-134), ERD, TEST_PLAN map, README.
+
+**Verification (all run 2026-11-06)**
+
+| Command                                                            | Result                   |
+| ------------------------------------------------------------------ | ------------------------ |
+| `composer check` → build, `vp check`, `vue-tsc`, Pint, Larastan L7 | all pass, 0 errors       |
+| → `php artisan test` (MySQL)                                       | **281 passed** (was 271) |
+
+**Manual checks (browser, scratch DB `brevon_pos_test`, signed in as `harris`):** dispatched 8 + 6 doughnuts from BRV01 to POP01 (BRV01-…-D01, both balances moved); a count of one item 4 → 3 posted straight away as ADJ01 for an Owner; the low-stock alert and filter showed the item under its reorder level; wrote off 2 Chocolate Sprinkles at POP01 ("Unsold at closing") and landed on the pop-up's waste movements (6 → 4), with the location switcher showing POP01. No console errors. The user's `brevon_pos` was not touched.
+
+**Problems found and fixed during the phase**
+
+- A page prop named `location` hid the shared working-location prop, so the switcher said "No location assigned"; the prop is now `site`.
+- After writing off waste at a pop-up, the page went to the main branch's (empty) movements; it now switches to that location first, or stays on the form for an ended pop-up.
+- A migration index name was too long for MySQL; indexes now have short names.
+
+**Known issues / deferred**
+
+- 7b still to do: suppliers, purchase orders, partial and full receiving (T-INV-4, T-PO-1), lots and expiry, valuation. OI-018 stays deferred (FE-01).
+- Still to confirm with the owner: the Phase 6 limits (₱500.00 approval, ₱0.00 review). D-101 client menu questions: raise again after Phase 9.
+- The user's `brevon_pos` needs `php artisan migrate` (Phase 4b tables, D-121, Phase 6 and Phase 7a).
+
+**Next step:** Phase 7b — purchasing, after user review.

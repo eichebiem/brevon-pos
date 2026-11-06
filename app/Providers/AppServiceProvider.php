@@ -18,6 +18,8 @@ use App\Models\Product;
 use App\Models\ProductPrice;
 use App\Models\ProductVariant;
 use App\Models\Setting;
+use App\Models\StockAdjustment;
+use App\Models\StockTransfer;
 use App\Models\Terminal;
 use App\Models\User;
 use App\Support\Database\DestructiveCommandGuard;
@@ -80,6 +82,8 @@ class AppServiceProvider extends ServiceProvider
             'inventory_movement' => InventoryMovement::class,
             'cashier_shift' => CashierShift::class,
             'cash_movement' => CashMovement::class,
+            'stock_adjustment' => StockAdjustment::class,
+            'stock_transfer' => StockTransfer::class,
             'order' => Order::class,
             'payment' => Payment::class,
         ]);

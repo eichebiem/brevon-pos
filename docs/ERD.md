@@ -202,6 +202,9 @@ erDiagram
     inventory_lots |o--o{ inventory_movements : ""
     branches ||--o{ stock_adjustments : ""
     stock_adjustments ||--|{ stock_adjustment_items : ""
+    branches ||--o{ stock_transfers : "from (main)"
+    branches ||--o{ stock_transfers : "to (pop-up)"
+    stock_transfers ||--|{ stock_transfer_items : ""
     suppliers ||--o{ purchase_orders : ""
     purchase_orders ||--|{ purchase_order_items : ""
     purchase_orders |o--o{ goods_receipts : ""
@@ -219,7 +222,37 @@ erDiagram
       decimal balance_after
       varchar reference_type "morph-map alias"
       bigint reference_id }
+    stock_adjustments { bigint id PK
+      bigint branch_id FK
+      varchar adjustment_number UK
+      varchar kind "(+) count | change"
+      varchar status "pending | posted | rejected"
+      text reason
+      bigint created_by FK
+      bigint approved_by FK
+      datetime decided_at "(+)"
+      text decision_notes "(+)"
+      datetime posted_at }
+    stock_adjustment_items { bigint stock_adjustment_id FK
+      bigint inventory_item_id FK
+      decimal system_quantity
+      decimal counted_quantity
+      decimal variance_quantity
+      decimal unit_cost }
+    stock_transfers { bigint id PK
+      varchar transfer_number UK
+      bigint from_branch_id FK
+      bigint to_branch_id FK
+      text notes
+      bigint created_by FK
+      datetime posted_at }
+    stock_transfer_items { bigint stock_transfer_id FK
+      bigint inventory_item_id FK
+      decimal quantity
+      decimal unit_cost }
 ```
+
+Phase 7a constraints (D-131, D-133): CHECK `stock_adjustments.kind IN ('count','change')`, `status IN ('pending','posted','rejected')`; CHECK `variance_quantity = counted_quantity - system_quantity AND counted_quantity >= 0`; UNIQUE `(stock_adjustment_id, inventory_item_id)` and `(stock_transfer_id, inventory_item_id)`; CHECK `from_branch_id <> to_branch_id`, `quantity > 0`. Model guards: decided adjustments, their lines (except the cost stamped at posting) and every dispatch are never edited or deleted. `stock_transfers` is not in SRS §8.7 (schema addition from D-063).
 
 Invariant: for every (branch, item), `branch_inventory.quantity_on_hand = Σ inventory_movements.quantity_delta`. All writes go through one `InventoryLedger` service that locks the `branch_inventory` row (`FOR UPDATE`, rows locked in ascending item-id order to avoid deadlocks), checks negative stock, inserts the movement with `balance_after`, and updates the projection in the same transaction. Balances are per location, pop-ups included. `transfer_in`/`transfer_out` movement types are used only by the Phase 7 main → pop-up dispatch; rejected by the ledger before then (D-063). UNIQUE `branch_inventory(branch_id, inventory_item_id)`; INDEX `inventory_movements(branch_id, inventory_item_id, created_at)`, `purchase_orders(branch_id, status)`.
 
@@ -261,7 +294,7 @@ UNIQUE `recipes(product_id, version)`. Posting a batch: one transaction, status 
 4. number_sequences, branch_inventory, inventory_movements (no `inventory_lot_id` until Phase 7) — **Phase 4a (done)**, D-051/D-096
 5. payment_methods, cashier_shifts — **Phase 4a (done)**; orders, order_items, order_item_options, order_status_histories, payments — **Phase 4b (done)**
 6. cash_movements — **Phase 6 (done)**
-7. suppliers, inventory_lots, stock_adjustments(+items), purchase_orders(+items), goods_receipts(+items) — Phase 7
+7. stock_adjustments(+items), stock_transfers(+items) — **Phase 7a (done)**; suppliers, inventory_lots, purchase_orders(+items), goods_receipts(+items) — Phase 7b
 8. recipes, recipe_items, production_batches, production_batch_items, waste_records — Phase 8
 9. discounts, order_discounts, tax_rules, order_tax_lines, refunds, refund_items — Phase 9
 

@@ -2,7 +2,11 @@
 
 use App\Http\Controllers\Admin\AuditLogController;
 use App\Http\Controllers\Admin\CategoryController;
+use App\Http\Controllers\Admin\Inventory\DispatchController;
+use App\Http\Controllers\Admin\Inventory\InventoryItemController;
+use App\Http\Controllers\Admin\Inventory\StockAdjustmentController;
 use App\Http\Controllers\Admin\Inventory\StockController;
+use App\Http\Controllers\Admin\Inventory\WasteController;
 use App\Http\Controllers\Admin\LocationController;
 use App\Http\Controllers\Admin\OptionGroupController;
 use App\Http\Controllers\Admin\PaymentMethodController;
@@ -158,10 +162,35 @@ Route::middleware(['auth'])->group(function () {
         Route::middleware('permission:inventory.view')->group(function () {
             Route::get('inventory/stock', [StockController::class, 'index'])->name('inventory.stock');
             Route::get('inventory/movements', [StockController::class, 'movements'])->name('inventory.movements');
+            Route::get('inventory/items', [InventoryItemController::class, 'index'])->name('inventory.items.index');
+            Route::get('inventory/dispatches', [DispatchController::class, 'index'])->name('inventory.dispatches.index');
         });
         Route::middleware('permission:inventory.adjust')->group(function () {
             Route::get('inventory/opening-stock', [StockController::class, 'openingForm'])->name('inventory.opening');
             Route::post('inventory/opening-stock', [StockController::class, 'storeOpening'])->name('inventory.opening.store');
+            // Stock items, waste and dispatch (D-132–D-134).
+            Route::get('inventory/items/create', [InventoryItemController::class, 'create'])->name('inventory.items.create');
+            Route::post('inventory/items', [InventoryItemController::class, 'store'])->name('inventory.items.store');
+            Route::get('inventory/items/{item}/edit', [InventoryItemController::class, 'edit'])->name('inventory.items.edit');
+            Route::put('inventory/items/{item}', [InventoryItemController::class, 'update'])->name('inventory.items.update');
+            Route::get('inventory/waste', [WasteController::class, 'create'])->name('inventory.waste');
+            Route::post('inventory/waste', [WasteController::class, 'store'])->name('inventory.waste.store');
+            Route::get('inventory/dispatches/create', [DispatchController::class, 'create'])->name('inventory.dispatches.create');
+            Route::post('inventory/dispatches', [DispatchController::class, 'store'])->name('inventory.dispatches.store');
+            Route::get('inventory/adjustments/create', [StockAdjustmentController::class, 'create'])->name('inventory.adjustments.create');
+            Route::post('inventory/adjustments', [StockAdjustmentController::class, 'store'])->name('inventory.adjustments.store');
+        });
+        Route::middleware('permission:inventory.view')->group(function () {
+            Route::get('inventory/dispatches/{dispatch}', [DispatchController::class, 'show'])->name('inventory.dispatches.show');
+        });
+        // Counts and adjustments: entered with inventory.adjust, decided with inventory.approve-adjustment (D-131).
+        Route::middleware('permission:inventory.adjust|inventory.approve-adjustment')->group(function () {
+            Route::get('inventory/adjustments', [StockAdjustmentController::class, 'index'])->name('inventory.adjustments.index');
+            Route::get('inventory/adjustments/{adjustment}', [StockAdjustmentController::class, 'show'])->name('inventory.adjustments.show');
+        });
+        Route::middleware('permission:inventory.approve-adjustment')->group(function () {
+            Route::post('inventory/adjustments/{adjustment}/approve', [StockAdjustmentController::class, 'approve'])->name('inventory.adjustments.approve');
+            Route::post('inventory/adjustments/{adjustment}/reject', [StockAdjustmentController::class, 'reject'])->name('inventory.adjustments.reject');
         });
 
         // Shift review and corrections (FR-080–FR-082, D-128–D-130).

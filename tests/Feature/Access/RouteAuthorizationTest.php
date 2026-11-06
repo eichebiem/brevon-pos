@@ -22,15 +22,16 @@ class RouteAuthorizationTest extends TestCase
         '/admin/products', '/admin/products/create', '/admin/categories', '/admin/categories/create', '/admin/option-groups', '/admin/option-groups/create',
         '/staff/shift', '/admin/inventory/stock', '/admin/inventory/movements', '/admin/inventory/opening-stock',
         '/admin/payment-methods', '/pos/orders', '/staff/payments', '/admin/shifts',
+        '/admin/inventory/items', '/admin/inventory/adjustments', '/admin/inventory/dispatches',
     ];
 
     /** Expected access per seeded role, in ROUTES order. */
     private const MATRIX = [
-        PermissionCatalog::OWNER => [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-        PermissionCatalog::ADMIN => [1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-        PermissionCatalog::MANAGER => [1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1],
-        PermissionCatalog::CASHIER => [0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0],
-        PermissionCatalog::PREPARATION_STAFF => [0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0],
+        PermissionCatalog::OWNER => [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        PermissionCatalog::ADMIN => [1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        PermissionCatalog::MANAGER => [1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1],
+        PermissionCatalog::CASHIER => [0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
+        PermissionCatalog::PREPARATION_STAFF => [0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 0, 1],
     ];
 
     /**

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin\Inventory;
 
 use App\Domain\Inventory\OpeningStock;
 use App\Domain\Locations\LocationContext;
+use App\Domain\Shared\Quantity;
 use App\Enums\InventoryMovementType;
 use App\Http\Controllers\Controller;
 use App\Models\Branch;
@@ -31,13 +32,17 @@ class StockController extends Controller
     public function index(Request $request): Response
     {
         $location = $this->location($request);
-        $search = $request->validate(['search' => ['nullable', 'string', 'max:100']])['search'] ?? null;
+        $filters = $request->validate(['search' => ['nullable', 'string', 'max:100'], 'low' => ['nullable', 'boolean']]);
+        $search = $filters['search'] ?? null;
+        $lowOnly = (bool) ($filters['low'] ?? false);
 
         $rows = $location === null ? collect() : BranchInventory::query()
             ->where('branch_id', $location->id)
             ->join('inventory_items', 'inventory_items.id', '=', 'branch_inventory.inventory_item_id')
             ->leftJoin('units_of_measure', 'units_of_measure.id', '=', 'inventory_items.unit_of_measure_id')
             ->when($search, fn ($q, $s) => $q->where(fn ($q) => $q->where('inventory_items.name', 'like', "%{$s}%")->orWhere('inventory_items.sku', 'like', "%{$s}%")))
+            // FR-057: at or below the item's reorder level (0 = no alert).
+            ->when($lowOnly, fn ($q) => $q->where('inventory_items.reorder_level', '>', 0)->whereColumn('branch_inventory.quantity_on_hand', '<=', 'inventory_items.reorder_level'))
             ->orderBy('inventory_items.name')
             ->get([
                 'inventory_items.id', 'inventory_items.sku', 'inventory_items.name', 'inventory_items.reorder_level',
@@ -52,6 +57,7 @@ class StockController extends Controller
                 'on_hand' => $row->quantity_on_hand,
                 'reorder_level' => $row->getAttribute('reorder_level'),
                 'average_unit_cost' => $row->average_unit_cost,
+                'low' => self::isLow($row->quantity_on_hand, (string) $row->getAttribute('reorder_level')),
                 'updated_at' => $row->updated_at?->toIso8601String(),
             ]);
 
@@ -59,6 +65,11 @@ class StockController extends Controller
             'site' => $location?->only(['id', 'code', 'name']),
             'rows' => $rows,
             'search' => $search,
+            'lowOnly' => $lowOnly,
+            'lowCount' => $location === null ? 0 : BranchInventory::query()->where('branch_id', $location->id)
+                ->join('inventory_items', 'inventory_items.id', '=', 'branch_inventory.inventory_item_id')
+                ->where('inventory_items.reorder_level', '>', 0)
+                ->whereColumn('branch_inventory.quantity_on_hand', '<=', 'inventory_items.reorder_level')->count(),
             'awaitingOpening' => $location ? $this->opening->eligibleItems($location)->count() : 0,
         ]);
     }
@@ -104,7 +115,6 @@ class StockController extends Controller
             'filters' => (object) $filters,
             'items' => InventoryItem::query()->orderBy('name')->get(['id', 'sku', 'name']),
             'types' => collect(InventoryMovementType::cases())
-                ->reject(fn (InventoryMovementType $t) => $t->isTransfer())
                 ->map(fn (InventoryMovementType $t) => ['value' => $t->value, 'label' => $t->label()])->values(),
         ]);
     }
@@ -152,6 +162,14 @@ class StockController extends Controller
         Inertia::flash('toast', ['type' => 'success', 'message' => trans_choice('Opening stock saved for :count item.|Opening stock saved for :count items.', $count, ['count' => $count])]);
 
         return to_route('admin.inventory.stock');
+    }
+
+    /** FR-057: at or below a reorder level above zero. */
+    private static function isLow(string $onHand, string $reorderLevel): bool
+    {
+        $level = Quantity::fromString($reorderLevel);
+
+        return $level->isPositive() && Quantity::fromString($onHand)->compare($level) <= 0;
     }
 
     private function location(Request $request): ?Branch
