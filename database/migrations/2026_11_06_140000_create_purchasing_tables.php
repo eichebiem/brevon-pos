@@ -7,8 +7,9 @@ use Illuminate\Support\Facades\Schema;
 
 /**
  * Purchasing (FR-058–FR-060, UC-006; D-135–D-139): suppliers, purchase
- * orders, goods receipts and lots. Stock still moves only through
- * InventoryLedger; a receipt line points at the lot it created.
+ * orders and goods receipts. Stock still moves only through InventoryLedger.
+ * No lots or expiry tracking (D-167); 'expired' stays as a receiving
+ * condition so expired deliveries can be rejected.
  */
 return new class extends Migration
 {
@@ -61,22 +62,6 @@ return new class extends Migration
             $table->unique(['purchase_order_id', 'inventory_item_id'], 'purchase_order_items_line_unique');
         });
 
-        Schema::create('inventory_lots', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('branch_id')->constrained()->restrictOnDelete();
-            $table->foreignId('inventory_item_id')->constrained()->restrictOnDelete();
-            $table->string('lot_number', 80)->nullable();
-            $table->timestamp('received_at')->nullable();
-            $table->date('expires_at')->nullable();
-            $table->decimal('quantity_received', 14, 3);
-            $table->decimal('quantity_remaining', 14, 3);
-            $table->decimal('unit_cost', 14, 4)->nullable();
-            $table->foreignId('supplier_id')->nullable()->constrained()->restrictOnDelete();
-            $table->timestamps();
-
-            $table->index(['branch_id', 'inventory_item_id', 'expires_at'], 'inventory_lots_fefo_index');
-        });
-
         Schema::create('goods_receipts', function (Blueprint $table) {
             $table->id();
             $table->foreignId('branch_id')->constrained()->restrictOnDelete();
@@ -96,7 +81,6 @@ return new class extends Migration
             $table->foreignId('goods_receipt_id')->constrained()->restrictOnDelete();
             $table->foreignId('purchase_order_item_id')->nullable()->constrained()->restrictOnDelete();
             $table->foreignId('inventory_item_id')->constrained()->restrictOnDelete();
-            $table->foreignId('inventory_lot_id')->nullable()->constrained()->restrictOnDelete();
             $table->decimal('quantity_received', 14, 3);
             $table->decimal('unit_cost', 14, 4)->nullable();
             $table->string('condition', 30)->default('accepted');
@@ -104,25 +88,16 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        Schema::table('inventory_movements', function (Blueprint $table) {
-            $table->foreignId('inventory_lot_id')->nullable()->after('inventory_item_id')->constrained()->restrictOnDelete();
-        });
-
         DB::statement("ALTER TABLE purchase_orders ADD CONSTRAINT purchase_orders_status_check CHECK (status IN ('draft','submitted','partially_received','received','cancelled'))");
         DB::statement('ALTER TABLE purchase_orders ADD CONSTRAINT purchase_orders_subtotal_check CHECK (subtotal >= 0)');
         DB::statement('ALTER TABLE purchase_order_items ADD CONSTRAINT purchase_order_items_qty_check CHECK (quantity_ordered > 0 AND quantity_received >= 0 AND unit_cost >= 0 AND line_total >= 0)');
-        DB::statement('ALTER TABLE inventory_lots ADD CONSTRAINT inventory_lots_qty_check CHECK (quantity_received > 0 AND quantity_remaining >= 0 AND quantity_remaining <= quantity_received AND (unit_cost IS NULL OR unit_cost >= 0))');
         DB::statement("ALTER TABLE goods_receipt_items ADD CONSTRAINT goods_receipt_items_check CHECK (quantity_received > 0 AND (unit_cost IS NULL OR unit_cost >= 0) AND `condition` IN ('accepted','damaged','expired'))");
     }
 
     public function down(): void
     {
-        Schema::table('inventory_movements', function (Blueprint $table) {
-            $table->dropConstrainedForeignId('inventory_lot_id');
-        });
         Schema::dropIfExists('goods_receipt_items');
         Schema::dropIfExists('goods_receipts');
-        Schema::dropIfExists('inventory_lots');
         Schema::dropIfExists('purchase_order_items');
         Schema::dropIfExists('purchase_orders');
         Schema::dropIfExists('suppliers');

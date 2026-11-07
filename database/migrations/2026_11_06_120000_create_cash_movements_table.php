@@ -41,18 +41,10 @@ return new class extends Migration
         DB::statement("ALTER TABLE cash_movements ADD CONSTRAINT cash_movements_type_check CHECK (movement_type IN ('cash_in','cash_out','cash_paid_out','cash_refund','correction'))");
         DB::statement("ALTER TABLE cash_movements ADD CONSTRAINT cash_movements_status_check CHECK (status IN ('pending','approved','rejected'))");
         DB::statement("ALTER TABLE cash_movements ADD CONSTRAINT cash_movements_amount_check CHECK ((movement_type = 'correction' AND amount <> 0 AND corrects IN ('expected','counted')) OR (movement_type <> 'correction' AND amount > 0 AND corrects IS NULL))");
-
-        Schema::table('cashier_shifts', function (Blueprint $table) {
-            $table->dateTime('reviewed_at')->nullable()->after('approved_by');
-            $table->text('review_notes')->nullable()->after('reviewed_at');
-        });
     }
 
     public function down(): void
     {
-        Schema::table('cashier_shifts', function (Blueprint $table) {
-            $table->dropColumn(['reviewed_at', 'review_notes']);
-        });
         Schema::dropIfExists('cash_movements');
     }
 };

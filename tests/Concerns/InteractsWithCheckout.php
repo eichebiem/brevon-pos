@@ -116,7 +116,7 @@ trait InteractsWithCheckout
     {
         return [
             'idempotency_key' => (string) Str::uuid(),
-            'order_type' => 'walk_in',
+            'order_type' => 'takeout',
             'items' => $items,
             'payment' => $payment,
             ...$extra,

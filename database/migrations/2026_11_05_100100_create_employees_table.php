@@ -24,10 +24,18 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
         });
+
+        Schema::table('users', function (Blueprint $table) {
+            $table->foreignId('employee_id')->nullable()->unique()->after('password')
+                ->constrained('employees')->restrictOnDelete();
+        });
     }
 
     public function down(): void
     {
+        Schema::table('users', function (Blueprint $table) {
+            $table->dropConstrainedForeignId('employee_id');
+        });
         Schema::dropIfExists('employees');
     }
 };

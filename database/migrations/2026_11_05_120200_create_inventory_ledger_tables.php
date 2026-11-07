@@ -9,8 +9,7 @@ use Illuminate\Support\Facades\Schema;
  * Inventory ledger (FR-054, FR-055, BR-011; D-051). inventory_movements is the
  * append-only source of truth; branch_inventory is the per-location balance
  * projection and must always equal the sum of movements. Both are written only
- * by App\Domain\Inventory\InventoryLedger. inventory_lot_id arrives with lots
- * in Phase 7.
+ * by App\Domain\Inventory\InventoryLedger. No lots (D-167).
  */
 return new class extends Migration
 {

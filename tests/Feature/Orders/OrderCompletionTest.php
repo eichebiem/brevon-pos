@@ -55,9 +55,9 @@ class OrderCompletionTest extends TestCase
         return Order::query()->latest('id')->firstOrFail();
     }
 
-    public function test_every_sale_is_completed_at_checkout_even_made_to_order_and_advance_pickup(): void
+    public function test_every_sale_is_completed_at_checkout_even_made_to_order_and_advance_order(): void
     {
-        foreach (['walk_in', 'advance_pickup'] as $type) {
+        foreach (['takeout', 'advance_order'] as $type) {
             $order = $this->sell(['order_type' => $type, 'pickup_at' => '2030-01-01 10:00']);
 
             $this->assertSame(OrderStatus::Completed, $order->status);

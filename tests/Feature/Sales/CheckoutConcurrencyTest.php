@@ -131,7 +131,7 @@ class CheckoutConcurrencyTest extends TestCase
     {
         app(CheckoutService::class)->checkout($cashier, new CheckoutData(
             idempotencyKey: $key ?? (string) Str::uuid(),
-            orderType: OrderType::WalkIn,
+            orderType: OrderType::Takeout,
             lines: [new CartLine($doughnut->id, null, Quantity::fromString('1'))],
             payment: new PaymentInput('CASH', Money::fromDecimal('100')),
         ));

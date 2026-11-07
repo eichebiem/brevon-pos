@@ -2,23 +2,19 @@
 
 namespace App\Enums;
 
-/** FR-028, D-029. All five are enabled in V1. */
+/** FR-028, D-029, D-181. The POS offers these three, in this order. */
 enum OrderType: string
 {
-    case WalkIn = 'walk_in';
     case DineIn = 'dine_in';
     case Takeout = 'takeout';
-    case AdvancePickup = 'advance_pickup';
-    case Bulk = 'bulk';
+    case AdvanceOrder = 'advance_order';
 
     public function label(): string
     {
         return match ($this) {
-            self::WalkIn => 'Walk-in',
             self::DineIn => 'Dine-in',
             self::Takeout => 'Takeout',
-            self::AdvancePickup => 'Advance pickup',
-            self::Bulk => 'Bulk',
+            self::AdvanceOrder => 'Advance Order',
         };
     }
 }

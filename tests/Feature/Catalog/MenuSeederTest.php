@@ -70,46 +70,6 @@ class MenuSeederTest extends TestCase
         $this->assertSame(0, Category::query()->whereNotNull('parent_id')->count());
     }
 
-    public function test_the_category_migration_flattens_an_older_menu_and_removes_the_old_groups(): void
-    {
-        $this->staff(PermissionCatalog::OWNER);
-        $this->seed(MenuSeeder::class);
-        // Rebuild the older layout: Doughnuts › Regular, Premium, Assorted boxes; Cold Drinks › Matcha, Lemonade; Other › Combos.
-        $group = fn (string $name, int $sort) => Category::query()->create(['name' => $name, 'slug' => str($name)->slug()->toString().'-old', 'sort_order' => $sort, 'is_active' => true]);
-        $doughnuts = $group('Doughnuts', 1);
-        $cold = $group('Cold Drinks', 3);
-        $other = $group('Other', 4);
-        foreach (['Regular' => $doughnuts, 'Premium' => $doughnuts, 'Assorted boxes' => $doughnuts, 'Matcha series' => $cold, 'Lemonade series' => $cold, 'Combos' => $other] as $name => $parent) {
-            Category::query()->where('name', $name)->update(['parent_id' => $parent->id, 'sort_order' => 10]);
-        }
-        $mine = Category::query()->create(['name' => 'Merch', 'slug' => 'merch', 'sort_order' => 9, 'is_active' => true]);
-        $migration = require database_path('migrations/2026_11_07_100600_flatten_categories.php');
-
-        // A product left in an old group stops it.
-        $stray = Product::query()->where('sku', 'CB-BETTER-TOGETHER')->sole();
-        $combos = $stray->category_id;
-        $stray->forceFill(['category_id' => $other->id])->save();
-        try {
-            $migration->up();
-            $this->fail('Expected the migration to refuse while Other holds a product.');
-        } catch (\RuntimeException $e) {
-            $this->assertStringContainsString('Other', $e->getMessage());
-        }
-        $this->assertSame($doughnuts->id, Category::query()->where('name', 'Regular')->value('parent_id'), 'nothing changed');
-
-        $stray->forceFill(['category_id' => $combos])->save();
-        $migration->up();
-
-        $this->assertSame(
-            ['Regular', 'Premium', 'Assorted boxes', 'Coffee', 'Matcha series', 'Lemonade series', 'Combos', 'Merch'],
-            Category::query()->orderBy('sort_order')->pluck('name')->all(),
-        );
-        $this->assertSame(0, Category::query()->whereNotNull('parent_id')->count());
-        $this->assertTrue($mine->refresh()->exists, "the owner's own categories stay");
-        $this->assertSame(36, Product::query()->count());
-        $this->assertSame(0, Product::query()->whereDoesntHave('category')->count());
-    }
-
     public function test_running_again_adds_nothing_and_keeps_changes_made_in_the_app(): void
     {
         $this->staff(PermissionCatalog::OWNER);

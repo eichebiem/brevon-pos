@@ -32,6 +32,9 @@ return new class extends Migration
             $table->text('closing_notes')->nullable();
             $table->foreignId('closed_by')->nullable()->constrained('users')->restrictOnDelete();
             $table->foreignId('approved_by')->nullable()->constrained('users')->restrictOnDelete();
+            // Manager review of the closed shift (D-126–D-130).
+            $table->dateTime('reviewed_at')->nullable();
+            $table->text('review_notes')->nullable();
             $table->tinyInteger('open_guard')->nullable()->storedAs("IF(`status` = 'open', 1, NULL)");
             $table->timestamps();
 

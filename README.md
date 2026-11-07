@@ -63,8 +63,8 @@ php artisan migrate --seed
 php artisan storage:link   # needed for product images and the store logo
 ```
 
-Seeding creates the five roles, their permissions, the permanent location `BRV01` (Brevon Doughnuts & Coffee — Main), units of
-measure and four starter categories, plus the accounts and menu below. Re-seeding only adds what is missing: it never
+Seeding creates the three roles (Owner, Manager, Cashier), their permissions, the permanent location `BRV01` (Brevon Doughnuts & Coffee — Main), units of
+measure and the seven categories, plus the accounts and menu below. Re-seeding only adds what is missing: it never
 resets an existing account's password or overwrites a product.
 
 **Default Owners — every environment, including production (D-102):**

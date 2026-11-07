@@ -95,7 +95,7 @@ const storageKey = computed(() =>
     activeShift.value ? `brevon.pos.cart.${activeShift.value.number}` : null,
 );
 const cart = ref<CartLine[]>([]);
-const orderType = ref(props.orderTypes[0]?.value ?? 'walk_in');
+const orderType = ref(props.orderTypes[0]?.value ?? 'dine_in');
 const orderNotes = ref('');
 
 function restoreCart(): void {
@@ -109,7 +109,10 @@ function restoreCart(): void {
         if (saved) {
             // Drop lines whose product is no longer sold here.
             cart.value = saved.cart.filter((l) => byId.value.has(l.product_id));
-            orderType.value = saved.orderType;
+            // A saved type the POS no longer offers (e.g. Walk-in, D-181) falls back to the first one.
+            if (props.orderTypes.some((t) => t.value === saved.orderType)) {
+                orderType.value = saved.orderType;
+            }
             orderNotes.value = saved.orderNotes;
         }
     } catch {
@@ -198,7 +201,7 @@ function clearSale(): void {
     approver.value = null;
     discountErrors.value = {};
     orderNotes.value = '';
-    orderType.value = props.orderTypes[0]?.value ?? 'walk_in';
+    orderType.value = props.orderTypes[0]?.value ?? 'dine_in';
     lineErrors.value = {};
     banner.value = null;
 }

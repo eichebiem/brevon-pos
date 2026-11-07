@@ -30,7 +30,6 @@ return new class extends Migration
             $table->foreignId('unit_of_measure_id')->constrained('units_of_measure')->restrictOnDelete();
             $table->decimal('reorder_level', 14, 3)->default(0);
             $table->boolean('is_perishable')->default(false);
-            $table->boolean('track_lot')->default(false);
             $table->boolean('is_active')->default(true);
             $table->timestamps();
             $table->softDeletes();

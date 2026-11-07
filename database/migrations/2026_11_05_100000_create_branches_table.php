@@ -23,8 +23,6 @@ return new class extends Migration
             $table->string('city_municipality', 100)->nullable();
             $table->string('province', 100)->nullable();
             $table->string('postal_code', 20)->nullable();
-            $table->string('phone', 30)->nullable();
-            $table->string('email', 150)->nullable();
             $table->string('timezone', 64)->default('Asia/Manila');
             $table->char('currency', 3)->default('PHP');
             $table->boolean('is_active')->default(true);
