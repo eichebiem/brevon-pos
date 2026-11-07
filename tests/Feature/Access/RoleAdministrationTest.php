@@ -59,6 +59,27 @@ class RoleAdministrationTest extends TestCase
         $this->assertSame([PermissionCatalog::CASHIER], $baker->refresh()->getRoleNames()->all());
     }
 
+    public function test_roles_are_listed_owner_manager_cashier_then_by_creation(): void
+    {
+        $owner = $this->staff(PermissionCatalog::OWNER);
+        // Built-in roles go first even on a database where they were made in another order.
+        Role::findByName(PermissionCatalog::OWNER)->forceFill(['created_at' => now()->addDay()])->save();
+        Role::findByName(PermissionCatalog::CASHIER)->forceFill(['created_at' => now()->subYear()])->save();
+        Role::create(['name' => 'Baker'])->forceFill(['created_at' => now()->subDay()])->save();
+        Role::create(['name' => 'Accountant'])->forceFill(['created_at' => now()])->save();
+        $both = $this->staff(PermissionCatalog::CASHIER);
+        $both->assignRole('Accountant', PermissionCatalog::MANAGER);
+
+        $expected = [PermissionCatalog::OWNER, PermissionCatalog::MANAGER, PermissionCatalog::CASHIER, 'Baker', 'Accountant'];
+        $this->actingAs($owner)->get('/admin/roles')->assertOk()
+            ->assertInertia(fn ($page) => $page->where('roles', fn ($roles) => collect($roles)->pluck('name')->all() === $expected));
+        $this->actingAs($owner)->get('/admin/users/create')->assertOk()
+            ->assertInertia(fn ($page) => $page->where('roles', $expected));
+        $this->actingAs($owner)->get('/admin/users')->assertOk()
+            ->assertInertia(fn ($page) => $page->where('roles', $expected)
+                ->where('users.data', fn ($users) => collect($users)->firstWhere('id', $both->id)['roles'] === [PermissionCatalog::MANAGER, PermissionCatalog::CASHIER, 'Accountant']));
+    }
+
     public function test_seeding_twice_is_idempotent(): void
     {
         $before = Role::query()->withCount('permissions')->pluck('permissions_count', 'name')->all();

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Domain\Access\AccessGuard;
 use App\Domain\Access\PermissionCatalog;
+use App\Domain\Access\RoleOrder;
 use App\Domain\Access\RoleService;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\RoleRequest;
@@ -21,7 +22,7 @@ class RoleController extends Controller
 
     public function index(): Response
     {
-        $roles = Role::query()->withCount('permissions')->orderBy('name')->get()->map(fn (Role $role) => [
+        $roles = RoleOrder::query()->withCount('permissions')->get()->map(fn (Role $role) => [
             'id' => $role->id,
             'name' => $role->name,
             'permissions_count' => $role->permissions_count,

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Domain\Access\AccessGuard;
+use App\Domain\Access\RoleOrder;
 use App\Domain\Access\UserService;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\UserRequest;
@@ -12,7 +13,6 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
-use Spatie\Permission\Models\Role;
 
 /** Staff accounts (FR-005, FR-006). Route middleware: permission:users.manage. */
 class UserController extends Controller
@@ -32,7 +32,7 @@ class UserController extends Controller
         ]);
 
         $users = User::query()
-            ->with(['roles:id,name', 'branches:id,code,name'])
+            ->with(['roles:id,name,created_at', 'branches:id,code,name'])
             ->when($filters['search'] ?? null, fn ($query, $search) => $query->where(fn ($q) => $q
                 ->where('name', 'like', "%{$search}%")
                 ->orWhere('email', 'like', "%{$search}%")
@@ -50,7 +50,7 @@ class UserController extends Controller
                 'username' => $user->username,
                 'email' => $user->email,
                 'is_active' => $user->is_active,
-                'roles' => $user->roles->pluck('name'),
+                'roles' => RoleOrder::sort($user->roles)->pluck('name'),
                 'locations' => $user->branches->pluck('code'),
                 'last_login_at' => $user->last_login_at?->toIso8601String(),
             ]);
@@ -58,7 +58,7 @@ class UserController extends Controller
         return Inertia::render('admin/users/Index', [
             'users' => $users,
             'filters' => (object) $filters,
-            'roles' => Role::query()->orderBy('name')->pluck('name'),
+            'roles' => RoleOrder::query()->pluck('name'),
             'locations' => Branch::query()->orderBy('code')->get(['id', 'code', 'name']),
         ]);
     }
@@ -132,7 +132,7 @@ class UserController extends Controller
     private function formOptions(): array
     {
         return [
-            'roles' => Role::query()->orderBy('name')->pluck('name'),
+            'roles' => RoleOrder::query()->pluck('name'),
             'locations' => Branch::query()->orderBy('location_type')->orderBy('code')->get()->map(fn (Branch $branch) => [
                 'id' => $branch->id,
                 'code' => $branch->code,
