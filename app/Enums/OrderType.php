@@ -21,10 +21,4 @@ enum OrderType: string
             self::Bulk => 'Bulk',
         };
     }
-
-    /** Orders collected later need a pickup date and time. */
-    public function needsPickupTime(): bool
-    {
-        return $this === self::AdvancePickup;
-    }
 }

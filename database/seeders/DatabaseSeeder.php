@@ -14,7 +14,8 @@ class DatabaseSeeder extends Seeder
      *
      * Seeds reference data, the three default Owners (every environment,
      * known starting password — change it after first sign-in, D-102), the
-     * local-only "Cashier 1" (D-100) and the shop's menu (D-101).
+     * shop's menu (D-101) and, locally only, the SM Rosales pop-up with its
+     * terminal and "Cashier 1" / "Cashier 2" (D-100, D-178).
      */
     public function run(): void
     {
@@ -25,9 +26,12 @@ class DatabaseSeeder extends Seeder
             PaymentMethodSeeder::class,
             DiscountSeeder::class,
             DefaultOwnersSeeder::class,
-            LocalUsersSeeder::class,
             // The shop's menu, in every environment (D-101).
             MenuSeeder::class,
+            // Local only (D-100, D-178): SM Rosales after the menu, so it gets
+            // the main branch's doughnuts; then the cashiers.
+            LocalLocationsSeeder::class,
+            LocalUsersSeeder::class,
         ]);
     }
 }

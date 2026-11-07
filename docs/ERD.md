@@ -70,9 +70,6 @@ erDiagram
     branches |o--o{ product_prices : "branch price (NULL = global)"
     products ||--o{ product_branch : availability
     branches ||--o{ product_branch : ""
-    products ||--o{ product_option_group : ""
-    option_groups ||--o{ product_option_group : ""
-    option_groups ||--o{ product_options : has
     inventory_items |o--o{ products : "(+) finished-good stock item"
     inventory_items |o--o{ product_variants : "(+) variant stock item"
 
@@ -95,7 +92,7 @@ erDiagram
 
 Rules: current price = latest row with `effective_from ≤ now < coalesce(effective_until, ∞)`, in the order variant + location → variant → location → base (D-087). New price closes the previous row (`effective_until`) — rows are never updated otherwise. UNIQUE `product_branch(product_id, branch_id)`, `product_option_group(product_id, option_group_id)`. **Built in Phase 3:** generated columns `product_prices.scope_key` / `open_guard` (UNIQUE: one open price per scope), `product_variants.default_guard` (one default variant per product), `settings.branch_scope` (UNIQUE with `key`); CHECKs `products_stock_link_check` (finished_stock ⇒ stock item, D-085/D-089), price ≥ 0, `effective_until > effective_from`, option `price_delta ≥ 0`, single-choice groups max 1.
 
-## 3. Orders, payments, refunds, discounts, tax
+## 3. Orders, payments, refunds, discounts
 
 ```mermaid
 erDiagram
@@ -106,8 +103,6 @@ erDiagram
     orders ||--|{ order_items : contains
     products |o--o{ order_items : "snapshot source"
     product_variants |o--o{ order_items : ""
-    order_items ||--o{ order_item_options : ""
-    product_options |o--o{ order_item_options : ""
     orders ||--o{ order_status_histories : ""
     orders ||--o{ payments : ""
     payment_methods ||--o{ payments : ""
@@ -120,8 +115,6 @@ erDiagram
     order_discounts ||--o| order_discount_beneficiaries : "SC/PWD only"
     products |o--o{ discounts : "product scope"
     categories |o--o{ discounts : "category scope"
-    orders ||--o{ order_tax_lines : ""
-    tax_rules |o--o{ order_tax_lines : ""
 
     orders { bigint id PK
       bigint branch_id FK
@@ -153,6 +146,8 @@ Constraints: UNIQUE `orders(branch_id, order_number)`, UNIQUE `orders(branch_id,
 **Phase 9a (built, D-145–D-149):** `discounts` per SRS §8.5 plus `kind` (`standard` / `senior_pwd`) and `product_id` / `category_id` for product- and category-scoped discounts (CHECK: the right one is set for the scope; SC/PWD is always order-wide percentage; percentages ≤ 100; ends after starts). `order_discounts`: UNIQUE `order_id` (one discount per order), plus `discount_type_snapshot` and `discount_value_snapshot`; `approved_by` is the manager who approved at the counter. `order_discount_beneficiaries` (D-068, D-148): one row per SC/PWD order discount, `beneficiary_type` (`senior_citizen` / `pwd`), `full_name`, `card_number`, `address` — **the only personal data in V1, encrypted at rest (Laravel `encrypted` cast), never indexed or searched**. `tax_rules` per SRS (percentage only; none seeded); `order_tax_lines` per SRS plus `inclusive_snapshot`. `order_items.discount_amount` and `tax_amount` hold each line's share (they add up to the order totals); `line_total` stays the price before discount. Grand total = subtotal − discount + tax added on top; tax included in prices is shown in `tax_total` but does not change the total. All new order rows are immutable (model guards).
 
 **Phase 9b (built, D-150–D-155):** `refunds` per SRS §8.4 plus `kind` (`refund` / `void`), `cashier_shift_id` (nullable; the drawer cash was handed back from) and `reference_number` (the e-wallet transfer sent back); `refund_number` UNIQUE (`{location}-{YYYYMMDD}-R{nnnn}`); status `processed` (CHECK allows `pending` / `processed` / `rejected`); CHECK amount > 0. `refund_items` per SRS (UNIQUE `refund_id` + `order_item_id`; CHECK quantity > 0, amount ≥ 0). All FKs RESTRICT; refund rows and payments' amounts are never changed (model guards). Cash refunds are `cash_movements` rows of type `cash_refund` with `reference_type = 'refund'`; stock put back is an `inventory_movements` `return_in` row referencing the refund. Morph name `refund`.
+
+**Phase 11a removals (built, D-165–D-171; migrations `2026_11_07_100000`–`100400`):** dropped tables `tax_rules`, `order_tax_lines`, `option_groups`, `product_options`, `product_option_group`, `order_item_options`, `inventory_lots`; dropped columns `orders.tax_total`, `order_items.tax_amount`, `order_items.option_total`, `inventory_items.track_lot`, `goods_receipt_items.inventory_lot_id`, `inventory_movements.inventory_lot_id`, and `orders.pickup_at` when no order has a pickup time (D-171). CHECK `orders_money_check` and `order_items_amounts_check` re-added without the tax and add-on columns (`line_total` = unit price × quantity). Every new order is `completed` and `paid` at checkout; the other order statuses, the cancellation columns, `pending`/`failed` payment statuses and past `void` refunds stay for history.
 
 ## 4. Cash management
 
@@ -203,10 +198,7 @@ erDiagram
     units_of_measure ||--o{ inventory_items : ""
     inventory_items ||--o{ branch_inventory : balance
     branches ||--o{ branch_inventory : ""
-    inventory_items ||--o{ inventory_lots : ""
-    suppliers |o--o{ inventory_lots : ""
     inventory_items ||--o{ inventory_movements : ledger
-    inventory_lots |o--o{ inventory_movements : ""
     branches ||--o{ stock_adjustments : ""
     stock_adjustments ||--|{ stock_adjustment_items : ""
     branches ||--o{ stock_transfers : "from (main)"
@@ -288,18 +280,9 @@ erDiagram
     goods_receipt_items { bigint goods_receipt_id FK
       bigint purchase_order_item_id FK
       bigint inventory_item_id FK
-      bigint inventory_lot_id FK
       decimal quantity_received
       decimal unit_cost
       varchar condition "accepted | damaged | expired" }
-    inventory_lots { bigint id PK
-      bigint branch_id FK
-      bigint inventory_item_id FK
-      varchar lot_number
-      date expires_at
-      decimal quantity_received
-      decimal quantity_remaining "FEFO estimate"
-      bigint supplier_id FK }
 ```
 
 Phase 7a constraints (D-131, D-133): CHECK `stock_adjustments.kind IN ('count','change')`, `status IN ('pending','posted','rejected')`; CHECK `variance_quantity = counted_quantity - system_quantity AND counted_quantity >= 0`; UNIQUE `(stock_adjustment_id, inventory_item_id)` and `(stock_transfer_id, inventory_item_id)`; CHECK `from_branch_id <> to_branch_id`, `quantity > 0`. Model guards: decided adjustments, their lines (except the cost stamped at posting) and every dispatch are never edited or deleted. `stock_transfers` is not in SRS §8.7 (schema addition from D-063).

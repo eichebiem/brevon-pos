@@ -7,12 +7,15 @@ use App\Models\UnitOfMeasure;
 use Illuminate\Database\Seeder;
 
 /**
- * Reference data only (SRS Appendix B, D-054): units of measure and the four
- * starting categories. No products or prices — those are entered by the
- * owner (Appendix B: "imported only after owner approval").
+ * Reference data only (SRS Appendix B, D-054): units of measure and the
+ * shop's seven categories, all top level, in menu order (D-177). No products
+ * or prices here; MenuSeeder adds the menu.
  */
 class CatalogReferenceSeeder extends Seeder
 {
+    /** The categories, in the order the POS tabs show them (D-177). */
+    public const CATEGORIES = ['Regular', 'Premium', 'Assorted boxes', 'Coffee', 'Matcha series', 'Lemonade series', 'Combos'];
+
     public function run(): void
     {
         foreach (
@@ -28,7 +31,7 @@ class CatalogReferenceSeeder extends Seeder
             UnitOfMeasure::query()->firstOrCreate(['code' => $code], ['name' => $name, 'precision' => $precision]);
         }
 
-        foreach (['Doughnuts', 'Coffee', 'Cold Drinks', 'Other'] as $order => $name) {
+        foreach (self::CATEGORIES as $order => $name) {
             Category::query()->firstOrCreate(
                 ['slug' => str($name)->slug()->toString()],
                 ['name' => $name, 'sort_order' => ($order + 1), 'is_active' => true],

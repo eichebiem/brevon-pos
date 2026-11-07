@@ -16,7 +16,6 @@ use App\Models\Branch;
 use App\Models\GoodsReceipt;
 use App\Models\GoodsReceiptItem;
 use App\Models\InventoryItem;
-use App\Models\InventoryLot;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
 use App\Models\Supplier;
@@ -26,10 +25,10 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Receiving deliveries (FR-056, FR-059, FR-060, UC-006; D-137, D-138).
+ * Receiving deliveries (FR-056, FR-059, UC-006; D-137).
  *
- * One transaction per delivery: the goods receipt, a lot for each accepted
- * line of a lot-tracked item, a purchase_receipt movement at the delivered
+ * One transaction per delivery: the goods receipt, a purchase_receipt
+ * movement for each accepted line at the delivered
  * cost (which updates the weighted average, D-048), and — against a
  * purchase order — the received quantities and the order's status.
  * Damaged or expired quantities are recorded on the receipt but never
@@ -46,7 +45,7 @@ class GoodsReceiving
 
     /**
      * @param  array{location: Branch, purchase_order: PurchaseOrder|null, supplier_id: int|null, delivery_reference: string|null, notes: string|null, accept_over: bool}  $header
-     * @param  list<array{inventory_item_id: int, purchase_order_item_id: int|null, quantity: string|null, unit_cost: string|null, rejected_quantity: string|null, rejected_condition: string|null, lot_number: string|null, expires_at: string|null}>  $lines
+     * @param  list<array{inventory_item_id: int, purchase_order_item_id: int|null, quantity: string|null, unit_cost: string|null, rejected_quantity: string|null, rejected_condition: string|null}>  $lines
      */
     public function receive(User $actor, array $header, array $lines): GoodsReceipt
     {
@@ -99,31 +98,15 @@ class GoodsReceiving
             foreach ($rows as $row) {
                 $item = $row['item'];
                 if ($row['quantity'] !== null) {
-                    $lot = null;
-                    if ($item->track_lot) {
-                        $lot = new InventoryLot;
-                        $lot->forceFill([
-                            'branch_id' => $location->id,
-                            'inventory_item_id' => $item->id,
-                            'lot_number' => $row['lot_number'],
-                            'received_at' => now(),
-                            'expires_at' => $row['expires_at'],
-                            'quantity_received' => $row['quantity']->toString(),
-                            'quantity_remaining' => $row['quantity']->toString(),
-                            'unit_cost' => $row['unit_cost'],
-                            'supplier_id' => $supplierId,
-                        ])->save();
-                    }
                     (new GoodsReceiptItem)->forceFill([
                         'goods_receipt_id' => $receipt->id,
                         'purchase_order_item_id' => $row['order_line']?->id,
                         'inventory_item_id' => $item->id,
-                        'inventory_lot_id' => $lot?->id,
                         'quantity_received' => $row['quantity']->toString(),
                         'unit_cost' => $row['unit_cost'],
                         'condition' => ReceiptCondition::Accepted,
                     ])->save();
-                    $changes[] = new StockChange($location->id, $item->id, InventoryMovementType::PurchaseReceipt, $row['quantity'], $row['unit_cost'], $number, $receipt, $lot?->id);
+                    $changes[] = new StockChange($location->id, $item->id, InventoryMovementType::PurchaseReceipt, $row['quantity'], $row['unit_cost'], $number, $receipt);
 
                     if ($row['order_line'] !== null) {
                         $line = $row['order_line'];
@@ -164,9 +147,9 @@ class GoodsReceiving
     }
 
     /**
-     * @param  list<array{inventory_item_id: int, purchase_order_item_id: int|null, quantity: string|null, unit_cost: string|null, rejected_quantity: string|null, rejected_condition: string|null, lot_number: string|null, expires_at: string|null}>  $lines
+     * @param  list<array{inventory_item_id: int, purchase_order_item_id: int|null, quantity: string|null, unit_cost: string|null, rejected_quantity: string|null, rejected_condition: string|null}>  $lines
      * @param  Collection<int, PurchaseOrderItem>|null  $orderLines
-     * @return list<array{item: InventoryItem, order_line: PurchaseOrderItem|null, quantity: Quantity|null, unit_cost: numeric-string|null, rejected_quantity: Quantity|null, rejected_condition: ReceiptCondition|null, lot_number: string|null, expires_at: string|null, over: bool}>
+     * @return list<array{item: InventoryItem, order_line: PurchaseOrderItem|null, quantity: Quantity|null, unit_cost: numeric-string|null, rejected_quantity: Quantity|null, rejected_condition: ReceiptCondition|null, over: bool}>
      */
     private function parseLines(array $lines, $orderLines, bool $acceptOver): array
     {
@@ -177,7 +160,6 @@ class GoodsReceiving
         }
 
         $items = PurchaseItems::query()->with('unit')->whereIn('id', array_column($lines, 'inventory_item_id'))->get()->keyBy('id');
-        $today = BusinessClock::today()->toDateString();
         $rows = [];
         $errors = [];
         $seen = [];
@@ -237,28 +219,6 @@ class GoodsReceiving
                 continue;
             }
 
-            $lotNumber = $blank($line['lot_number']) ? null : trim((string) $line['lot_number']);
-            $expires = $blank($line['expires_at']) ? null : (string) $line['expires_at'];
-            if ($quantity !== null && $item->track_lot) {
-                if ($lotNumber === null && $expires === null) {
-                    $errors["lines.{$i}.lot_number"] = __('Enter the lot number or the expiry date.');
-
-                    continue;
-                }
-                if ($expires !== null) {
-                    if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $expires, $m) !== 1 || ! checkdate((int) $m[2], (int) $m[3], (int) $m[1])) {
-                        $errors["lines.{$i}.expires_at"] = __('Enter a valid expiry date.');
-
-                        continue;
-                    }
-                    if ($expires < $today) {
-                        $errors["lines.{$i}.expires_at"] = __('This has already expired. Record it as expired instead of accepting it.');
-
-                        continue;
-                    }
-                }
-            }
-
             $over = false;
             if ($orderLine !== null && $quantity !== null) {
                 $after = Quantity::fromString($orderLine->quantity_received)->add($quantity);
@@ -281,8 +241,6 @@ class GoodsReceiving
                 'unit_cost' => $cost,
                 'rejected_quantity' => $rejected,
                 'rejected_condition' => $condition,
-                'lot_number' => $quantity !== null && $item->track_lot ? $lotNumber : null,
-                'expires_at' => $quantity !== null && $item->track_lot ? $expires : null,
                 'over' => $over,
             ];
         }

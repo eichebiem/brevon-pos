@@ -154,7 +154,7 @@ class ShiftTest extends TestCase
 
     public function test_preparation_staff_cannot_open_a_shift(): void
     {
-        $this->open($this->staff(PermissionCatalog::PREPARATION_STAFF), $this->counter)->assertForbidden();
+        $this->open($this->staff($this->bakerRole()), $this->counter)->assertForbidden();
     }
 
     public function test_cashier_closes_their_shift_with_a_cash_count(): void

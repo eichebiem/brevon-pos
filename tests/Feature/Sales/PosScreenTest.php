@@ -37,17 +37,16 @@ class PosScreenTest extends TestCase
                 ->where('canOpenShift', true));
     }
 
-    public function test_pos_screen_lists_products_prices_sizes_add_ons_and_stock_left(): void
+    public function test_pos_screen_lists_products_prices_sizes_and_stock_left(): void
     {
         $this->doughnut('44.00', '7');
         $coffee = $this->coffee();
         $cashier = $this->cashierOnShift();
 
         $this->actingAs($cashier)->get('/pos')->assertOk()
-            ->assertInertia(function ($page) use ($coffee) {
+            ->assertInertia(function ($page) {
                 $page->component('pos/Index')
                     ->where('canSell', true)
-                    ->where('canVerifyEwallet', false)
                     ->has('paymentMethods', 2)
                     ->has('catalog.products', 2);
 
@@ -60,8 +59,7 @@ class PosScreenTest extends TestCase
                 $this->assertTrue($latte['prices_vary']);
                 $this->assertSame(['Iced 16oz', 'Hot 12oz'], array_column($latte['variants'], 'name'));
                 $this->assertSame(['110.00', '120.00'], array_column($latte['variants'], 'price'));
-                $this->assertSame('Add-ons', $latte['option_groups'][0]['name']);
-                $this->assertSame([$coffee['shot']->id, $coffee['oat']->id], array_column($latte['option_groups'][0]['options'], 'id'));
+                $this->assertArrayNotHasKey('option_groups', $latte, 'no add-ons (D-166)');
             });
     }
 
@@ -81,13 +79,13 @@ class PosScreenTest extends TestCase
     {
         $coffee = $this->coffee();
         $cashier = $this->cashierOnShift();
-        $line = ['product_id' => $coffee['product']->id, 'variant_id' => $coffee['hot']->id, 'quantity' => 2, 'option_ids' => [$coffee['shot']->id]];
+        $line = ['product_id' => $coffee['product']->id, 'variant_id' => $coffee['hot']->id, 'quantity' => 2];
 
         $this->actingAs($cashier)->postJson('/pos/quote', ['items' => [$line], 'payment' => ['method' => 'CASH', 'amount_tendered' => '300']])
             ->assertOk()
-            ->assertJsonPath('lines.0.unit_total', '145.00')
-            ->assertJsonPath('grand_total', '290.00')
-            ->assertJsonPath('change', '10.00');
+            ->assertJsonPath('lines.0.unit_price', '120.00')
+            ->assertJsonPath('grand_total', '240.00')
+            ->assertJsonPath('change', '60.00');
 
         $this->actingAs($cashier)->postJson('/pos/quote', ['items' => [$line], 'payment' => ['method' => 'CASH', 'amount_tendered' => '200']])
             ->assertOk()
@@ -136,7 +134,7 @@ class PosScreenTest extends TestCase
         $coffee = $this->coffee();
         $cashier = $this->cashierOnShift();
         $this->checkout($cashier, $this->payload(
-            [['product_id' => $coffee['product']->id, 'variant_id' => $coffee['iced']->id, 'quantity' => 1, 'option_ids' => [$coffee['oat']->id], 'notes' => 'less ice']],
+            [['product_id' => $coffee['product']->id, 'variant_id' => $coffee['iced']->id, 'quantity' => 1, 'notes' => 'less ice']],
             ['method' => 'CASH', 'amount_tendered' => '200'],
         ))->assertRedirect();
         $order = Order::query()->sole();
@@ -149,13 +147,12 @@ class PosScreenTest extends TestCase
                 ->where('autoPrint', true)
                 ->where('receipt.title', OrderReceipt::TITLE)
                 ->where('receipt.order.order_number', $order->order_number)
-                ->where('receipt.order.grand_total', '140.00')
+                ->where('receipt.order.grand_total', '110.00')
                 ->where('receipt.items.0.name', 'Latte')
                 ->where('receipt.items.0.variant', 'Iced 16oz')
                 ->where('receipt.items.0.notes', 'less ice')
-                ->where('receipt.items.0.options.0.name', 'Oat milk')
                 ->where('receipt.payments.0.amount_tendered', '200.00')
-                ->where('receipt.payments.0.change_amount', '60.00')
+                ->where('receipt.payments.0.change_amount', '90.00')
                 ->where('receipt.location.name', $this->mainLocation()->name));
 
         $this->actingAs($cashier)->get("/pos/orders/{$order->id}")->assertOk()

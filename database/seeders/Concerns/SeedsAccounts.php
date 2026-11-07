@@ -7,14 +7,14 @@ use App\Models\Branch;
 use App\Models\User;
 
 /**
- * Creates missing accounts at the permanent location. An existing account
- * (matched by username) keeps its password and details; only its role and
- * location assignment are ensured.
+ * Creates missing accounts at the permanent location, or at the location
+ * named in `location`. An existing account (matched by username) keeps its
+ * password and details; only its role and location assignment are ensured.
  */
 trait SeedsAccounts
 {
     /**
-     * @param  list<array{username: string, name: string, email: string, role: string}>  $accounts
+     * @param  list<array{username: string, name: string, email: string, role: string, location?: string}>  $accounts
      */
     private function seedAccounts(array $accounts, string $password): void
     {
@@ -33,7 +33,14 @@ trait SeedsAccounts
             $user->forceFill(['email_verified_at' => $user->email_verified_at ?? now()])->save();
 
             $user->syncRoles([$account['role']]);
-            $user->branches()->syncWithoutDetaching([$main->id => ['is_default' => true]]);
+            $location = isset($account['location'])
+                ? Branch::query()->where('name', $account['location'])->firstOrFail()
+                : $main;
+            if (! $user->branches()->exists()) {
+                $user->branches()->attach($location->id, ['is_default' => true]);
+            } else {
+                $user->branches()->syncWithoutDetaching([$location->id]);
+            }
 
             $this->command?->info("{$account['role']} ready: username \"{$account['username']}\".");
         }

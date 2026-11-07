@@ -8,13 +8,9 @@ use App\Domain\Sales\OrderReceipt;
 use App\Domain\Shared\AuditLogger;
 use App\Domain\Shared\BusinessClock;
 use App\Domain\Shifts\ShiftService;
-use App\Enums\OrderStatus;
-use App\Enums\PaymentMethodType;
-use App\Enums\PaymentStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\OrderStatusHistory;
-use App\Models\Payment;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -89,7 +85,6 @@ class OrderController extends Controller
             'workflow' => [
                 'status' => $order->status->value,
                 'status_label' => $order->status->label(),
-                'next_status' => $order->status->isActive() ? $order->status->next()?->value : null,
                 'payment_status' => $order->payment_status->value,
                 'cancellation' => $order->cancelled_at === null ? null : [
                     'at' => $order->cancelled_at->toIso8601String(),
@@ -103,16 +98,6 @@ class OrderController extends Controller
                     'at' => $h->created_at->toIso8601String(),
                     'notes' => $h->notes,
                 ])->all(),
-                'pending_payments' => $order->payments->where('status', PaymentStatus::Pending)->map(fn (Payment $p) => [
-                    'id' => $p->id,
-                    'method' => $p->method?->name,
-                    'amount' => $p->amount,
-                    'reference_number' => $p->reference_number,
-                ])->values()->all(),
-                'has_cash' => $order->payments->contains(fn (Payment $p) => $p->method?->type === PaymentMethodType::Cash),
-                'can_advance' => $user->can('orders.update-status') && $order->status->isActive() && $order->status !== OrderStatus::Pending,
-                'can_cancel' => $user->can('orders.cancel') && $order->status->isCancellable(),
-                'can_verify' => $user->can('payments.verify-ewallet') && $order->status !== OrderStatus::Cancelled,
                 'can_view_beneficiary' => $user->can('discounts.view-beneficiary') && $order->discount()->whereHas('beneficiary')->exists(),
                 'refunds' => $refunds->history($order),
                 'refund' => $refunds->form($user, $order),

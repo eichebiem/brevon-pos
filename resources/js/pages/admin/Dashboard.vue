@@ -53,8 +53,7 @@ const reportQuery = computed(() => ({
                     <template v-if="filters.to !== filters.from">
                         – {{ formatDate(filters.to) }}</template
                     >
-                    · sales that were paid (or are waiting for a GCash check)
-                    and not cancelled.
+                    · sales that were paid and not cancelled.
                 </p>
             </div>
             <Link

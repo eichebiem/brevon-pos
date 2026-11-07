@@ -19,7 +19,6 @@ type OrderLine = {
     name: string | null;
     unit: string | null;
     precision: number;
-    track_lot: boolean;
     quantity_ordered: string;
     quantity_received: string;
     quantity_due: string;
@@ -33,8 +32,6 @@ type Line = {
     unit_cost: string;
     rejected_quantity: string;
     rejected_condition: string;
-    lot_number: string;
-    expires_at: string;
 };
 
 const props = defineProps<{
@@ -63,8 +60,6 @@ const blank = (id: number, orderLine: OrderLine | null): Line => ({
     unit_cost: orderLine?.unit_cost ?? '',
     rejected_quantity: '',
     rejected_condition: '',
-    lot_number: '',
-    expires_at: '',
 });
 
 const form = useForm({
@@ -82,7 +77,6 @@ type Meta = {
     sku: string | null;
     name: string | null;
     unit: string | null;
-    track_lot: boolean;
     due: string | null;
 };
 
@@ -94,7 +88,6 @@ const meta = computed(() => {
             sku: l.sku,
             name: l.name,
             unit: l.unit,
-            track_lot: l.track_lot,
             due: l.quantity_due,
         });
     }
@@ -104,7 +97,6 @@ const meta = computed(() => {
             sku: i.sku,
             name: i.name,
             unit: i.unit,
-            track_lot: i.track_lot,
             due: null,
         });
     }
@@ -140,9 +132,6 @@ function addLine(): void {
 }
 
 const errors = computed(() => form.errors as Record<string, string>);
-const anyLot = computed(() =>
-    form.lines.some((l) => meta.value.get(l.inventory_item_id)?.track_lot),
-);
 
 function submit(): void {
     form.post(store().url);
@@ -286,13 +275,6 @@ function submit(): void {
                             <th scope="col" class="py-2 pr-3 font-medium">
                                 Damaged / expired
                             </th>
-                            <th
-                                v-if="anyLot"
-                                scope="col"
-                                class="py-2 pr-3 font-medium"
-                            >
-                                Lot no. / expiry
-                            </th>
                             <th v-if="!order" scope="col">
                                 <span class="sr-only">Remove</span>
                             </th>
@@ -405,42 +387,6 @@ function submit(): void {
                                         errors[`lines.${i}.rejected_condition`]
                                     "
                                 />
-                            </td>
-                            <td v-if="anyLot" class="py-2 pr-3">
-                                <div
-                                    v-if="
-                                        meta.get(line.inventory_item_id)
-                                            ?.track_lot
-                                    "
-                                    class="grid gap-1"
-                                >
-                                    <Input
-                                        v-model="line.lot_number"
-                                        class="w-32"
-                                        maxlength="80"
-                                        placeholder="Lot no."
-                                        :aria-label="`Lot number of ${meta.get(line.inventory_item_id)?.name}`"
-                                        :data-test="`gr-lot-${meta.get(line.inventory_item_id)?.sku}`"
-                                    />
-                                    <Input
-                                        v-model="line.expires_at"
-                                        class="w-36"
-                                        type="date"
-                                        :aria-label="`Expiry date of ${meta.get(line.inventory_item_id)?.name}`"
-                                        :data-test="`gr-expiry-${meta.get(line.inventory_item_id)?.sku}`"
-                                    />
-                                    <InputError
-                                        :message="
-                                            errors[`lines.${i}.lot_number`] ??
-                                            errors[`lines.${i}.expires_at`]
-                                        "
-                                    />
-                                </div>
-                                <span
-                                    v-else
-                                    class="text-xs text-muted-foreground"
-                                    >Not tracked</span
-                                >
                             </td>
                             <td v-if="!order" class="py-2">
                                 <Button

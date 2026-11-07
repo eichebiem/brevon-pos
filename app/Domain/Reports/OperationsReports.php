@@ -164,7 +164,7 @@ class OperationsReports
                 ['label' => 'Approved by a manager', 'value' => (string) $list->whereNotNull('approved_by')->count(), 'type' => 'int'],
             ],
             'notes' => [
-                'Counted on the day of the sale, for sales that were paid (or are waiting for a GCash check) and not cancelled — the same as the sales report.',
+                'Counted on the day of the sale, for sales that were paid and not cancelled — the same as the sales report.',
                 'Senior Citizen / PWD details are never shown in reports.',
             ],
             'tables' => [

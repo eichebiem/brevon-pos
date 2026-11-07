@@ -14,17 +14,17 @@ use Illuminate\Validation\ValidationException;
 /**
  * Stock item master data (SRS §8.7, FR-057; D-134). Ingredients, packaging
  * and retail items are added here; doughnut stock items come from their
- * product (D-089), so only their reorder level and lot/expiry flags change
+ * product (D-089), so only their reorder level and perishable flag change
  * here. SKUs never change; the unit is fixed once the item has movements.
  */
 class InventoryItemService
 {
-    public const EDITABLE_WHEN_LINKED = ['reorder_level', 'is_perishable', 'track_lot'];
+    public const EDITABLE_WHEN_LINKED = ['reorder_level', 'is_perishable'];
 
     public function __construct(private readonly AuditLogger $audit) {}
 
     /**
-     * @param  array{sku: string, name: string, item_type: string, unit_of_measure_id: int, reorder_level: string, is_perishable: bool, track_lot: bool}  $data
+     * @param  array{sku: string, name: string, item_type: string, unit_of_measure_id: int, reorder_level: string, is_perishable: bool}  $data
      */
     public function create(User $actor, array $data): InventoryItem
     {
@@ -47,7 +47,7 @@ class InventoryItemService
     public function update(User $actor, InventoryItem $item, array $data): InventoryItem
     {
         $linked = $item->product()->exists();
-        $allowed = $linked ? self::EDITABLE_WHEN_LINKED : ['name', 'unit_of_measure_id', 'reorder_level', 'is_perishable', 'track_lot', 'is_active'];
+        $allowed = $linked ? self::EDITABLE_WHEN_LINKED : ['name', 'unit_of_measure_id', 'reorder_level', 'is_perishable', 'is_active'];
         $data = array_intersect_key($data, array_flip($allowed));
 
         $unitId = (int) ($data['unit_of_measure_id'] ?? $item->unit_of_measure_id);

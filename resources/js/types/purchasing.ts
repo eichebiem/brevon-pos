@@ -24,7 +24,6 @@ export type PurchaseItem = {
     name: string;
     unit: string | null;
     precision: number;
-    track_lot: boolean;
 };
 
 export const orderTone: Record<

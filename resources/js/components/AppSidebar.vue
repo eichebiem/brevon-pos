@@ -1,11 +1,9 @@
 <script setup lang="ts">
-import { Link, usePage } from '@inertiajs/vue3';
+import { Link } from '@inertiajs/vue3';
 import {
     ArrowLeftRight,
     ChartColumn,
-    ChefHat,
     Coins,
-    BadgeCheck,
     BadgePercent,
     BookOpen,
     Boxes,
@@ -15,7 +13,6 @@ import {
     CookingPot,
     Croissant,
     Factory,
-    Landmark,
     FileText,
     FolderTree,
     History,
@@ -53,14 +50,12 @@ import { usePermissions } from '@/composables/usePermissions';
 import { dashboard, landing } from '@/routes';
 import { index as auditIndex } from '@/routes/admin/audit';
 import { index as categoriesIndex } from '@/routes/admin/categories';
-import { lots, movements, stock, valuation } from '@/routes/admin/inventory';
+import { movements, stock, valuation } from '@/routes/admin/inventory';
 import { index as adjustmentsIndex } from '@/routes/admin/inventory/adjustments';
 import { index as dispatchesIndex } from '@/routes/admin/inventory/dispatches';
 import { index as itemsIndex } from '@/routes/admin/inventory/items';
 import { index as locationsIndex } from '@/routes/admin/locations';
-import { index as optionGroupsIndex } from '@/routes/admin/option-groups';
 import { index as paymentMethodsIndex } from '@/routes/admin/payment-methods';
-import { index as taxRulesIndex } from '@/routes/admin/tax-rules';
 import { index as productionIndex } from '@/routes/admin/production';
 import { index as productsIndex } from '@/routes/admin/products';
 import { index as purchaseOrdersIndex } from '@/routes/admin/purchase-orders';
@@ -77,19 +72,16 @@ import { index as shiftsIndex } from '@/routes/admin/shifts';
 import { index as suppliersIndex } from '@/routes/admin/suppliers';
 import { index as usersIndex } from '@/routes/admin/users';
 import { index as pos } from '@/routes/pos';
-import { payments as gcashChecks, preparation, shift } from '@/routes/staff';
+import { shift } from '@/routes/staff';
 import type { NavItem } from '@/types';
 
 const { can } = usePermissions();
 
 // Links are hidden by permission for convenience only; every route is
 // enforced on the server (FR-007). "a|b" means either permission.
-const page = usePage();
 const visible = (items: NavItem[]) =>
     items.filter(
-        (item) =>
-            (!item.feature || page.props.features?.[item.feature]) &&
-            (!item.permission || item.permission.split('|').some(can)),
+        (item) => !item.permission || item.permission.split('|').some(can),
     );
 
 const operations = computed(() =>
@@ -113,18 +105,6 @@ const operations = computed(() =>
             permission: 'shifts.open',
         },
         {
-            title: 'Preparation',
-            href: preparation(),
-            icon: ChefHat,
-            permission: 'orders.update-status',
-        },
-        {
-            title: 'GCash to check',
-            href: gcashChecks(),
-            icon: BadgeCheck,
-            permission: 'payments.verify-ewallet',
-        },
-        {
             title: 'Shifts',
             href: shiftsIndex(),
             icon: Coins,
@@ -145,12 +125,6 @@ const catalog = computed(() =>
             title: 'Categories',
             href: categoriesIndex(),
             icon: FolderTree,
-            permission: 'products.view',
-        },
-        {
-            title: 'Options & add-ons',
-            href: optionGroupsIndex(),
-            icon: ListPlus,
             permission: 'products.view',
         },
     ]),
@@ -186,12 +160,6 @@ const inventory = computed(() =>
             title: 'Stock items',
             href: itemsIndex(),
             icon: Boxes,
-            permission: 'inventory.view',
-        },
-        {
-            title: 'Lots & expiry',
-            href: lots(),
-            icon: CalendarClock,
             permission: 'inventory.view',
         },
         {
@@ -318,13 +286,6 @@ const administration = computed(() =>
             permission: 'settings.manage',
         },
         {
-            title: 'Tax rules',
-            href: taxRulesIndex(),
-            icon: Landmark,
-            permission: 'settings.manage',
-            feature: 'tax_rules',
-        },
-        {
             title: 'Users',
             href: usersIndex(),
             icon: Users,
@@ -367,7 +328,6 @@ const administration = computed(() =>
                 label="Operations"
                 :items="operations"
             />
-            <NavMain v-if="catalog.length" label="Catalog" :items="catalog" />
             <NavMain
                 v-if="inventory.length"
                 label="Inventory"
@@ -384,6 +344,7 @@ const administration = computed(() =>
                 :items="purchasing"
             />
             <NavMain v-if="reports.length" label="Reports" :items="reports" />
+            <NavMain v-if="catalog.length" label="Catalog" :items="catalog" />
             <NavMain
                 v-if="administration.length"
                 label="Administration"

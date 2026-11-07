@@ -8,9 +8,7 @@ use App\Enums\InventoryTrackingMode;
 use App\Models\Branch;
 use App\Models\BranchInventory;
 use App\Models\Category;
-use App\Models\OptionGroup;
 use App\Models\Product;
-use App\Models\ProductOption;
 use App\Models\ProductVariant;
 use Illuminate\Support\Collection;
 
@@ -37,8 +35,6 @@ class PosCatalog
             ->with([
                 'category.parent',
                 'variants' => fn ($q) => $q->where('is_active', true)->orderBy('sort_order')->orderBy('id'),
-                'optionGroups' => fn ($q) => $q->where('is_active', true),
-                'optionGroups.options' => fn ($q) => $q->where('is_active', true),
             ])
             ->get();
 
@@ -86,14 +82,6 @@ class PosCatalog
             'prices_vary' => $variants->pluck('price')->unique()->count() > 1,
             'on_hand' => $tracked && $variants->isEmpty() ? ($stock[$product->inventory_item_id] ?? '0.000') : null,
             'variants' => $variants->all(),
-            'option_groups' => $product->optionGroups->map(fn (OptionGroup $g) => [
-                'id' => $g->id,
-                'name' => $g->name,
-                'single' => $g->selection_type->value === 'single',
-                'min' => $g->min_selections,
-                'max' => $g->max_selections,
-                'options' => $g->options->map(fn (ProductOption $o) => ['id' => $o->id, 'name' => $o->name, 'price_delta' => $o->price_delta])->values()->all(),
-            ])->filter(fn (array $g) => $g['options'] !== [])->values()->all(),
         ];
     }
 

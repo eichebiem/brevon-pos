@@ -49,7 +49,7 @@ class ProductionTest extends TestCase
         $this->setUpCheckout();
         $this->main = $this->mainLocation();
         $this->manager = $this->staff(PermissionCatalog::MANAGER);
-        $this->prep = $this->staff(PermissionCatalog::PREPARATION_STAFF);
+        $this->prep = $this->staff($this->bakerRole());
 
         $this->doughnut = Product::factory()->finishedStock()->create(['name' => 'Choco Custard']);
         $this->flour = $this->ingredientItem('ING-FLOUR');
@@ -278,7 +278,7 @@ class ProductionTest extends TestCase
         $this->assertSame('26.000', $this->onHand($this->main, $this->egg));
     }
 
-    public function test_a_drink_takes_its_ingredients_at_checkout_and_gives_them_back_on_cancel(): void
+    public function test_a_drink_takes_its_ingredients_at_checkout(): void
     {
         ['product' => $latte, 'iced' => $iced, 'hot' => $hot] = $this->coffee();
         $latte->forceFill(['inventory_tracking_mode' => InventoryTrackingMode::RecipeAtSale])->save();
@@ -307,10 +307,6 @@ class ProductionTest extends TestCase
         $this->assertSame(1, Order::query()->count());
         $this->assertSame('300.000', $this->onHand($this->main, $milk));
 
-        $order = Order::query()->sole();
-        $this->actingAs($this->manager)->post("/orders/{$order->id}/cancel", ['reason' => 'Wrong order', 'return_stock' => true])->assertSessionHasNoErrors();
-        $this->assertSame('1000.000', $this->onHand($this->main, $milk));
-        $this->assertSame('500.000', $this->onHand($this->main, $beans));
         $this->assertTrue(app(InventoryLedger::class)->reconcile()->isEmpty());
     }
 

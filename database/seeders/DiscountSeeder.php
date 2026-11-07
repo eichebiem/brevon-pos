@@ -10,9 +10,9 @@ use Illuminate\Database\Seeder;
 
 /**
  * Idempotent. The Senior Citizen / PWD discount the owner set at 12% with
- * VAT disregarded (D-068). It starts switched OFF: SC/PWD rules must be
- * confirmed by the accountant before use (BR-018), then the owner turns it
- * on under Discounts.
+ * VAT disregarded (D-068). It starts switched ON (user request 2026-11-07,
+ * D-175); the owner can turn it off under Discounts. An existing row is left
+ * as it is, so re-seeding never undoes the owner's choice.
  */
 class DiscountSeeder extends Seeder
 {
@@ -30,7 +30,7 @@ class DiscountSeeder extends Seeder
             'value' => '12.00',
             'scope' => DiscountScope::Order,
             'requires_approval' => false,
-            'is_active' => false,
+            'is_active' => true,
         ])->save();
     }
 }

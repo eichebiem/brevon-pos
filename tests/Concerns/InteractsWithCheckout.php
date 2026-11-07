@@ -4,16 +4,25 @@ namespace Tests\Concerns;
 
 use App\Domain\Access\PermissionCatalog;
 use App\Domain\Catalog\PriceService;
+use App\Domain\Shared\BusinessClock;
 use App\Domain\Shared\Money;
+use App\Domain\Shared\NumberSequence;
 use App\Domain\Shifts\ShiftService;
-use App\Enums\OptionSelectionType;
+use App\Enums\OrderPaymentStatus;
+use App\Enums\OrderStatus;
+use App\Enums\PaymentMethodType;
+use App\Enums\PaymentStatus;
+use App\Enums\RefundKind;
 use App\Models\Branch;
 use App\Models\CashierShift;
 use App\Models\InventoryItem;
-use App\Models\OptionGroup;
+use App\Models\Order;
+use App\Models\OrderItem;
+use App\Models\Payment;
 use App\Models\Product;
-use App\Models\ProductOption;
 use App\Models\ProductVariant;
+use App\Models\Refund;
+use App\Models\RefundItem;
 use App\Models\Terminal;
 use App\Models\User;
 use Database\Seeders\PaymentMethodSeeder;
@@ -74,9 +83,9 @@ trait InteractsWithCheckout
     }
 
     /**
-     * A made-to-order coffee with sizes and an optional add-on group.
+     * A made-to-order coffee with two sizes.
      *
-     * @return array{product: Product, iced: ProductVariant, hot: ProductVariant, shot: ProductOption, oat: ProductOption, group: OptionGroup}
+     * @return array{product: Product, iced: ProductVariant, hot: ProductVariant}
      */
     protected function coffee(): array
     {
@@ -86,12 +95,7 @@ trait InteractsWithCheckout
         $this->sellAt($product, $this->mainLocation(), '110.00');
         app(PriceService::class)->set($this->owner, $product, '120.00', $hot);
 
-        $group = OptionGroup::query()->create(['name' => 'Add-ons', 'selection_type' => OptionSelectionType::Multiple, 'min_selections' => 0, 'max_selections' => 2, 'is_active' => true]);
-        $shot = ProductOption::query()->create(['option_group_id' => $group->id, 'name' => 'Extra shot', 'price_delta' => '25.00', 'is_active' => true, 'sort_order' => 0]);
-        $oat = ProductOption::query()->create(['option_group_id' => $group->id, 'name' => 'Oat milk', 'price_delta' => '30.00', 'is_active' => true, 'sort_order' => 1]);
-        $product->optionGroups()->attach($group->id, ['sort_order' => 0]);
-
-        return compact('product', 'iced', 'hot', 'shot', 'oat', 'group');
+        return compact('product', 'iced', 'hot');
     }
 
     protected function sellAt(Product $product, Branch $location, string $price): void
@@ -126,5 +130,56 @@ trait InteractsWithCheckout
     protected function checkout(User $cashier, array $payload): TestResponse
     {
         return $this->actingAs($cashier)->post('/pos/checkout', $payload);
+    }
+
+    /**
+     * Writes a cancellation the way the removed Cancel action did (before
+     * D-169), so reports and refunds can be tested against older orders:
+     * the order is cancelled, its payment refunded, and one void record
+     * covers every item. Stock is not touched.
+     */
+    protected function pastCancellation(Order $order, User $by, string $reason): Refund
+    {
+        /** @var Payment $payment */
+        $payment = $order->payments()->with('method')->firstOrFail();
+        /** @var Branch $location */
+        $location = $order->branch()->firstOrFail();
+        $today = BusinessClock::today();
+        $isCash = $payment->method?->type === PaymentMethodType::Cash;
+
+        $payment->forceFill(['status' => PaymentStatus::Refunded])->save();
+        $refund = new Refund;
+        $refund->forceFill([
+            'order_id' => $order->id,
+            'payment_id' => $payment->id,
+            'branch_id' => $order->branch_id,
+            'cashier_shift_id' => $isCash ? $order->cashier_shift_id : null,
+            'refund_number' => sprintf('%s-%s-R%04d', $location->code, $today->format('Ymd'), app(NumberSequence::class)->next($location, 'refund', $today)),
+            'kind' => RefundKind::Void,
+            'amount' => $payment->amount,
+            'refund_method' => (string) $payment->method?->code,
+            'reason' => $reason,
+            'status' => Refund::PROCESSED,
+            'requested_by' => $by->id,
+            'approved_by' => $by->id,
+            'processed_at' => now(),
+        ])->save();
+        $order->items()->each(fn (OrderItem $item) => (new RefundItem)->forceFill([
+            'refund_id' => $refund->id,
+            'order_item_id' => $item->id,
+            'quantity' => $item->quantity,
+            'amount' => Money::fromDecimal($item->line_total)->subtract(Money::fromDecimal($item->discount_amount))->toDecimal(),
+            'return_to_stock' => false,
+        ])->save());
+
+        $order->forceFill([
+            'status' => OrderStatus::Cancelled,
+            'payment_status' => OrderPaymentStatus::Refunded,
+            'cancelled_at' => now(),
+            'cancelled_by' => $by->id,
+            'cancellation_reason' => $reason,
+        ])->save();
+
+        return $refund;
     }
 }

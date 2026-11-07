@@ -17,7 +17,6 @@ export type SalesFigures = {
     discounts: string;
     refunds: string;
     net: string;
-    tax: string;
     orders: number;
     average: string;
     quantity: string;
@@ -36,7 +35,6 @@ export type CollectionRow = {
     method: string;
     payments: number;
     received: string;
-    waiting: string;
     refunds: number;
     given_back: string;
     net: string;

@@ -30,7 +30,6 @@ class PosController extends Controller
         return Inertia::render('pos/Index', [
             'canOpenShift' => $user->can('shifts.open'),
             'canSell' => $user->can('pos.create-sale') && $user->can('payments.record'),
-            'canVerifyEwallet' => $user->can('payments.verify-ewallet'),
             'catalog' => $shift === null ? null : $catalog->for($shift->branch),
             'paymentMethods' => $shift === null ? [] : PaymentMethod::query()->where('is_active', true)->orderBy('id')->get()
                 ->map(fn (PaymentMethod $m) => [
@@ -55,7 +54,7 @@ class PosController extends Controller
                 'senior_pwd' => $d->isSeniorPwd(),
                 'requires_approval' => $d->requires_approval,
             ])->all(),
-            'orderTypes' => array_map(fn (OrderType $t) => ['value' => $t->value, 'label' => $t->label(), 'needs_pickup' => $t->needsPickupTime()], OrderType::cases()),
+            'orderTypes' => array_map(fn (OrderType $t) => ['value' => $t->value, 'label' => $t->label()], OrderType::cases()),
         ]);
     }
 }

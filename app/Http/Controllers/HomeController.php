@@ -19,7 +19,8 @@ class HomeController extends Controller
         return match (true) {
             $user->can('dashboard.view') => to_route('dashboard'),
             $user->can('pos.access') => to_route('pos.index'),
-            $user->can('orders.update-status') => to_route('staff.preparation'),
+            // A custom role for bakers (production only) starts on production.
+            $user->can('production.create') => to_route('admin.production.index'),
             default => to_route('profile.edit'),
         };
     }

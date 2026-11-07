@@ -164,7 +164,8 @@ class LocationService
     /**
      * D-064: a new pop-up starts with nothing for sale; this explicit action
      * copies the main branch's available products that pop-ups may sell
-     * (finished stock only, D-063). Returns the number copied.
+     * (finished stock only, D-063). Archived products are skipped (D-179).
+     * Returns the number copied.
      */
     public function copyAvailabilityFromMain(Branch $popUp): int
     {
@@ -172,6 +173,7 @@ class LocationService
 
         $ids = Product::query()
             ->where('inventory_tracking_mode', 'finished_stock')
+            ->where('is_active', true)
             ->whereHas('locations', fn ($q) => $q->where('branches.id', $main->id)->where('product_branch.is_available', true))
             ->pluck('id');
 

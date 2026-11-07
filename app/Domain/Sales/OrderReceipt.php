@@ -7,8 +7,6 @@ use App\Enums\RefundKind;
 use App\Models\Branch;
 use App\Models\Order;
 use App\Models\OrderItem;
-use App\Models\OrderItemOption;
-use App\Models\OrderTaxLine;
 use App\Models\Payment;
 use App\Models\Refund;
 
@@ -30,7 +28,7 @@ class OrderReceipt
      */
     public function for(Order $order): array
     {
-        $order->loadMissing(['branch', 'terminal', 'creator', 'items.options', 'payments.method', 'discount.beneficiary', 'discount.approver:id,name', 'taxLines', 'refunds']);
+        $order->loadMissing(['branch', 'terminal', 'creator', 'items', 'payments.method', 'discount.beneficiary', 'discount.approver:id,name', 'refunds']);
         $discount = $order->discount;
         /** @var Branch $location */
         $location = $order->branch;
@@ -55,13 +53,11 @@ class OrderReceipt
                 'status' => $order->status->value,
                 'payment_status' => $order->payment_status->value,
                 'created_at' => $order->created_at->toIso8601String(),
-                'pickup_at' => $order->pickup_at?->toIso8601String(),
                 'notes' => $order->notes,
                 'cashier' => $order->creator?->name,
                 'terminal' => $order->terminal?->terminal_code,
                 'subtotal' => $order->subtotal,
                 'discount_total' => $order->discount_total,
-                'tax_total' => $order->tax_total,
                 'grand_total' => $order->grand_total,
             ],
             'items' => $order->items->map(fn (OrderItem $item) => [
@@ -69,11 +65,9 @@ class OrderReceipt
                 'variant' => $item->variant_name_snapshot,
                 'quantity' => $item->quantity,
                 'unit_price' => $item->unit_price,
-                'option_total' => $item->option_total,
                 'line_total' => $item->line_total,
                 'discount_amount' => $item->discount_amount,
                 'notes' => $item->notes,
-                'options' => $item->options->map(fn (OrderItemOption $o) => ['name' => $o->option_name_snapshot, 'price_delta' => $o->price_delta_snapshot])->all(),
             ])->all(),
             // D-148: beneficiary details are always masked on the receipt.
             'discount' => $discount === null ? null : [
@@ -85,13 +79,6 @@ class OrderReceipt
                 'approved_by' => $discount->approver?->name,
                 'beneficiary' => $discount->beneficiary?->forDisplay(false),
             ],
-            'taxes' => $order->taxLines->map(fn (OrderTaxLine $t) => [
-                'name' => $t->tax_name_snapshot,
-                'rate' => rtrim(rtrim($t->tax_rate_snapshot, '0'), '.'),
-                'inclusive' => $t->inclusive_snapshot,
-                'taxable_amount' => $t->taxable_amount,
-                'amount' => $t->tax_amount,
-            ])->all(),
             // D-155: refunds of a completed sale are printed under the payment.
             'refunds' => $order->refunds->where('kind', RefundKind::Refund)->map(fn (Refund $r) => [
                 'refund_number' => $r->refund_number,

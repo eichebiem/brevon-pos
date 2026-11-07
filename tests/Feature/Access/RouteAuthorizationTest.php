@@ -16,25 +16,23 @@ class RouteAuthorizationTest extends TestCase
     use RefreshDatabase;
 
     private const ROUTES = [
-        '/admin/dashboard', '/pos', '/staff/preparation',
+        '/admin/dashboard', '/pos',
         '/admin/users', '/admin/users/create', '/admin/roles', '/admin/roles/create', '/admin/audit-logs', '/admin/audit-logs/logins',
         '/admin/locations', '/admin/locations/create', '/admin/settings',
-        '/admin/products', '/admin/products/create', '/admin/categories', '/admin/categories/create', '/admin/option-groups', '/admin/option-groups/create',
+        '/admin/products', '/admin/products/create', '/admin/categories', '/admin/categories/create',
         '/staff/shift', '/admin/inventory/stock', '/admin/inventory/movements', '/admin/inventory/opening-stock',
-        '/admin/payment-methods', '/pos/orders', '/staff/payments', '/admin/shifts',
+        '/admin/payment-methods', '/pos/orders', '/admin/shifts',
         '/admin/inventory/items', '/admin/inventory/adjustments', '/admin/inventory/dispatches',
-        '/admin/suppliers', '/admin/purchase-orders', '/admin/receipts', '/admin/inventory/lots', '/admin/inventory/valuation',
+        '/admin/suppliers', '/admin/purchase-orders', '/admin/receipts', '/admin/inventory/valuation',
         '/admin/recipes', '/admin/production', '/admin/discounts',
         '/admin/reports/sales', '/admin/reports/refunds', '/admin/reports/waste',
     ];
 
     /** Expected access per seeded role, in ROUTES order. */
     private const MATRIX = [
-        PermissionCatalog::OWNER => [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-        PermissionCatalog::ADMIN => [1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-        PermissionCatalog::MANAGER => [1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1],
-        PermissionCatalog::CASHIER => [0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        PermissionCatalog::PREPARATION_STAFF => [0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0],
+        PermissionCatalog::OWNER => [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        PermissionCatalog::MANAGER => [1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1],
+        PermissionCatalog::CASHIER => [0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
     ];
 
     /**
@@ -78,7 +76,6 @@ class RouteAuthorizationTest extends TestCase
             'owner' => [PermissionCatalog::OWNER, '/admin/dashboard'],
             'manager' => [PermissionCatalog::MANAGER, '/admin/dashboard'],
             'cashier' => [PermissionCatalog::CASHIER, '/pos'],
-            'preparation' => [PermissionCatalog::PREPARATION_STAFF, '/staff/preparation'],
         ];
     }
 

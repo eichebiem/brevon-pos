@@ -5,7 +5,6 @@ namespace App\Domain\Inventory;
 use App\Domain\Shared\Quantity;
 use App\Models\BranchInventory;
 use App\Models\InventoryItem;
-use App\Models\InventoryLot;
 use App\Models\InventoryMovement;
 use App\Models\User;
 use Illuminate\Support\Collection;
@@ -68,8 +67,6 @@ class InventoryLedger
         return DB::transaction(function () use ($actor, $changes) {
             $balances = $this->lockBalances($changes);
             $allowNegative = (bool) config('brevon.allow_negative_stock');
-            $lotTracked = InventoryItem::query()->whereIn('id', array_map(fn (StockChange $c) => $c->inventoryItemId, $changes))
-                ->where('track_lot', true)->pluck('id')->flip();
             $movements = [];
 
             foreach ($changes as $change) {
@@ -96,7 +93,6 @@ class InventoryLedger
                 $movement->forceFill([
                     'branch_id' => $change->branchId,
                     'inventory_item_id' => $change->inventoryItemId,
-                    'inventory_lot_id' => $change->type->isInbound() ? $change->lotId : null,
                     'movement_type' => $change->type,
                     'quantity_delta' => $delta->toString(),
                     'unit_cost' => $change->unitCost,
@@ -107,10 +103,6 @@ class InventoryLedger
                     'created_by' => $actor->id,
                     'created_at' => now(),
                 ])->save();
-
-                if (! $change->type->isInbound() && $lotTracked->has($change->inventoryItemId)) {
-                    $this->useUpLots($change->branchId, $change->inventoryItemId, $change->quantity);
-                }
 
                 $movements[] = $movement;
             }
@@ -225,34 +217,6 @@ class InventoryLedger
         $average = bcdiv(bcadd($existingValue, $receivedValue, 8), $total, 8);
 
         return bcadd($average, '0.00005', 4);
-    }
-
-    /**
-     * Lots are used up first-expiring-first as stock leaves (D-138). Stock
-     * is never picked by lot at the counter, so this is an estimate that
-     * drives the expiry list; lots are locked after the balance row, in the
-     * same order everywhere. Stock without a lot (opening stock, counts) is
-     * taken last.
-     */
-    private function useUpLots(int $branchId, int $itemId, Quantity $quantity): void
-    {
-        $left = $quantity;
-        $lots = InventoryLot::query()
-            ->where('branch_id', $branchId)->where('inventory_item_id', $itemId)
-            ->where('quantity_remaining', '>', 0)
-            ->orderByRaw('expires_at IS NULL')->orderBy('expires_at')->orderBy('id')
-            ->lockForUpdate()->get();
-
-        foreach ($lots as $lot) {
-            if (! $left->isPositive()) {
-                break;
-            }
-            $remaining = Quantity::fromString($lot->quantity_remaining);
-            $take = $remaining->compare($left) <= 0 ? $remaining : $left;
-            $lot->quantity_remaining = $remaining->subtract($take)->toString();
-            $lot->save();
-            $left = $left->subtract($take);
-        }
     }
 
     private function key(int $branchId, int $itemId): string

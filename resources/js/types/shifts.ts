@@ -51,8 +51,6 @@ export type ShiftSummary = {
     non_cash: {
         method: string;
         verified: string;
-        pending: string;
-        pending_count: number;
     }[];
     order_count: number;
     cancelled_count: number;

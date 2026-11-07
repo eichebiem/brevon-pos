@@ -22,23 +22,23 @@ const props = defineProps<{
     method: PosPaymentMethod | null;
     total: string | null;
     change: string | null;
-    canVerify: boolean;
     processing: boolean;
     errors: Record<string, string | undefined>;
 }>();
 const emit = defineEmits<{
-    confirm: [payment: { reference: string; verified: boolean }];
+    confirm: [payment: { reference: string }];
 }>();
 
 const reference = ref('');
-const verified = ref(false);
+// D-168: the cashier confirms the transfer arrived before finishing the sale.
+const received = ref(false);
 const isCash = computed(() => props.method?.type === 'cash');
 
 watch(open, (isOpen) => {
     if (isOpen) {
         tendered.value = '';
         reference.value = '';
-        verified.value = false;
+        received.value = false;
     }
 });
 
@@ -58,7 +58,9 @@ const ready = computed(() => {
     }
 
     return (
-        !props.method?.requires_reference || reference.value.trim().length >= 6
+        received.value &&
+        (!props.method?.requires_reference ||
+            reference.value.trim().length >= 6)
     );
 });
 
@@ -66,7 +68,6 @@ function confirm(): void {
     if (ready.value) {
         emit('confirm', {
             reference: reference.value.trim(),
-            verified: verified.value,
         });
     }
 }
@@ -170,24 +171,17 @@ function confirm(): void {
                         <InputError :message="errors['payment.reference']" />
                     </div>
                     <label
-                        v-if="canVerify"
-                        class="flex items-center gap-2 text-sm"
+                        class="flex min-h-11 items-center gap-2 rounded-lg border border-border px-3 text-sm"
                     >
                         <input
-                            v-model="verified"
+                            v-model="received"
                             type="checkbox"
                             class="size-4 accent-brevon-navy"
+                            data-test="pos-received"
                         />
-                        I checked this payment in the {{ method?.name }} app
+                        I checked that this payment arrived in the shop's
+                        {{ method?.name }} account
                     </label>
-                    <p
-                        v-else
-                        class="rounded-lg bg-amber-100 px-3 py-2 text-sm text-amber-900"
-                    >
-                        Saved as <strong>waiting for verification</strong>. A
-                        manager confirms it later.
-                    </p>
-                    <InputError :message="errors['payment.verified']" />
                 </template>
 
                 <InputError :message="errors['payment.method']" />

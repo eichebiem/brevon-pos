@@ -11,7 +11,6 @@ use App\Http\Controllers\Admin\Inventory\StockController;
 use App\Http\Controllers\Admin\Inventory\StockValueController;
 use App\Http\Controllers\Admin\Inventory\WasteController;
 use App\Http\Controllers\Admin\LocationController;
-use App\Http\Controllers\Admin\OptionGroupController;
 use App\Http\Controllers\Admin\PaymentMethodController;
 use App\Http\Controllers\Admin\ProductController;
 use App\Http\Controllers\Admin\Production\ProductionBatchController;
@@ -24,19 +23,15 @@ use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\ShiftReviewController;
 use App\Http\Controllers\Admin\StoreSettingsController;
-use App\Http\Controllers\Admin\TaxRuleController;
 use App\Http\Controllers\Admin\TerminalController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\LocationSwitchController;
-use App\Http\Controllers\Orders\OrderStatusController;
 use App\Http\Controllers\Orders\RefundController;
 use App\Http\Controllers\Pos\CheckoutController;
 use App\Http\Controllers\Pos\OrderController as PosOrderController;
 use App\Http\Controllers\PosController;
 use App\Http\Controllers\Staff\CashMovementController;
-use App\Http\Controllers\Staff\PaymentCheckController;
-use App\Http\Controllers\Staff\PreparationController;
 use App\Http\Controllers\Staff\ShiftController;
 use Illuminate\Support\Facades\Route;
 
@@ -93,23 +88,9 @@ Route::middleware(['auth'])->group(function () {
         Route::post('cash-movements/{movement}/approve', [CashMovementController::class, 'approve'])->name('cash-movements.approve');
         Route::post('cash-movements/{movement}/reject', [CashMovementController::class, 'reject'])->name('cash-movements.reject');
     });
-    // Preparation and order status (FR-046–FR-052, D-123–D-125).
-    Route::get('staff/preparation', [PreparationController::class, 'index'])
-        ->middleware('permission:orders.update-status')->name('staff.preparation');
-    Route::post('orders/{order}/advance', [OrderStatusController::class, 'advance'])
-        ->middleware('permission:orders.update-status')->name('orders.advance');
-    Route::post('orders/{order}/cancel', [OrderStatusController::class, 'cancel'])
-        ->middleware('permission:orders.cancel')->name('orders.cancel');
     // Refunds of completed sales (FR-042–FR-045, D-150–D-155).
     Route::post('orders/{order}/refunds', [RefundController::class, 'store'])
         ->middleware(['permission:refunds.request', 'throttle:30,1'])->name('orders.refunds.store');
-
-    // GCash checks (BR-019, D-124).
-    Route::middleware('permission:payments.verify-ewallet')->group(function () {
-        Route::get('staff/payments', [PaymentCheckController::class, 'index'])->name('staff.payments');
-        Route::post('payments/{payment}/verify', [PaymentCheckController::class, 'verify'])->name('payments.verify');
-        Route::post('payments/{payment}/reject', [PaymentCheckController::class, 'reject'])->name('payments.reject');
-    });
 
     Route::prefix('admin')->name('admin.')->group(function () {
         Route::middleware('permission:users.manage')->group(function () {
@@ -155,36 +136,23 @@ Route::middleware(['auth'])->group(function () {
             Route::post('discounts', [DiscountController::class, 'store'])->name('discounts.store');
             Route::get('discounts/{discount}/edit', [DiscountController::class, 'edit'])->name('discounts.edit');
             Route::put('discounts/{discount}', [DiscountController::class, 'update'])->name('discounts.update');
-            // Tax rules are a later feature (D-164): 404 until switched on.
-            Route::middleware('feature:tax_rules')->group(function () {
-                Route::get('tax-rules', [TaxRuleController::class, 'index'])->name('tax-rules.index');
-                Route::get('tax-rules/create', [TaxRuleController::class, 'create'])->name('tax-rules.create');
-                Route::post('tax-rules', [TaxRuleController::class, 'store'])->name('tax-rules.store');
-                Route::get('tax-rules/{taxRule}/edit', [TaxRuleController::class, 'edit'])->name('tax-rules.edit');
-                Route::put('tax-rules/{taxRule}', [TaxRuleController::class, 'update'])->name('tax-rules.update');
-            });
         });
 
         // Catalog (FR-015–FR-021). Viewing needs products.view; each change its own permission.
         Route::middleware('permission:products.view')->group(function () {
             Route::get('categories', [CategoryController::class, 'index'])->name('categories.index');
-            Route::get('option-groups', [OptionGroupController::class, 'index'])->name('option-groups.index');
             Route::get('products', [ProductController::class, 'index'])->name('products.index');
             Route::get('products/{product}/prices', [ProductPriceController::class, 'index'])->name('products.prices');
         });
         Route::middleware('permission:products.create')->group(function () {
             Route::get('categories/create', [CategoryController::class, 'create'])->name('categories.create');
             Route::post('categories', [CategoryController::class, 'store'])->name('categories.store');
-            Route::get('option-groups/create', [OptionGroupController::class, 'create'])->name('option-groups.create');
-            Route::post('option-groups', [OptionGroupController::class, 'store'])->name('option-groups.store');
             Route::get('products/create', [ProductController::class, 'create'])->name('products.create');
             Route::post('products', [ProductController::class, 'store'])->name('products.store');
         });
         Route::middleware('permission:products.update')->group(function () {
             Route::get('categories/{category}/edit', [CategoryController::class, 'edit'])->name('categories.edit');
             Route::put('categories/{category}', [CategoryController::class, 'update'])->name('categories.update');
-            Route::get('option-groups/{optionGroup}/edit', [OptionGroupController::class, 'edit'])->name('option-groups.edit');
-            Route::put('option-groups/{optionGroup}', [OptionGroupController::class, 'update'])->name('option-groups.update');
             Route::get('products/{product}/edit', [ProductController::class, 'edit'])->name('products.edit');
             Route::put('products/{product}', [ProductController::class, 'update'])->name('products.update');
             Route::patch('products/{product}/pos-availability', [ProductController::class, 'setPosAvailability'])->name('products.pos-availability');
@@ -233,8 +201,7 @@ Route::middleware(['auth'])->group(function () {
             Route::post('inventory/adjustments/{adjustment}/reject', [StockAdjustmentController::class, 'reject'])->name('inventory.adjustments.reject');
         });
 
-        // Lots and stock value (FR-060, FR-063; D-138, D-139).
-        Route::get('inventory/lots', [StockValueController::class, 'lots'])->middleware('permission:inventory.view')->name('inventory.lots');
+        // Stock value (FR-063; D-139).
         Route::get('inventory/valuation', [StockValueController::class, 'valuation'])->middleware('permission:reports.inventory')->name('inventory.valuation');
 
         // Purchasing (FR-058, FR-059, UC-006; D-135–D-137).

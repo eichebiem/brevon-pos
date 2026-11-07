@@ -11,9 +11,7 @@ use App\Models\Discount;
 use App\Models\Employee;
 use App\Models\GoodsReceipt;
 use App\Models\InventoryItem;
-use App\Models\InventoryLot;
 use App\Models\InventoryMovement;
-use App\Models\OptionGroup;
 use App\Models\Order;
 use App\Models\OrderDiscount;
 use App\Models\Payment;
@@ -29,7 +27,6 @@ use App\Models\Setting;
 use App\Models\StockAdjustment;
 use App\Models\StockTransfer;
 use App\Models\Supplier;
-use App\Models\TaxRule;
 use App\Models\Terminal;
 use App\Models\User;
 use App\Support\Database\DestructiveCommandGuard;
@@ -87,7 +84,6 @@ class AppServiceProvider extends ServiceProvider
             'product' => Product::class,
             'product_variant' => ProductVariant::class,
             'product_price' => ProductPrice::class,
-            'option_group' => OptionGroup::class,
             'payment_method' => PaymentMethod::class,
             'inventory_movement' => InventoryMovement::class,
             'cashier_shift' => CashierShift::class,
@@ -97,12 +93,10 @@ class AppServiceProvider extends ServiceProvider
             'supplier' => Supplier::class,
             'purchase_order' => PurchaseOrder::class,
             'goods_receipt' => GoodsReceipt::class,
-            'inventory_lot' => InventoryLot::class,
             'recipe' => Recipe::class,
             'production_batch' => ProductionBatch::class,
             'discount' => Discount::class,
             'order_discount' => OrderDiscount::class,
-            'tax_rule' => TaxRule::class,
             'order' => Order::class,
             'payment' => Payment::class,
             'refund' => Refund::class,

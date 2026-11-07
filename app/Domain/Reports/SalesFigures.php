@@ -12,7 +12,6 @@ use App\Domain\Shared\Money;
  *  - discounts: each line's share of the order discount;
  *  - refunds: what was given back on these lines (sale-date view);
  *  - net sales: gross − discounts − refunds;
- *  - tax: each line's share of tax (none is charged while tax is off);
  *  - orders: orders with at least one of these lines; average = net ÷ orders.
  */
 final readonly class SalesFigures
@@ -21,7 +20,6 @@ final readonly class SalesFigures
         public Money $gross,
         public Money $discounts,
         public Money $refunds,
-        public Money $tax,
         public int $orders,
         public string $quantity,
     ) {}
@@ -34,7 +32,6 @@ final readonly class SalesFigures
             $money($row->gross ?? null),
             $money($row->discounts ?? null),
             $money($row->refunds ?? null),
-            $money($row->tax ?? null),
             (int) ($row->orders ?? 0),
             is_numeric($row->quantity ?? null) ? (string) $row->quantity : '0',
         );
@@ -67,7 +64,6 @@ final readonly class SalesFigures
             'discounts' => $this->discounts->toDecimal(),
             'refunds' => $this->refunds->toDecimal(),
             'net' => $this->net()->toDecimal(),
-            'tax' => $this->tax->toDecimal(),
             'orders' => $this->orders,
             'average' => $this->average()->toDecimal(),
             'quantity' => rtrim(rtrim($this->quantity, '0'), '.') ?: '0',

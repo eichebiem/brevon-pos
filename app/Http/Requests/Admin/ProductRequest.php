@@ -24,7 +24,6 @@ class ProductRequest extends FormRequest
         $this->merge([
             'sku' => strtoupper(trim((string) $this->input('sku'))),
             'variants' => array_values((array) $this->input('variants', [])),
-            'option_group_ids' => array_values((array) $this->input('option_group_ids', [])),
             'location_ids' => array_values((array) $this->input('location_ids', [])),
         ]);
     }
@@ -54,8 +53,6 @@ class ProductRequest extends FormRequest
             'variants.*.sku' => ['nullable', 'string', 'max:60', 'regex:/^[A-Za-z0-9][A-Za-z0-9-]*$/', 'distinct:ignore_case'],
             'variants.*.is_default' => ['sometimes', 'boolean'],
             'variants.*.is_active' => ['sometimes', 'boolean'],
-            'option_group_ids' => ['array'],
-            'option_group_ids.*' => ['integer', 'distinct', 'exists:option_groups,id'],
             'location_ids' => ['array'],
             'location_ids.*' => ['integer', 'distinct', 'exists:branches,id'],
             'base_price' => $product === null ? ['required', 'string', 'max:12'] : ['prohibited'],

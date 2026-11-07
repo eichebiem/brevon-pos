@@ -8,9 +8,8 @@ use App\Models\OrderItem;
 
 /**
  * What is left to give back on one order line (D-151). `share` is the
- * line's part of what the customer paid: its total after discount, plus
- * its part of any added tax, so the shares of all lines add up to the
- * order total exactly.
+ * line's part of what the customer paid: its total after discount, so the
+ * shares of all lines add up to the order total exactly.
  */
 final readonly class RefundableLine
 {

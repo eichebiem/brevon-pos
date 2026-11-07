@@ -1,16 +1,5 @@
 /** Shapes sent by PosController / OrderReceipt (Phase 4c). Money is a decimal string from the server. */
 
-export type PosOption = { id: number; name: string; price_delta: string };
-
-export type PosOptionGroup = {
-    id: number;
-    name: string;
-    single: boolean;
-    min: number;
-    max: number | null;
-    options: PosOption[];
-};
-
 export type PosVariant = {
     id: number;
     name: string;
@@ -29,7 +18,6 @@ export type PosProduct = {
     prices_vary: boolean;
     on_hand: string | null;
     variants: PosVariant[];
-    option_groups: PosOptionGroup[];
 };
 
 export type PosCatalog = {
@@ -47,7 +35,6 @@ export type PosPaymentMethod = {
 export type PosOrderType = {
     value: string;
     label: string;
-    needs_pickup: boolean;
 };
 
 /** A cart line kept in the browser: ids and choices only, never prices (BR-003). */
@@ -55,7 +42,6 @@ export type CartLine = {
     key: string;
     product_id: number;
     variant_id: number | null;
-    option_ids: number[];
     quantity: number;
     notes: string;
 };
@@ -67,18 +53,8 @@ export type QuoteLine = {
     variant: string | null;
     quantity: string;
     unit_price: string;
-    option_total: string;
-    unit_total: string;
-    options: { id: number; name: string; price_delta: string }[];
     line_total: string;
     discount_amount: string;
-};
-
-export type QuoteTax = {
-    name: string;
-    rate: string;
-    inclusive: boolean;
-    amount: string;
 };
 
 export type Quote = {
@@ -92,8 +68,6 @@ export type Quote = {
         amount: string;
     } | null;
     discount_needs_approval: boolean;
-    tax_total: string;
-    taxes: QuoteTax[];
     grand_total: string;
     change: string | null;
 };
@@ -166,13 +140,11 @@ export type Receipt = {
         status: string;
         payment_status: string;
         created_at: string;
-        pickup_at: string | null;
         notes: string | null;
         cashier: string | null;
         terminal: string | null;
         subtotal: string;
         discount_total: string;
-        tax_total: string;
         grand_total: string;
     };
     items: {
@@ -180,11 +152,9 @@ export type Receipt = {
         variant: string | null;
         quantity: string;
         unit_price: string;
-        option_total: string;
         line_total: string;
         discount_amount: string;
         notes: string | null;
-        options: { name: string; price_delta: string }[];
     }[];
     discount: {
         name: string;
@@ -195,13 +165,6 @@ export type Receipt = {
         approved_by: string | null;
         beneficiary: ReceiptBeneficiary | null;
     } | null;
-    taxes: {
-        name: string;
-        rate: string;
-        inclusive: boolean;
-        taxable_amount: string;
-        amount: string;
-    }[];
     payments: {
         method: string | null;
         amount: string;
@@ -250,32 +213,4 @@ export type RefundForm = {
         remaining_amount: string;
         can_return_to_stock: boolean;
     }[];
-};
-
-export type PrepCard = {
-    id: number;
-    order_number: string;
-    short_number: string;
-    order_type: string;
-    status: 'confirmed' | 'preparing' | 'ready';
-    next_status: string | null;
-    payment_status: string;
-    created_at: string;
-    pickup_at: string | null;
-    notes: string | null;
-    items: {
-        name: string;
-        variant: string | null;
-        quantity: string;
-        notes: string | null;
-        made_to_order: boolean;
-        options: string[];
-    }[];
-};
-
-export type PrepBoard = {
-    new: PrepCard[];
-    preparing: PrepCard[];
-    ready: PrepCard[];
-    scheduled: PrepCard[];
 };

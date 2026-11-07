@@ -9,7 +9,6 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\ProductRequest;
 use App\Models\Branch;
 use App\Models\Category;
-use App\Models\OptionGroup;
 use App\Models\Product;
 use App\Models\ProductPrice;
 use App\Models\ProductVariant;
@@ -87,7 +86,7 @@ class ProductController extends Controller
 
     public function edit(Product $product): Response
     {
-        $product->load(['variants', 'optionGroups', 'locations', 'inventoryItem.unit']);
+        $product->load(['variants', 'locations', 'inventoryItem.unit']);
 
         return Inertia::render('admin/products/Form', [
             ...$this->formOptions($product),
@@ -102,7 +101,6 @@ class ProductController extends Controller
                     'unit' => $product->inventoryItem->unit?->code,
                 ] : null,
                 'variants' => $product->variants->map(fn (ProductVariant $v) => $v->only(['id', 'name', 'sku', 'is_default', 'is_active'])),
-                'option_group_ids' => $product->optionGroups->pluck('id'),
                 'location_ids' => $product->locations->filter(fn (Branch $b) => (bool) $b->getRelationValue('pivot')?->getAttribute('is_available'))->pluck('id')->values(),
             ],
         ]);
@@ -150,16 +148,12 @@ class ProductController extends Controller
      */
     private function formOptions(?Product $product = null): array
     {
-        $attachedGroups = $product?->optionGroups->pluck('id')->all() ?? [];
-
         return [
             'categories' => Category::query()->with('parent:id,name')
                 ->where(fn ($q) => $q->where('is_active', true)->when($product, fn ($q) => $q->orWhere('id', $product?->category_id)))
                 ->orderBy('name')->get()
                 ->map(fn (Category $c) => ['id' => $c->id, 'name' => $c->parent ? "{$c->parent->name} › {$c->name}" : $c->name, 'is_active' => $c->is_active])
                 ->sortBy('name')->values(),
-            'optionGroups' => OptionGroup::query()->where(fn ($q) => $q->where('is_active', true)->orWhereIn('id', $attachedGroups))
-                ->orderBy('name')->get()->map(fn (OptionGroup $g) => ['id' => $g->id, 'name' => $g->name, 'is_active' => $g->is_active]),
             'locations' => Branch::query()->orderBy('location_type')->orderBy('code')->get()->map(fn (Branch $b) => [
                 'id' => $b->id, 'code' => $b->code, 'name' => $b->name, 'type' => $b->location_type->value, 'is_active' => $b->is_active,
             ]),

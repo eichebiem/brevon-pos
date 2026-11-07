@@ -100,15 +100,6 @@ class Product extends Model
         return $this->belongsToMany(Branch::class, 'product_branch')->withPivot('is_available')->withTimestamps();
     }
 
-    /**
-     * @return BelongsToMany<OptionGroup, $this>
-     */
-    public function optionGroups(): BelongsToMany
-    {
-        return $this->belongsToMany(OptionGroup::class, 'product_option_group')
-            ->withPivot('sort_order')->withTimestamps()->orderByPivot('sort_order');
-    }
-
     public function imageUrl(): ?string
     {
         return $this->image_path ? Storage::disk('public')->url($this->image_path) : null;

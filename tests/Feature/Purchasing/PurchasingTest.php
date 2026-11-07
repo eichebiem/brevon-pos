@@ -4,7 +4,6 @@ namespace Tests\Feature\Purchasing;
 
 use App\Domain\Access\PermissionCatalog;
 use App\Domain\Inventory\InventoryLedger;
-use App\Domain\Shared\BusinessClock;
 use App\Enums\InventoryMovementType;
 use App\Enums\PurchaseOrderStatus;
 use App\Enums\ReceiptCondition;
@@ -13,12 +12,12 @@ use App\Models\BranchInventory;
 use App\Models\GoodsReceipt;
 use App\Models\GoodsReceiptItem;
 use App\Models\InventoryItem;
-use App\Models\InventoryLot;
 use App\Models\InventoryMovement;
 use App\Models\PurchaseOrder;
 use App\Models\Supplier;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Testing\TestResponse;
 use Inertia\Testing\AssertableInertia;
 use LogicException;
@@ -26,7 +25,7 @@ use Tests\Concerns\InteractsWithStaff;
 use Tests\Concerns\InteractsWithStock;
 use Tests\TestCase;
 
-/** Phase 7b: suppliers, purchase orders, receiving, lots, valuation (FR-056, FR-058–FR-060, FR-063, UC-006; T-INV-4, T-PO-1; D-135–D-139). */
+/** Phase 7b: suppliers, purchase orders, receiving, valuation (FR-056, FR-058, FR-059, FR-063, UC-006; T-INV-4, T-PO-1; D-135–D-137, D-139, D-167). */
 class PurchasingTest extends TestCase
 {
     use InteractsWithStaff;
@@ -46,7 +45,7 @@ class PurchasingTest extends TestCase
         $this->seedAccess();
         $this->main = $this->mainLocation();
         $this->manager = $this->staff(PermissionCatalog::MANAGER);
-        $this->clerk = $this->staff(PermissionCatalog::PREPARATION_STAFF);
+        $this->clerk = $this->staff($this->bakerRole());
         $this->clerk->givePermissionTo(['purchase-orders.create', 'purchase-orders.receive', 'inventory.receive']);
     }
 
@@ -96,14 +95,6 @@ class PurchasingTest extends TestCase
             ])->values()->all(),
             ...$extra,
         ]);
-    }
-
-    private function lotItem(): InventoryItem
-    {
-        $item = $this->ingredientItem('ING-CREAM');
-        $item->forceFill(['name' => 'Cream', 'track_lot' => true, 'is_perishable' => true])->save();
-
-        return $item;
     }
 
     public function test_suppliers_get_codes_and_are_switched_off_not_deleted(): void
@@ -251,51 +242,22 @@ class PurchasingTest extends TestCase
         $this->assertSame('800.000', $this->onHand($this->main, $flour));
     }
 
-    /** FR-060: lot-tracked items need a lot or expiry, and lots are used up first-expiring-first. */
-    public function test_lots_are_recorded_and_used_up_first_expiring_first(): void
+    /** D-167: lots & expiry were removed; a perishable item is received like any other. */
+    public function test_deliveries_are_received_without_lots_or_expiry(): void
     {
-        $cream = $this->lotItem();
-        $order = $this->ordered($this->supplier(), [[$cream, '20', '2.50']]);
-        $today = BusinessClock::today();
+        $cream = $this->ingredientItem('ING-CREAM');
+        $cream->forceFill(['name' => 'Cream', 'is_perishable' => true])->save();
+        $order = $this->ordered($this->supplier(), [[$cream, '10', '2.50']]);
 
-        $this->receive($order, [$cream->id => ['quantity' => '10']], $this->clerk)->assertSessionHasErrors('lines.0.lot_number');
-        $this->receive($order, [$cream->id => ['quantity' => '10', 'expires_at' => $today->subDay()->toDateString()]], $this->clerk)->assertSessionHasErrors('lines.0.expires_at');
-        $this->receive($order, [$cream->id => ['quantity' => '10', 'expires_at' => '2026-02-30']], $this->clerk)->assertSessionHasErrors('lines.0.expires_at');
-
-        $this->receive($order, [$cream->id => ['quantity' => '10', 'lot_number' => 'L-LATE', 'expires_at' => $today->addDays(30)->toDateString()]], $this->clerk)->assertSessionHasNoErrors();
-        $this->receive($order, [$cream->id => ['quantity' => '10', 'lot_number' => 'L-SOON', 'expires_at' => $today->addDays(3)->toDateString()]], $this->clerk)->assertSessionHasNoErrors();
-
-        $late = InventoryLot::query()->where('lot_number', 'L-LATE')->sole();
-        $soon = InventoryLot::query()->where('lot_number', 'L-SOON')->sole();
-        $this->assertSame($soon->id, InventoryMovement::query()->latest('id')->firstOrFail()->inventory_lot_id);
-        $this->assertSame($soon->id, GoodsReceiptItem::query()->latest('id')->firstOrFail()->inventory_lot_id);
-
-        // 12 used: the lot expiring first goes first.
-        $this->postStock($this->manager, $this->main, $cream, '12', InventoryMovementType::ProductionConsumption);
-        $this->assertSame(['0.000', '8.000'], [$soon->refresh()->quantity_remaining, $late->refresh()->quantity_remaining]);
-
-        $this->actingAs($this->manager)->get('/admin/inventory/lots')
-            ->assertInertia(fn (AssertableInertia $page) => $page->component('admin/inventory/Lots')
-                ->where('counts.expiring', 0)
-                ->where('lots.total', 0));
-        $this->postStock($this->manager, $this->main, $cream, '8', InventoryMovementType::Waste);
-        $this->assertSame('0.000', $late->refresh()->quantity_remaining);
-        $this->assertTrue(app(InventoryLedger::class)->reconcile()->isEmpty());
-
-        $this->expectException(LogicException::class);
-        $late->forceFill(['expires_at' => $today->addYear()->toDateString()])->save();
-    }
-
-    public function test_expiring_lots_are_flagged_on_stock_on_hand(): void
-    {
-        $cream = $this->lotItem();
-        $order = $this->ordered($this->supplier(), [[$cream, '5', '2.50']]);
-        $this->receive($order, [$cream->id => ['quantity' => '5', 'expires_at' => BusinessClock::today()->addDays(2)->toDateString()]], $this->clerk)->assertSessionHasNoErrors();
-
+        $this->receive($order, [$cream->id => ['quantity' => '10', 'lot_number' => 'L-1', 'expires_at' => '2020-01-01']], $this->clerk)->assertSessionHasNoErrors();
+        $this->assertSame('10.000', $this->onHand($this->main, $cream));
+        $this->assertFalse(Schema::hasTable('inventory_lots'));
+        $this->assertFalse(Schema::hasColumn('inventory_items', 'track_lot'));
+        $this->assertFalse(Schema::hasColumn('inventory_movements', 'inventory_lot_id'));
+        $this->assertFalse(Schema::hasColumn('goods_receipt_items', 'inventory_lot_id'));
+        $this->actingAs($this->manager)->get('/admin/inventory/lots')->assertNotFound();
         $this->actingAs($this->manager)->get('/admin/inventory/stock')
-            ->assertInertia(fn (AssertableInertia $page) => $page->where('lots.expiring', 1)->where('lots.expired', 0));
-        $this->actingAs($this->manager)->get('/admin/inventory/lots?show=expiring')
-            ->assertInertia(fn (AssertableInertia $page) => $page->where('lots.data.0.state', 'expiring'));
+            ->assertInertia(fn (AssertableInertia $page) => $page->missing('lots'));
     }
 
     public function test_a_delivery_can_be_received_without_an_order(): void

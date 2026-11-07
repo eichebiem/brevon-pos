@@ -4,7 +4,6 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import AuthLayout from '@/layouts/AuthLayout.vue';
 import PosLayout from '@/layouts/PosLayout.vue';
 import SettingsLayout from '@/layouts/settings/Layout.vue';
-import StaffLayout from '@/layouts/StaffLayout.vue';
 import { initializeFlashToast } from '@/lib/flashToast';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Brevon POS';
@@ -20,8 +19,6 @@ void createInertiaApp({
                 return null;
             case name.startsWith('pos/'):
                 return PosLayout;
-            case name.startsWith('staff/'):
-                return StaffLayout;
             case name.startsWith('settings/'):
                 return [AppLayout, SettingsLayout];
             default:

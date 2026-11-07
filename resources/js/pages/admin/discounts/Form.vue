@@ -96,9 +96,7 @@ function submit(): void {
             <p>
                 Records the beneficiary's full name, ID card number and address
                 on the order (shown masked except to owners). The owner set the
-                rate at 12% with VAT disregarded. The law (RA 9994, RA 10754)
-                sets 20% plus VAT exemption, so have the accountant confirm
-                before switching this on.
+                rate at 12% with VAT disregarded.
             </p>
         </section>
 

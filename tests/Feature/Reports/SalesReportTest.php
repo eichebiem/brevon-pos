@@ -5,6 +5,7 @@ namespace Tests\Feature\Reports;
 use App\Domain\Access\PermissionCatalog;
 use App\Domain\Locations\LocationService;
 use App\Domain\Reports\ReportFilters;
+use App\Domain\Shared\BusinessClock;
 use App\Domain\Shifts\ExpectedCash;
 use App\Domain\Shifts\ShiftService;
 use App\Enums\DiscountKind;
@@ -80,11 +81,7 @@ class SalesReportTest extends TestCase
 
         $coffee = $this->coffee();
         $cancelled = $this->sell([['product_id' => $coffee['product']->id, 'variant_id' => $coffee['iced']->id, 'quantity' => 1]]);
-        $this->actingAs($this->manager)->post("/orders/{$cancelled->id}/cancel", ['reason' => 'Out of milk', 'return_stock' => false])->assertSessionHasNoErrors();
-
-        $rejected = $this->sell([['product_id' => $this->glazed->id, 'quantity' => 1]], ['method' => 'GCASH', 'reference' => 'GC99990000']);
-        $payment = Payment::query()->where('order_id', $rejected->id)->sole();
-        $this->actingAs($this->manager)->post("/payments/{$payment->id}/reject", ['reason' => 'Never arrived'])->assertSessionHasNoErrors();
+        $this->pastCancellation($cancelled, $this->manager, 'Out of milk');
 
         return $a;
     }
@@ -95,7 +92,7 @@ class SalesReportTest extends TestCase
 
         $this->actingAs($this->manager)->get('/admin/reports/sales')->assertOk()
             ->assertInertia(fn (AssertableInertia $page) => $page->component('admin/reports/Sales')
-                ->where('summary', ['gross' => '281.00', 'discounts' => '20.88', 'refunds' => '38.50', 'net' => '221.62', 'tax' => '0.00', 'orders' => 3, 'average' => '73.87', 'quantity' => '7'])
+                ->where('summary', ['gross' => '281.00', 'discounts' => '20.88', 'refunds' => '38.50', 'net' => '221.62', 'orders' => 3, 'average' => '73.87', 'quantity' => '7'])
                 ->has('periods', 1)
                 ->where('periods.0.net', '221.62')
                 ->has('products', 2)
@@ -116,9 +113,8 @@ class SalesReportTest extends TestCase
                 ->where('payments.rows.0.given_back', '38.50')
                 ->where('payments.rows.0.net', '177.62')
                 ->where('payments.rows.1.method', 'GCash')
-                ->where('payments.rows.1.received', '0.00')
-                ->where('payments.rows.1.waiting', '44.00')
-                ->where('payments.total.net', '177.62'));
+                ->where('payments.rows.1.received', '44.00')
+                ->where('payments.total.net', '221.62'));
 
         // Net collected in cash equals what the cashier's drawer took in sales less refunds.
         $c = app(ExpectedCash::class)->components($this->shiftOf($this->cashier));
@@ -145,16 +141,19 @@ class SalesReportTest extends TestCase
 
     public function test_dates_follow_manila_business_days_and_locations_are_kept_apart(): void
     {
-        // T-RPT-2, FR-095.
+        // T-RPT-2, FR-095. Dates are relative to today's Manila business date.
+        $today = BusinessClock::today();
+        [$d0, $d1] = [$today->toDateString(), $today->subDay()->toDateString()];
         $yesterday = $this->sell([['product_id' => $this->choco->id, 'quantity' => 1]]);
-        DB::table('orders')->where('id', $yesterday->id)->update(['business_date' => '2026-11-05']);
+        DB::table('orders')->where('id', $yesterday->id)->update(['business_date' => $d1]);
         $this->sell([['product_id' => $this->glazed->id, 'quantity' => 1]]);
 
-        $this->actingAs($this->manager)->get('/admin/reports/sales?from=2026-11-05&to=2026-11-05')
-            ->assertInertia(fn (AssertableInertia $page) => $page->where('summary.net', '44.00')->where('filters.from', '2026-11-05'));
-        $this->actingAs($this->manager)->get('/admin/reports/sales?from=2026-11-05&to=2026-11-06&group=month')
-            ->assertInertia(fn (AssertableInertia $page) => $page->where('summary.net', '79.00')->has('periods', 1)->where('periods.0.period', 'November 2026'));
-        $this->actingAs($this->manager)->get('/admin/reports/sales?from=2026-11-06&to=2026-11-05')->assertSessionHasErrors('to');
+        $this->actingAs($this->manager)->get("/admin/reports/sales?from={$d1}&to={$d1}")
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('summary.net', '44.00')->where('filters.from', $d1));
+        $months = $today->month === $today->subDay()->month ? 1 : 2;
+        $this->actingAs($this->manager)->get("/admin/reports/sales?from={$d1}&to={$d0}&group=month")
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('summary.net', '79.00')->has('periods', $months)->where('periods.'.($months - 1).'.period', $today->format('F Y')));
+        $this->actingAs($this->manager)->get("/admin/reports/sales?from={$d0}&to={$d1}")->assertSessionHasErrors('to');
 
         // Refunds given back count on the Manila day they were processed.
         $f = new ReportFilters(CarbonImmutable::parse('2026-11-06'), CarbonImmutable::parse('2026-11-06'), [1]);
@@ -168,15 +167,15 @@ class SalesReportTest extends TestCase
         $this->sell([['product_id' => $kioskDoughnut->id, 'quantity' => 2]], as: $kioskCashier);
 
         $main = $this->mainLocation();
-        $this->actingAs($this->owner)->get("/admin/reports/sales?from=2026-11-05&location={$main->id}")
+        $this->actingAs($this->owner)->get("/admin/reports/sales?from={$d1}&location={$main->id}")
             ->assertInertia(fn (AssertableInertia $page) => $page->where('summary.net', '79.00'));
-        $this->actingAs($this->owner)->get("/admin/reports/sales?from=2026-11-05&location={$popUp->id}")
+        $this->actingAs($this->owner)->get("/admin/reports/sales?from={$d1}&location={$popUp->id}")
             ->assertInertia(fn (AssertableInertia $page) => $page->where('summary.net', '100.00'));
-        $this->actingAs($this->owner)->get('/admin/reports/sales?from=2026-11-05')
+        $this->actingAs($this->owner)->get("/admin/reports/sales?from={$d1}")
             ->assertInertia(fn (AssertableInertia $page) => $page->where('summary.net', '179.00'));
 
         // The manager is assigned only to the main branch: "all" means main, and the pop-up is refused.
-        $this->actingAs($this->manager)->get('/admin/reports/sales?from=2026-11-05')
+        $this->actingAs($this->manager)->get("/admin/reports/sales?from={$d1}")
             ->assertInertia(fn (AssertableInertia $page) => $page->where('summary.net', '79.00')->has('options.locations', 1));
         $this->actingAs($this->manager)->get("/admin/reports/sales?location={$popUp->id}")->assertSessionHasErrors('location');
     }
@@ -184,7 +183,7 @@ class SalesReportTest extends TestCase
     public function test_reports_and_exports_need_their_permissions_and_exports_are_safe_and_logged(): void
     {
         // T-RPT-3, FR-096.
-        $prep = $this->staff(PermissionCatalog::PREPARATION_STAFF);
+        $prep = $this->staff($this->bakerRole());
         foreach ([$this->cashier, $prep] as $user) {
             $this->actingAs($user)->get('/admin/reports/sales')->assertForbidden();
             $this->actingAs($user)->get('/admin/dashboard')->assertForbidden();

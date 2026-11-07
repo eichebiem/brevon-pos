@@ -11,7 +11,6 @@ use App\Models\Branch;
 use App\Models\CashierShift;
 use App\Models\CashMovement;
 use App\Models\Order;
-use App\Models\Payment;
 use App\Models\Product;
 use App\Models\Terminal;
 use App\Models\User;
@@ -82,13 +81,11 @@ class ShiftCashTest extends TestCase
     {
         $this->sell(2);                                                        // + 88.00
         $this->sell(1, ['method' => 'GCASH', 'reference' => 'GC12340001']);   // GCash: not in the drawer
-        $gcash = Payment::query()->latest('id')->firstOrFail();
-        $this->actingAs($this->manager)->post("/payments/{$gcash->id}/verify")->assertSessionHasNoErrors();
-        $this->sell(1, ['method' => 'GCASH', 'reference' => 'GC12340002']);   // still pending
-        $latte = $this->coffee();                                             // made to order, so still cancellable
+        $this->sell(1, ['method' => 'GCASH', 'reference' => 'GC12340002']);
+        $latte = $this->coffee();
         $this->checkout($this->cashier, $this->payload([['product_id' => $latte['product']->id, 'variant_id' => $latte['iced']->id, 'quantity' => 1]]))->assertSessionHasNoErrors();
-        $cancelled = Order::query()->latest('id')->firstOrFail();             // + 110.00, then cancelled
-        $this->actingAs($this->manager)->post("/orders/{$cancelled->id}/cancel", ['reason' => 'Changed mind', 'return_stock' => true])->assertSessionHasNoErrors();
+        $cancelled = Order::query()->latest('id')->firstOrFail();             // + 110.00, then cancelled (before D-169)
+        $this->pastCancellation($cancelled, $this->manager, 'Changed mind');
 
         $this->record($this->manager, 'cash_in', '200.00')->assertSessionHasNoErrors();
         $this->record($this->manager, 'cash_out', '100.00', 'Safe drop')->assertSessionHasNoErrors();
@@ -101,7 +98,7 @@ class ShiftCashTest extends TestCase
         $this->assertSame('88.00', $summary['cash_sales']);
         $this->assertSame('110.00', $summary['cancelled_cash']);
         $this->assertSame(['200.00', '100.00', '50.00', '0.00'], [$summary['cash_in'], $summary['cash_out'], $summary['paid_out'], $summary['refunds']]);
-        $this->assertSame([['method' => 'GCash', 'verified' => '44.00', 'pending' => '44.00', 'pending_count' => 1]], $summary['non_cash']);
+        $this->assertSame([['method' => 'GCash', 'verified' => '88.00']], $summary['non_cash']);
         $this->assertSame(4, $summary['order_count']);
         $this->assertSame(1, $summary['cancelled_count']);
 

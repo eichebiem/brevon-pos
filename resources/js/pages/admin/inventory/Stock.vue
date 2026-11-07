@@ -14,13 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { usePermissions } from '@/composables/usePermissions';
 import { formatDateTime, formatQuantity, formatUnitCost } from '@/lib/format';
-import {
-    lots as lotsPage,
-    movements,
-    opening,
-    stock,
-    waste,
-} from '@/routes/admin/inventory';
+import { movements, opening, stock, waste } from '@/routes/admin/inventory';
 import { create as newAdjustment } from '@/routes/admin/inventory/adjustments';
 import { create as newDispatch } from '@/routes/admin/inventory/dispatches';
 
@@ -42,7 +36,6 @@ const props = defineProps<{
     search: string | null;
     lowOnly: boolean;
     lowCount: number;
-    lots: { expiring: number; expired: number };
     awaitingOpening: number;
 }>();
 
@@ -158,38 +151,6 @@ function showLow(): void {
             <Button size="sm" variant="outline" @click="showLow"
                 >Show low stock</Button
             >
-        </p>
-
-        <p
-            v-if="lots.expiring + lots.expired > 0"
-            class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-900"
-            role="status"
-            data-test="expiry-alert"
-        >
-            <span>
-                <template v-if="lots.expired"
-                    >{{ lots.expired }}
-                    {{ lots.expired === 1 ? 'lot has' : 'lots have' }}
-                    expired.
-                </template>
-                <template v-if="lots.expiring"
-                    >{{ lots.expiring }}
-                    {{ lots.expiring === 1 ? 'lot expires' : 'lots expire' }}
-                    within a week.</template
-                >
-            </span>
-            <Button size="sm" variant="outline" as-child>
-                <Link
-                    :href="
-                        lotsPage({
-                            query: {
-                                show: lots.expired ? 'expired' : 'expiring',
-                            },
-                        })
-                    "
-                    >See lots</Link
-                >
-            </Button>
         </p>
 
         <form

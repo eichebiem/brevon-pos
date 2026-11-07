@@ -25,7 +25,7 @@ final class PurchaseItems
     }
 
     /**
-     * @return list<array{id: int, sku: string, name: string, unit: string|null, precision: int, track_lot: bool}>
+     * @return list<array{id: int, sku: string, name: string, unit: string|null, precision: int}>
      */
     public static function forForm(): array
     {
@@ -36,7 +36,6 @@ final class PurchaseItems
                 'name' => $item->name,
                 'unit' => $item->unit?->code,
                 'precision' => $item->unit->precision ?? 3,
-                'track_lot' => $item->track_lot,
             ])->all());
     }
 

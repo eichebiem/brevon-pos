@@ -50,7 +50,7 @@ class UserAdministrationTest extends TestCase
 
     public function test_admin_creates_a_cashier_with_location_and_profile_and_it_is_audited(): void
     {
-        $admin = $this->staff(PermissionCatalog::ADMIN);
+        $admin = $this->staff($this->officeRole());
 
         $this->actingAs($admin)->post('/admin/users', $this->payload())->assertRedirect('/admin/users');
 
@@ -71,7 +71,7 @@ class UserAdministrationTest extends TestCase
 
     public function test_every_account_needs_a_username(): void
     {
-        $admin = $this->staff(PermissionCatalog::ADMIN);
+        $admin = $this->staff($this->officeRole());
 
         foreach (['', '   ', 'ab', 'Ana Cruz', '.ana'] as $bad) {
             $this->actingAs($admin)->post('/admin/users', $this->payload(['username' => $bad]))->assertSessionHasErrors('username');
@@ -86,7 +86,7 @@ class UserAdministrationTest extends TestCase
 
     public function test_a_user_needs_at_least_one_role_and_one_location(): void
     {
-        $admin = $this->staff(PermissionCatalog::ADMIN);
+        $admin = $this->staff($this->officeRole());
 
         $this->actingAs($admin)->post('/admin/users', $this->payload(['roles' => [], 'branch_ids' => []]))
             ->assertSessionHasErrors(['roles', 'branch_ids']);
@@ -94,7 +94,7 @@ class UserAdministrationTest extends TestCase
 
     public function test_default_location_must_be_one_of_the_assigned_locations(): void
     {
-        $admin = $this->staff(PermissionCatalog::ADMIN);
+        $admin = $this->staff($this->officeRole());
         $popUp = Branch::factory()->popUp()->create();
 
         $this->actingAs($admin)->post('/admin/users', $this->payload(['default_branch_id' => $popUp->id]))
@@ -103,7 +103,7 @@ class UserAdministrationTest extends TestCase
 
     public function test_admin_cannot_assign_the_owner_role(): void
     {
-        $admin = $this->staff(PermissionCatalog::ADMIN);
+        $admin = $this->staff($this->officeRole());
 
         $this->actingAs($admin)->post('/admin/users', $this->payload(['roles' => [PermissionCatalog::OWNER]]))
             ->assertSessionHasErrors('roles');
@@ -124,7 +124,7 @@ class UserAdministrationTest extends TestCase
 
     public function test_admin_cannot_edit_or_deactivate_an_owner(): void
     {
-        $admin = $this->staff(PermissionCatalog::ADMIN);
+        $admin = $this->staff($this->officeRole());
         $owner = $this->staff(PermissionCatalog::OWNER);
 
         $this->actingAs($admin)->get("/admin/users/{$owner->id}/edit")->assertForbidden();
@@ -134,8 +134,8 @@ class UserAdministrationTest extends TestCase
 
     public function test_users_cannot_change_their_own_roles_or_deactivate_themselves(): void
     {
-        $admin = $this->staff(PermissionCatalog::ADMIN, attributes: ['email' => 'me@example.test']);
-        $base = $this->payload(['email' => 'me@example.test', 'username' => $admin->username, 'password' => '', 'password_confirmation' => '', 'has_employee_profile' => false, 'roles' => [PermissionCatalog::ADMIN]]);
+        $admin = $this->staff($this->officeRole(), attributes: ['email' => 'me@example.test']);
+        $base = $this->payload(['email' => 'me@example.test', 'username' => $admin->username, 'password' => '', 'password_confirmation' => '', 'has_employee_profile' => false, 'roles' => ['Office']]);
 
         $this->actingAs($admin)->put("/admin/users/{$admin->id}", [...$base, 'roles' => [PermissionCatalog::MANAGER]])
             ->assertSessionHasErrors('roles');
@@ -143,7 +143,7 @@ class UserAdministrationTest extends TestCase
             ->assertSessionHasErrors('is_active');
 
         $this->assertTrue($admin->refresh()->is_active);
-        $this->assertTrue($admin->hasRole(PermissionCatalog::ADMIN));
+        $this->assertTrue($admin->hasRole('Office'));
     }
 
     public function test_an_owner_can_deactivate_another_owner_while_one_active_owner_remains(): void
@@ -167,7 +167,7 @@ class UserAdministrationTest extends TestCase
         $owner = $this->staff(PermissionCatalog::OWNER);
         $this->staff(PermissionCatalog::OWNER, attributes: ['is_active' => false]);
 
-        foreach ([[[PermissionCatalog::ADMIN], true], [[PermissionCatalog::OWNER], false]] as [$roles, $active]) {
+        foreach ([[[PermissionCatalog::MANAGER], true], [[PermissionCatalog::OWNER], false]] as [$roles, $active]) {
             try {
                 $guard->assertKeepsAnActiveOwner($owner, $roles, $active);
                 $this->fail('Expected the last active Owner to be protected.');
@@ -177,13 +177,13 @@ class UserAdministrationTest extends TestCase
         }
 
         $this->staff(PermissionCatalog::OWNER);
-        $guard->assertKeepsAnActiveOwner($owner, [PermissionCatalog::ADMIN], true);
+        $guard->assertKeepsAnActiveOwner($owner, [PermissionCatalog::MANAGER], true);
         $this->addToAssertionCount(1);
     }
 
     public function test_deactivation_is_audited_and_ends_the_session(): void
     {
-        $admin = $this->staff(PermissionCatalog::ADMIN);
+        $admin = $this->staff($this->officeRole());
         $cashier = $this->staff(PermissionCatalog::CASHIER);
 
         $this->actingAs($admin)->patch("/admin/users/{$cashier->id}/status", ['is_active' => false])->assertSessionHasNoErrors();
@@ -198,7 +198,7 @@ class UserAdministrationTest extends TestCase
 
     public function test_password_reset_by_admin_is_audited_without_the_password(): void
     {
-        $admin = $this->staff(PermissionCatalog::ADMIN);
+        $admin = $this->staff($this->officeRole());
         $cashier = $this->staff(PermissionCatalog::CASHIER, attributes: ['email' => 'c@example.test', 'username' => 'cash1']);
 
         $this->actingAs($admin)->put("/admin/users/{$cashier->id}", $this->payload([
@@ -214,7 +214,7 @@ class UserAdministrationTest extends TestCase
 
     public function test_user_list_filters_by_role_and_status(): void
     {
-        $admin = $this->staff(PermissionCatalog::ADMIN);
+        $admin = $this->staff($this->officeRole());
         $this->staff(PermissionCatalog::CASHIER, attributes: ['name' => 'Active Cashier']);
         $this->staff(PermissionCatalog::CASHIER, attributes: ['name' => 'Old Cashier', 'is_active' => false]);
 

@@ -141,7 +141,8 @@ class MenuSeeder extends Seeder
      */
     public static function menu(): array
     {
-        $doughnut = ['parent' => 'Doughnuts', 'type' => ProductType::FinishedGood, 'mode' => InventoryTrackingMode::FinishedStock, 'unit' => 'piece', 'variants' => []];
+        // Seven top-level categories, no parents (D-177).
+        $doughnut = ['parent' => null, 'type' => ProductType::FinishedGood, 'mode' => InventoryTrackingMode::FinishedStock, 'unit' => 'piece', 'variants' => []];
         $drink = ['type' => ProductType::MadeToOrder, 'mode' => InventoryTrackingMode::None, 'unit' => 'cup'];
 
         return [
@@ -165,7 +166,7 @@ class MenuSeeder extends Seeder
             ]],
             // Assorted boxes and the combo hold doughnuts of the customer's
             // choice; the box itself has no stock of its own (D-101, open item).
-            ['parent' => 'Doughnuts', 'category' => 'Assorted boxes', 'type' => ProductType::MadeToOrder, 'mode' => InventoryTrackingMode::None, 'unit' => 'box', 'variants' => [], 'items' => [
+            ['parent' => null, 'category' => 'Assorted boxes', 'type' => ProductType::MadeToOrder, 'mode' => InventoryTrackingMode::None, 'unit' => 'box', 'variants' => [], 'items' => [
                 ['sku' => 'BX-HALF-DOZEN', 'name' => 'Assorted Half Dozen', 'prices' => ['279.00']],
                 ['sku' => 'BX-DOZEN', 'name' => 'Assorted Dozen', 'prices' => ['549.00']],
             ]],
@@ -181,20 +182,20 @@ class MenuSeeder extends Seeder
                 ['sku' => 'CF-SPANISH-LATTE', 'name' => 'Spanish Latte', 'prices' => ['125.00', '135.00']],
                 ['sku' => 'CF-WHITE-MOCHA', 'name' => 'White Mocha', 'prices' => ['125.00', '135.00']],
             ]],
-            [...$drink, 'parent' => 'Cold Drinks', 'category' => 'Matcha series', 'variants' => [], 'items' => [
+            [...$drink, 'parent' => null, 'category' => 'Matcha series', 'variants' => [], 'items' => [
                 ['sku' => 'MT-BREVON-CLASSIC', 'name' => 'Brevon Classic Matcha', 'prices' => ['150.00']],
                 ['sku' => 'MT-SEASALT', 'name' => 'Matcha Seasalt', 'prices' => ['150.00']],
                 ['sku' => 'MT-STRAWBERRY', 'name' => 'Strawberry Matcha', 'prices' => ['140.00']],
                 ['sku' => 'MT-COCONUT-CLOUD', 'name' => 'Coconut Matcha Cloud', 'prices' => ['140.00']],
             ]],
-            [...$drink, 'parent' => 'Cold Drinks', 'category' => 'Lemonade series', 'variants' => ['16oz', '22oz'], 'items' => [
+            [...$drink, 'parent' => null, 'category' => 'Lemonade series', 'variants' => ['16oz', '22oz'], 'items' => [
                 ['sku' => 'LM-CLASSIC', 'name' => 'Classic Lemonade', 'prices' => ['60.00', '70.00']],
                 ['sku' => 'LM-STRAWBERRY', 'name' => 'Strawberry Lemonade', 'prices' => ['70.00', '80.00']],
                 ['sku' => 'LM-LYCHEE', 'name' => 'Lemonade Lychee', 'prices' => ['70.00', '80.00']],
                 ['sku' => 'LM-CUCUMBER', 'name' => 'Cucumber Lemonade', 'prices' => ['70.00', '80.00']],
                 ['sku' => 'LM-BLUE', 'name' => 'Blue Lemonade', 'prices' => ['70.00', '80.00']],
             ]],
-            ['parent' => 'Other', 'category' => 'Combos', 'type' => ProductType::MadeToOrder, 'mode' => InventoryTrackingMode::None, 'unit' => 'set', 'variants' => [], 'items' => [
+            ['parent' => null, 'category' => 'Combos', 'type' => ProductType::MadeToOrder, 'mode' => InventoryTrackingMode::None, 'unit' => 'set', 'variants' => [], 'items' => [
                 ['sku' => 'CB-BETTER-TOGETHER', 'name' => 'Better Together (Lemonade 16oz + Doughnut)', 'prices' => ['99.00']],
             ]],
         ];

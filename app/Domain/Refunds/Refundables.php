@@ -15,9 +15,8 @@ use App\Models\RefundItem;
 /**
  * The refundable quantity and amount of each line of an order (FR-042,
  * UC-005 steps 48–50; D-151), after every earlier refund. A line's share of
- * the order total is its total after discount, with any added tax spread
- * over the lines the same way; the shares add up to the order total to the
- * centavo.
+ * the order total is its total after discount; the shares add up to the
+ * order total to the centavo.
  */
 class Refundables
 {

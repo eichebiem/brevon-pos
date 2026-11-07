@@ -276,12 +276,6 @@ const textareaClass =
                             <dt>{{ row.method }}</dt>
                             <dd class="text-right tabular-nums">
                                 {{ formatMoney(row.verified) }}
-                                <span
-                                    v-if="row.pending_count"
-                                    class="block text-xs text-amber-700"
-                                    >+ {{ formatMoney(row.pending) }} still to
-                                    check ({{ row.pending_count }})</span
-                                >
                             </dd>
                         </div>
                     </dl>

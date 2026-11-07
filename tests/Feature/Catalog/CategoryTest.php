@@ -4,15 +4,15 @@ namespace Tests\Feature\Catalog;
 
 use App\Domain\Access\PermissionCatalog;
 use App\Models\Category;
-use App\Models\OptionGroup;
 use App\Models\Product;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Schema;
 use Tests\Concerns\InteractsWithStaff;
 use Tests\TestCase;
 
 /** FR-015, FR-018 · T-CAT-18..23 */
-class CategoryAndOptionsTest extends TestCase
+class CategoryTest extends TestCase
 {
     use InteractsWithStaff;
     use RefreshDatabase;
@@ -23,7 +23,7 @@ class CategoryAndOptionsTest extends TestCase
     {
         parent::setUp();
         $this->seedAccess();
-        $this->admin = $this->staff(PermissionCatalog::ADMIN);
+        $this->admin = $this->staff(PermissionCatalog::OWNER);
     }
 
     public function test_categories_get_unique_slugs_and_are_audited(): void
@@ -83,41 +83,12 @@ class CategoryAndOptionsTest extends TestCase
         $this->assertDatabaseHas('audit_logs', ['event' => 'category.archived', 'auditable_id' => $parent->id]);
     }
 
-    public function test_option_groups_enforce_their_selection_rules(): void
+    public function test_the_options_and_add_ons_screen_is_gone(): void
     {
-        $base = ['name' => 'Size', 'selection_type' => 'single', 'min_selections' => 1, 'is_active' => true, 'options' => [
-            ['name' => 'Regular', 'price_delta' => '0', 'is_active' => true],
-            ['name' => 'Large', 'price_delta' => '15.00', 'is_active' => true],
-        ]];
-
-        $this->actingAs($this->admin)->post('/admin/option-groups', [...$base, 'min_selections' => 2])->assertSessionHasErrors('min_selections');
-        $this->actingAs($this->admin)->post('/admin/option-groups', [...$base, 'options' => [['name' => 'Cheaper', 'price_delta' => '-5', 'is_active' => true]]])
-            ->assertSessionHasErrors('options.0.price_delta');
-        $this->actingAs($this->admin)->post('/admin/option-groups', [...$base, 'selection_type' => 'multiple', 'min_selections' => 3, 'max_selections' => 2])
-            ->assertSessionHasErrors('max_selections');
-        $this->actingAs($this->admin)->post('/admin/option-groups', [...$base, 'min_selections' => 1, 'options' => [['name' => 'Only', 'price_delta' => '0', 'is_active' => false]]])
-            ->assertSessionHasErrors('min_selections');
-
-        $this->actingAs($this->admin)->post('/admin/option-groups', [...$base, 'max_selections' => 5])->assertSessionHasNoErrors();
-
-        $group = OptionGroup::query()->where('name', 'Size')->firstOrFail();
-        $this->assertSame(1, $group->max_selections);
-        $this->assertSame(['0.00', '15.00'], $group->options()->pluck('price_delta')->all());
-        $this->assertDatabaseHas('audit_logs', ['event' => 'option_group.created', 'auditable_id' => $group->id]);
-    }
-
-    public function test_options_are_deactivated_not_deleted(): void
-    {
-        $group = OptionGroup::query()->create(['name' => 'Milk', 'selection_type' => 'single', 'min_selections' => 0, 'max_selections' => 1]);
-        $oat = $group->options()->create(['name' => 'Oat', 'price_delta' => '20.00']);
-
-        $this->actingAs($this->admin)->put("/admin/option-groups/{$group->id}", [
-            'name' => 'Milk', 'selection_type' => 'single', 'min_selections' => 0, 'is_active' => true,
-            'options' => [['id' => $oat->id, 'name' => 'Oat', 'price_delta' => '25', 'is_active' => false], ['name' => 'Soy', 'price_delta' => '20', 'is_active' => true]],
-        ])->assertSessionHasNoErrors();
-
-        $this->assertFalse($oat->refresh()->is_active);
-        $this->assertSame('25.00', $oat->price_delta);
-        $this->assertSame(2, $group->options()->count());
+        // D-166: options & add-ons removed at the client's request; sizes (variants) stay.
+        $this->actingAs($this->admin)->get('/admin/option-groups')->assertNotFound();
+        $this->assertFalse(Schema::hasTable('option_groups'));
+        $this->assertFalse(Schema::hasTable('order_item_options'));
+        $this->assertFalse(Schema::hasColumn('order_items', 'option_total'));
     }
 }

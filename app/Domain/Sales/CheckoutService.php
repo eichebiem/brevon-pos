@@ -22,7 +22,6 @@ use App\Enums\OrderPaymentStatus;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentMethodType;
 use App\Enums\PaymentStatus;
-use App\Enums\ProductType;
 use App\Models\Branch;
 use App\Models\CashierShift;
 use App\Models\Discount;
@@ -30,9 +29,7 @@ use App\Models\Order;
 use App\Models\OrderDiscount;
 use App\Models\OrderDiscountBeneficiary;
 use App\Models\OrderItem;
-use App\Models\OrderItemOption;
 use App\Models\OrderStatusHistory;
-use App\Models\OrderTaxLine;
 use App\Models\Payment;
 use App\Models\PaymentMethod;
 use App\Models\User;
@@ -43,7 +40,7 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * Completes a sale in one database transaction (FR-032; prompt invariants
- * 1–6, 9–11): the order, its lines and options, status history, payment,
+ * 1–6, 9–11): the order, its lines, status history, payment,
  * stock deduction and the shift link either all commit or none do.
  *
  * Location, terminal and shift come from the cashier's open shift (FR-012,
@@ -113,7 +110,6 @@ class CheckoutService
             return new CheckoutResult($this->replay($existing, $hash), true);
         }
 
-        $this->assertOrderDetails($data);
         $cart = $this->pricer->price($location, $data->lines, $data->discount);
         $beneficiary = $cart->discount?->discount->isSeniorPwd() ? $this->discounts->beneficiary($data->discount?->beneficiary) : null;
 
@@ -130,7 +126,6 @@ class CheckoutService
         $approver = $cart->discount === null || $data->discount === null ? null : $this->authoriseDiscount($cashier, $location, $cart->discount, $data->discount);
 
         $number = sprintf('%s-%s-%04d', $location->code, $today->format('Ymd'), $this->numbers->next($location, 'order', $today));
-        $status = $this->initialStatus($data, $cart);
         $now = now();
 
         $order = new Order;
@@ -141,30 +136,25 @@ class CheckoutService
             'order_number' => $number,
             'business_date' => $today->toDateString(),
             'order_type' => $data->orderType,
-            'status' => $status,
-            'payment_status' => $payment['status'] === PaymentStatus::Verified ? OrderPaymentStatus::Paid : OrderPaymentStatus::PendingVerification,
+            // D-169: every sale is finished at the counter.
+            'status' => OrderStatus::Completed,
+            'payment_status' => OrderPaymentStatus::Paid,
             'subtotal' => $cart->subtotal->toDecimal(),
             'discount_total' => $cart->discountTotal->toDecimal(),
-            'tax_total' => $cart->taxTotal->toDecimal(),
             'service_charge' => '0.00',
             'grand_total' => $cart->grandTotal->toDecimal(),
             'amount_paid' => $cart->grandTotal->toDecimal(),
             'amount_due' => '0.00',
             'notes' => $data->notes,
-            'pickup_at' => $data->pickupAt,
             'created_by' => $cashier->id,
-            'completed_at' => $status === OrderStatus::Completed ? $now : null,
+            'completed_at' => $now,
             'idempotency_key' => $data->idempotencyKey,
             'idempotency_request_hash' => $hash,
         ])->save();
 
         $this->saveLines($order, $cart);
         $this->saveDiscount($order, $cart, $cashier, $approver, $beneficiary, $data->discount?->reason);
-        $this->saveTaxes($order, $cart);
-        $this->recordStatus($order, null, OrderStatus::Confirmed, $cashier);
-        if ($status === OrderStatus::Completed) {
-            $this->recordStatus($order, OrderStatus::Confirmed, OrderStatus::Completed, $cashier);
-        }
+        $this->recordStatus($order, null, OrderStatus::Completed, $cashier);
 
         $record = new Payment;
         $record->forceFill([...$payment, 'order_id' => $order->id, 'payment_method_id' => $method->id, 'recorded_by' => $cashier->id, 'paid_at' => $now])->save();
@@ -174,7 +164,7 @@ class CheckoutService
         $this->audit->record('order.created', $order, null, [
             'order_number' => $order->order_number,
             'order_type' => $data->orderType->value,
-            'status' => $status->value,
+            'status' => OrderStatus::Completed->value,
             'grand_total' => $order->grand_total,
             'lines' => count($cart->lines),
             'shift' => $shift->shift_number,
@@ -218,18 +208,6 @@ class CheckoutService
         }
 
         return $shift;
-    }
-
-    private function assertOrderDetails(CheckoutData $data): void
-    {
-        if ($data->orderType->needsPickupTime()) {
-            if ($data->pickupAt === null) {
-                throw ValidationException::withMessages(['pickup_at' => __('Enter the pickup date and time.')]);
-            }
-            if ($data->pickupAt->lessThanOrEqualTo(BusinessClock::now())) {
-                throw ValidationException::withMessages(['pickup_at' => __('The pickup time must be in the future.')]);
-            }
-        }
     }
 
     private function lockMethod(PaymentInput $input): PaymentMethod
@@ -277,19 +255,15 @@ class CheckoutService
             }
         }
 
-        // D-039, BR-019: manual verification, only by someone allowed to verify.
-        if ($input->markVerified && ! $cashier->can('payments.verify-ewallet')) {
-            throw ValidationException::withMessages(['payment.verified' => __('You are not allowed to mark :method payments as verified.', ['method' => $method->name])]);
-        }
-
+        // D-168: the cashier confirms the transfer arrived before finishing the sale; there is no later check.
         return [
             'amount' => $due->toDecimal(),
             'amount_tendered' => null,
             'change_amount' => '0.00',
             'reference_number' => $reference,
-            'status' => $input->markVerified ? PaymentStatus::Verified : PaymentStatus::Pending,
-            'verified_by' => $input->markVerified ? $cashier->id : null,
-            'verified_at' => $input->markVerified ? CarbonImmutable::now() : null,
+            'status' => PaymentStatus::Verified,
+            'verified_by' => $cashier->id,
+            'verified_at' => CarbonImmutable::now(),
         ];
     }
 
@@ -297,17 +271,6 @@ class CheckoutService
     private function referenceUsed(PaymentMethod $method, string $reference): bool
     {
         return Payment::query()->where('payment_method_id', $method->id)->where('reference_number', $reference)->exists();
-    }
-
-    /**
-     * D-044: items made to order go to preparation; an order of ready-made
-     * items only is completed at once, unless it is collected later.
-     */
-    private function initialStatus(CheckoutData $data, PricedCart $cart): OrderStatus
-    {
-        $needsPreparation = array_any($cart->lines, fn (PricedLine $l) => $l->product->product_type === ProductType::MadeToOrder);
-
-        return $needsPreparation || $data->orderType->needsPickupTime() ? OrderStatus::Confirmed : OrderStatus::Completed;
     }
 
     private function saveLines(Order $order, PricedCart $cart): void
@@ -324,23 +287,10 @@ class CheckoutService
                 'product_type_snapshot' => $line->product->product_type->value,
                 'quantity' => $line->quantity->toString(),
                 'unit_price' => $line->unitPrice->toDecimal(),
-                'option_total' => $line->optionTotal->toDecimal(),
                 'discount_amount' => ($cart->lineDiscounts[$i] ?? Money::zero())->toDecimal(),
-                'tax_amount' => ($cart->lineTaxes[$i] ?? Money::zero())->toDecimal(),
                 'line_total' => $line->lineTotal->toDecimal(),
                 'notes' => $line->notes,
             ])->save();
-
-            foreach ($line->options as $choice) {
-                $option = new OrderItemOption;
-                $option->forceFill([
-                    'order_item_id' => $item->id,
-                    'option_id' => $choice['option']->id,
-                    'option_group_name_snapshot' => $choice['group']->name,
-                    'option_name_snapshot' => $choice['option']->name,
-                    'price_delta_snapshot' => $choice['option']->price_delta,
-                ])->save();
-            }
         }
     }
 
@@ -411,21 +361,6 @@ class CheckoutService
             'approved_by' => $approver?->username,
             'beneficiary' => $masked,
         ], $order->branch_id, $cashier);
-    }
-
-    private function saveTaxes(Order $order, PricedCart $cart): void
-    {
-        foreach ($cart->taxes as $tax) {
-            (new OrderTaxLine)->forceFill([
-                'order_id' => $order->id,
-                'tax_rule_id' => $tax->rule->id,
-                'tax_name_snapshot' => $tax->rule->name,
-                'tax_rate_snapshot' => $tax->rule->rate,
-                'inclusive_snapshot' => $tax->rule->inclusive,
-                'taxable_amount' => $tax->taxable->toDecimal(),
-                'tax_amount' => $tax->amount->toDecimal(),
-            ])->save();
-        }
     }
 
     private function recordStatus(Order $order, ?OrderStatus $from, OrderStatus $to, User $actor): void

@@ -17,15 +17,13 @@ class AccessGuard
     /** Seeded roles cannot be renamed or deleted. */
     public const SYSTEM_ROLES = [
         PermissionCatalog::OWNER,
-        PermissionCatalog::ADMIN,
         PermissionCatalog::MANAGER,
         PermissionCatalog::CASHIER,
-        PermissionCatalog::PREPARATION_STAFF,
     ];
 
     /**
      * The actor may only manage accounts whose permissions they fully hold
-     * (e.g. an Admin cannot reset an Owner's password).
+     * (e.g. a custom office role cannot reset an Owner's password).
      *
      * @throws AuthorizationException
      */

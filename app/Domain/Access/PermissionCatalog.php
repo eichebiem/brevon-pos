@@ -4,19 +4,17 @@ namespace App\Domain\Access;
 
 /**
  * Source of truth for permission names (SRS Appendix A + D-061) and the
- * default role matrix (D-076). Roles remain editable afterwards (FR-006).
+ * default role matrix (D-076). Three built-in roles since D-176: Owner (which
+ * absorbed Admin), Manager and Cashier. Other roles can still be made on the
+ * Roles screen (FR-006).
  */
 final class PermissionCatalog
 {
     public const OWNER = 'Owner';
 
-    public const ADMIN = 'Admin';
-
     public const MANAGER = 'Manager';
 
     public const CASHIER = 'Cashier';
-
-    public const PREPARATION_STAFF = 'Preparation Staff';
 
     /**
      * Permissions grouped for display.
@@ -29,8 +27,8 @@ final class PermissionCatalog
             'Dashboard' => ['dashboard.view'],
             'Point of sale' => ['pos.access', 'pos.create-sale', 'pos.apply-discount', 'pos.override-price'],
             'Discounts' => ['discounts.approve', 'discounts.view-beneficiary'],
-            'Orders' => ['orders.view', 'orders.update-status', 'orders.cancel'],
-            'Payments' => ['payments.record', 'payments.verify-ewallet'],
+            'Orders' => ['orders.view'],
+            'Payments' => ['payments.record'],
             'Refunds and voids' => ['refunds.request', 'refunds.approve', 'voids.approve'],
             'Products' => ['products.view', 'products.create', 'products.update', 'products.archive', 'products.manage-prices'],
             'Inventory' => ['inventory.view', 'inventory.receive', 'inventory.adjust', 'inventory.approve-adjustment'],
@@ -61,13 +59,12 @@ final class PermissionCatalog
 
         return [
             self::OWNER => $all,
-            self::ADMIN => array_values(array_diff($all, ['roles.manage'])),
             self::MANAGER => [
                 'dashboard.view',
                 'pos.access', 'pos.create-sale', 'pos.apply-discount',
                 'discounts.approve',
-                'orders.view', 'orders.update-status', 'orders.cancel',
-                'payments.record', 'payments.verify-ewallet',
+                'orders.view',
+                'payments.record',
                 'refunds.request', 'refunds.approve', 'voids.approve',
                 'products.view',
                 'inventory.view', 'inventory.receive', 'inventory.adjust', 'inventory.approve-adjustment',
@@ -84,12 +81,6 @@ final class PermissionCatalog
                 'refunds.request',
                 'products.view',
                 'shifts.open', 'shifts.close',
-            ],
-            self::PREPARATION_STAFF => [
-                'orders.view', 'orders.update-status',
-                'products.view',
-                'inventory.view',
-                'production.create',
             ],
         ];
     }

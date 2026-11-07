@@ -16,8 +16,9 @@ use Illuminate\Support\Facades\DB;
  * Sales reports (FR-088–FR-092, FR-095, FR-097, UC-009; D-156–D-158). Every
  * figure is summed from order lines, so totals, periods, products,
  * categories and cashiers always reconcile with each other. A sale counts
- * on its business date when it was paid or is waiting for its GCash check,
- * and was not cancelled; an order whose GCash never arrived is left out.
+ * on its business date when it was paid and not cancelled (GCash is
+ * confirmed at the sale, D-168; older orders whose GCash never arrived stay
+ * left out).
  * Reports only read; they never change anything.
  */
 class SalesReport
@@ -97,8 +98,8 @@ class SalesReport
 
     /**
      * FR-091, SRS §9 collections: money received per method on the sales in
-     * range (paid at checkout, so on the sale's business date), GCash still
-     * waiting for its check, and money given back per method on refunds
+     * range (paid at checkout, so on the sale's business date) and money
+     * given back per method on refunds
      * processed in range (refund-date view). Not filtered by category.
      *
      * @return array{rows: list<array<string, mixed>>, total: array<string, string>}
@@ -116,7 +117,6 @@ class SalesReport
             ->selectRaw('pay.payment_method_id as method_id')
             ->selectRaw('SUM(CASE WHEN pay.status IN (?, ?, ?) THEN pay.amount ELSE 0 END) as received', array_map(fn (PaymentStatus $s) => $s->value, PaymentStatus::taken()))
             ->selectRaw('SUM(CASE WHEN pay.status IN (?, ?, ?) THEN 1 ELSE 0 END) as received_count', array_map(fn (PaymentStatus $s) => $s->value, PaymentStatus::taken()))
-            ->selectRaw('SUM(CASE WHEN pay.status = ? THEN pay.amount ELSE 0 END) as waiting', [PaymentStatus::Pending->value])
             ->get()->keyBy('method_id');
 
         [$start, $end] = $f->utcRange();
@@ -132,7 +132,7 @@ class SalesReport
 
         $money = fn (mixed $v) => Money::fromDecimal(is_numeric($v) ? (string) $v : '0');
         $rows = [];
-        $totals = ['received' => Money::zero(), 'waiting' => Money::zero(), 'given_back' => Money::zero()];
+        $totals = ['received' => Money::zero(), 'given_back' => Money::zero()];
         foreach (PaymentMethod::query()->orderBy('id')->get() as $method) {
             $p = $payments->get($method->id);
             $r = $refunds->get($method->id);
@@ -140,16 +140,13 @@ class SalesReport
                 continue;
             }
             $received = $money($p->received ?? null);
-            $waiting = $money($p->waiting ?? null);
             $givenBack = $money($r->given_back ?? null);
             $totals['received'] = $totals['received']->add($received);
-            $totals['waiting'] = $totals['waiting']->add($waiting);
             $totals['given_back'] = $totals['given_back']->add($givenBack);
             $rows[] = [
                 'method' => $method->name,
                 'payments' => (int) ($p->received_count ?? 0),
                 'received' => $received->toDecimal(),
-                'waiting' => $waiting->toDecimal(),
                 'refunds' => (int) ($r->refund_count ?? 0),
                 'given_back' => $givenBack->toDecimal(),
                 'net' => $received->subtract($givenBack)->toDecimal(),
@@ -158,7 +155,6 @@ class SalesReport
 
         return ['rows' => $rows, 'total' => [
             'received' => $totals['received']->toDecimal(),
-            'waiting' => $totals['waiting']->toDecimal(),
             'given_back' => $totals['given_back']->toDecimal(),
             'net' => $totals['received']->subtract($totals['given_back'])->toDecimal(),
         ]];
@@ -191,7 +187,7 @@ class SalesReport
 
     private function aggregate(Builder $lines): Builder
     {
-        return $lines->selectRaw('SUM(oi.line_total) as gross, SUM(oi.discount_amount) as discounts, SUM(COALESCE(rf.refunded, 0)) as refunds, SUM(oi.tax_amount) as tax, COUNT(DISTINCT o.id) as orders, SUM(oi.quantity) as quantity');
+        return $lines->selectRaw('SUM(oi.line_total) as gross, SUM(oi.discount_amount) as discounts, SUM(COALESCE(rf.refunded, 0)) as refunds, COUNT(DISTINCT o.id) as orders, SUM(oi.quantity) as quantity');
     }
 
     private function periodLabel(string $period, string $groupBy): string

@@ -42,7 +42,6 @@ import type {
 const props = defineProps<{
     canOpenShift: boolean;
     canSell: boolean;
-    canVerifyEwallet: boolean;
     canApproveDiscount: boolean;
     discounts: PosDiscount[];
     catalog: PosCatalog | null;
@@ -68,11 +67,20 @@ const visible = computed(() => {
             : tab.value === 'all' || p.tab_id === tab.value,
     );
 });
-// Sub-category headings within a tab (e.g. Regular / Premium doughnuts).
+// Headings: one per category on All and in search results (D-177), and
+// sub-category headings within a tab when a category has any.
+const tabNames = computed(
+    () => new Map((props.catalog?.categories ?? []).map((c) => [c.id, c.name])),
+);
 const sections = computed(() => {
+    const across = tab.value === 'all' || search.value.trim() !== '';
     const groups = new Map<string, PosProduct[]>();
     for (const p of visible.value) {
-        const key = p.group ?? '';
+        const key = across
+            ? [tabNames.value.get(p.tab_id), p.group]
+                  .filter(Boolean)
+                  .join(' · ')
+            : (p.group ?? '');
         groups.set(key, [...(groups.get(key) ?? []), p]);
     }
 
@@ -89,7 +97,6 @@ const storageKey = computed(() =>
 const cart = ref<CartLine[]>([]);
 const orderType = ref(props.orderTypes[0]?.value ?? 'walk_in');
 const orderNotes = ref('');
-const pickupAt = ref('');
 
 function restoreCart(): void {
     if (!storageKey.value) {
@@ -140,7 +147,7 @@ const pickerOpen = ref(false);
 const picking = ref<PosProduct | null>(null);
 
 function pick(product: PosProduct): void {
-    if (product.variants.length > 0 || product.option_groups.length > 0) {
+    if (product.variants.length > 0) {
         picking.value = product;
         pickerOpen.value = true;
 
@@ -148,7 +155,6 @@ function pick(product: PosProduct): void {
     }
     addLine(product.id, {
         variant_id: null,
-        option_ids: [],
         quantity: 1,
         notes: '',
     });
@@ -158,13 +164,11 @@ function addLine(
     productId: number,
     choice: {
         variant_id: number | null;
-        option_ids: number[];
         quantity: number;
         notes: string;
     },
 ): void {
-    const options = [...choice.option_ids].sort((a, b) => a - b);
-    const key = `${productId}:${choice.variant_id ?? ''}:${options.join(',')}:${choice.notes}`;
+    const key = `${productId}:${choice.variant_id ?? ''}:${choice.notes}`;
     const existing = cart.value.find((l) => l.key === key);
     if (existing) {
         existing.quantity = Math.min(999, existing.quantity + choice.quantity);
@@ -175,7 +179,6 @@ function addLine(
         key,
         product_id: productId,
         variant_id: choice.variant_id,
-        option_ids: options,
         quantity: choice.quantity,
         notes: choice.notes,
     });
@@ -195,7 +198,6 @@ function clearSale(): void {
     approver.value = null;
     discountErrors.value = {};
     orderNotes.value = '';
-    pickupAt.value = '';
     orderType.value = props.orderTypes[0]?.value ?? 'walk_in';
     lineErrors.value = {};
     banner.value = null;
@@ -266,7 +268,6 @@ function itemsPayload() {
         product_id: l.product_id,
         variant_id: l.variant_id,
         quantity: l.quantity,
-        option_ids: l.option_ids,
         notes: l.notes || null,
     }));
 }
@@ -347,9 +348,6 @@ const total = computed(() => quote.value?.grand_total ?? null);
 const itemCount = computed(() =>
     cart.value.reduce((n, l) => n + l.quantity, 0),
 );
-const selectedType = computed(() =>
-    props.orderTypes.find((t) => t.value === orderType.value),
-);
 
 // ---- Payment and checkout (FR-031–FR-038) -------------------------------
 const payOpen = ref(false);
@@ -383,8 +381,7 @@ const canCheckout = computed(
         quote.value !== null &&
         !quoting.value &&
         Object.keys(lineErrors.value).length === 0 &&
-        !needsApproval.value &&
-        (!selectedType.value?.needs_pickup || pickupAt.value !== ''),
+        !needsApproval.value,
 );
 
 function openPayment(method: PosPaymentMethod): void {
@@ -400,7 +397,7 @@ function openPayment(method: PosPaymentMethod): void {
 const lastOrder = ref<LastOrder | null>(null);
 const completeOpen = ref(false);
 
-function submit(payment: { reference: string; verified: boolean }): void {
+function submit(payment: { reference: string }): void {
     if (!payMethod.value || processing.value || !quote.value) {
         return;
     }
@@ -408,7 +405,6 @@ function submit(payment: { reference: string; verified: boolean }): void {
     const body = {
         order_type: orderType.value,
         notes: orderNotes.value.trim() || null,
-        pickup_at: selectedType.value?.needs_pickup ? pickupAt.value : null,
         items: itemsPayload(),
         discount: discountPayload(true),
         expected_total: quote.value.grand_total,
@@ -416,7 +412,6 @@ function submit(payment: { reference: string; verified: boolean }): void {
             method: payMethod.value.code,
             amount_tendered: isCash ? tendered.value.trim() : null,
             reference: isCash ? null : payment.reference,
-            verified: isCash ? false : payment.verified,
         },
     };
     // The approver's password never goes into the retry fingerprint.
@@ -534,14 +529,10 @@ function lineFor(index: number) {
 function lineLabel(line: CartLine) {
     const product = byId.value.get(line.product_id);
     const variant = product?.variants.find((v) => v.id === line.variant_id);
-    const options = product?.option_groups
-        .flatMap((g) => g.options)
-        .filter((o) => line.option_ids.includes(o.id))
-        .map((o) => o.name);
 
     return {
         name: product?.name ?? 'Item no longer sold here',
-        detail: [variant?.name, ...(options ?? [])].filter(Boolean).join(' · '),
+        detail: variant?.name ?? '',
     };
 }
 
@@ -785,7 +776,7 @@ watch(
                                 class="text-xs text-muted-foreground"
                                 >×
                                 {{
-                                    formatMoney(lineFor(index)!.unit_total)
+                                    formatMoney(lineFor(index)!.unit_price)
                                 }}</span
                             >
                             <Button
@@ -828,21 +819,7 @@ watch(
                             </option>
                         </select>
                     </div>
-                    <div v-if="selectedType?.needs_pickup" class="grid gap-1">
-                        <Label for="pickup-at" class="text-xs">Pickup</Label>
-                        <Input
-                            id="pickup-at"
-                            v-model="pickupAt"
-                            type="datetime-local"
-                            class="h-11"
-                        />
-                    </div>
-                    <div
-                        :class="[
-                            'grid gap-1',
-                            selectedType?.needs_pickup ? 'col-span-2' : '',
-                        ]"
-                    >
+                    <div class="grid gap-1">
                         <Label for="order-notes" class="text-xs"
                             >Order note</Label
                         >
@@ -855,13 +832,6 @@ watch(
                         />
                     </div>
                 </div>
-                <p
-                    v-if="paymentErrors.pickup_at"
-                    class="text-xs text-red-700"
-                    role="alert"
-                >
-                    {{ paymentErrors.pickup_at }}
-                </p>
 
                 <p
                     v-if="banner"
@@ -914,11 +884,7 @@ watch(
                 </p>
 
                 <dl
-                    v-if="
-                        quote &&
-                        (Number(quote.discount_total) > 0 ||
-                            quote.taxes.length > 0)
-                    "
+                    v-if="quote && Number(quote.discount_total) > 0"
                     class="grid grid-cols-[1fr_auto] gap-x-2 gap-y-0.5 text-sm"
                     data-test="pos-breakdown"
                 >
@@ -935,16 +901,6 @@ watch(
                             data-test="pos-discount-amount"
                         >
                             −{{ formatMoney(quote.discount.amount) }}
-                        </dd>
-                    </template>
-                    <template v-for="tax in quote.taxes" :key="tax.name">
-                        <dt class="text-muted-foreground">
-                            {{ tax.name }} {{ Number(tax.rate) }}%{{
-                                tax.inclusive ? ' (included)' : ''
-                            }}
-                        </dt>
-                        <dd class="text-right tabular-nums">
-                            {{ formatMoney(tax.amount) }}
                         </dd>
                     </template>
                 </dl>
@@ -1003,7 +959,6 @@ watch(
         :method="payMethod"
         :total="total"
         :change="change"
-        :can-verify="canVerifyEwallet"
         :processing="processing"
         :errors="paymentErrors"
         @confirm="submit"

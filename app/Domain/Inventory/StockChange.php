@@ -14,7 +14,6 @@ final readonly class StockChange
 {
     /**
      * @param  string|null  $unitCost  decimal cost per unit for inbound movements (weighted average, D-048); validated by the ledger
-     * @param  int|null  $lotId  the lot an inbound receipt created (D-138)
      */
     public function __construct(
         public int $branchId,
@@ -24,6 +23,5 @@ final readonly class StockChange
         public ?string $unitCost = null,
         public ?string $reason = null,
         public ?Model $reference = null,
-        public ?int $lotId = null,
     ) {}
 }

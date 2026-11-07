@@ -2,13 +2,10 @@
 
 namespace App\Http\Controllers\Admin\Inventory;
 
-use App\Domain\Inventory\Lots;
 use App\Domain\Locations\LocationContext;
-use App\Domain\Shared\BusinessClock;
 use App\Domain\Shared\Money;
 use App\Http\Controllers\Controller;
 use App\Models\BranchInventory;
-use App\Models\InventoryLot;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -16,8 +13,7 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * Stock valuation at weighted average cost (FR-063; D-048, D-139) and the
- * lot / expiry list (FR-060; D-138).
+ * Stock valuation at weighted average cost (FR-063; D-048, D-139).
  */
 class StockValueController extends Controller
 {
@@ -68,43 +64,6 @@ class StockValueController extends Controller
             'total' => $total,
             'uncosted' => $rows->whereNull('average_unit_cost')->count(),
             'byLocation' => $byLocation,
-        ]);
-    }
-
-    public function lots(Request $request, Lots $lots): Response
-    {
-        $location = $this->locations->current($this->user($request));
-        $filters = $request->validate(['show' => ['nullable', 'in:expiring,expired,all']]);
-        $show = $filters['show'] ?? 'expiring';
-        $today = BusinessClock::today()->toDateString();
-        $soon = BusinessClock::today()->addDays(Lots::EXPIRING_DAYS)->toDateString();
-
-        return Inertia::render('admin/inventory/Lots', [
-            'site' => $location?->only(['id', 'code', 'name']),
-            'show' => $show,
-            'expiringDays' => Lots::EXPIRING_DAYS,
-            'counts' => $location ? $lots->counts($location) : ['expiring' => 0, 'expired' => 0],
-            'lots' => InventoryLot::query()
-                ->where('branch_id', $location->id ?? 0)
-                ->with(['item:id,sku,name,unit_of_measure_id', 'item.unit:id,code', 'supplier:id,supplier_code,name'])
-                ->when($show !== 'all', fn ($q) => $q->where('quantity_remaining', '>', 0)->whereNotNull('expires_at'))
-                ->when($show === 'expiring', fn ($q) => $q->where('expires_at', '>=', $today)->where('expires_at', '<=', $soon))
-                ->when($show === 'expired', fn ($q) => $q->where('expires_at', '<', $today))
-                ->orderByRaw('expires_at IS NULL')->orderBy('expires_at')->orderByDesc('id')
-                ->paginate(30)->withQueryString()
-                ->through(fn (InventoryLot $lot) => [
-                    'id' => $lot->id,
-                    'sku' => $lot->item?->sku,
-                    'name' => $lot->item?->name,
-                    'unit' => $lot->item?->unit?->code,
-                    'lot_number' => $lot->lot_number,
-                    'received_at' => $lot->received_at?->toIso8601String(),
-                    'expires_at' => $lot->expires_at?->toDateString(),
-                    'quantity_received' => $lot->quantity_received,
-                    'quantity_remaining' => $lot->quantity_remaining,
-                    'supplier' => $lot->supplier?->name,
-                    'state' => Lots::state($lot, $today, $soon),
-                ]),
         ]);
     }
 

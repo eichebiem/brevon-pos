@@ -141,7 +141,7 @@ class RefundTest extends TestCase
         $order = $this->sale();
         $choco = $this->line($order, $this->choco);
 
-        $prep = $this->staff(PermissionCatalog::PREPARATION_STAFF);
+        $prep = $this->staff($this->bakerRole());
         $this->refund($order, [$choco->id => '1'], as: $prep)->assertForbidden();
 
         $elsewhere = $this->staff(PermissionCatalog::CASHIER, Branch::factory()->popUp()->create(['code' => 'POP01']));
@@ -174,11 +174,11 @@ class RefundTest extends TestCase
             'reason' => 'Double tap', 'seen_refunded' => '38.50',
         ])->assertSessionHasErrors('refund');
 
-        // Orders still being made are cancelled, not refunded.
+        // Since D-169 a drink is completed at checkout, so it can be refunded at once.
         $coffee = $this->coffee();
         $this->checkout($this->cashier, $this->payload([['product_id' => $coffee['product']->id, 'variant_id' => $coffee['iced']->id, 'quantity' => 1]]))->assertSessionHasNoErrors();
-        $open = Order::query()->latest('id')->firstOrFail();
-        $this->refund($open, [$open->items()->firstOrFail()->id => '1'])->assertSessionHasErrors('refund');
+        $drink = Order::query()->latest('id')->firstOrFail();
+        $this->refund($drink, [$drink->items()->firstOrFail()->id => '1'])->assertSessionHasNoErrors();
     }
 
     public function test_the_original_sale_and_payment_are_kept_and_the_refund_is_its_own_record(): void
@@ -242,9 +242,6 @@ class RefundTest extends TestCase
         $coffee = $this->coffee();
         $this->checkout($this->cashier, $this->payload([['product_id' => $coffee['product']->id, 'variant_id' => $coffee['iced']->id, 'quantity' => 1]]))->assertSessionHasNoErrors();
         $drink = Order::query()->latest('id')->firstOrFail();
-        foreach (['confirmed', 'preparing', 'ready'] as $from) {
-            $this->actingAs($this->manager)->post("/orders/{$drink->id}/advance", ['from' => $from])->assertSessionHasNoErrors();
-        }
         $drinkLine = $drink->items()->firstOrFail();
         $this->refund($drink, [$drinkLine->id => ['1', true]])->assertSessionHasErrors("lines.{$drinkLine->id}");
 
@@ -263,11 +260,8 @@ class RefundTest extends TestCase
 
     public function test_gcash_refunds_record_the_transfer_sent_back_and_leave_the_drawer_alone(): void
     {
-        // A GCash payment is refunded only after a manager confirmed it arrived.
+        // GCash is confirmed at the sale (D-168), so it can be refunded straight away.
         $order = $this->sale(['method' => 'GCASH', 'reference' => 'GC12345678']);
-        $glazedLine = $this->line($order, $this->glazed);
-        $this->refund($order, [$glazedLine->id => '1'], ['reference' => 'GCBACK778899'])->assertSessionHasErrors('refund');
-        $this->actingAs($this->manager)->post('/payments/'.Payment::query()->sole()->id.'/verify')->assertSessionHasNoErrors();
         $glazed = $this->line($order, $this->glazed);
 
         $this->refund($order, [$glazed->id => '1'])->assertSessionHasErrors('reference');
@@ -280,19 +274,17 @@ class RefundTest extends TestCase
         $this->assertSame('1000.00', app(ExpectedCash::class)->for($this->shiftOf($this->cashier))->toDecimal());
     }
 
-    public function test_cancelling_an_order_writes_a_void_record_and_the_drawer_is_counted_once(): void
+    public function test_an_order_cancelled_before_d169_keeps_its_void_and_the_drawer_is_counted_once(): void
     {
-        // FR-041, BR-005, D-154.
+        // FR-041, BR-005, D-154; no new voids since D-169.
         $coffee = $this->coffee();
         $this->checkout($this->cashier, $this->payload([['product_id' => $coffee['product']->id, 'variant_id' => $coffee['iced']->id, 'quantity' => 2]]))->assertSessionHasNoErrors();
         $order = Order::query()->sole();
-
-        $this->actingAs($this->manager)->post("/orders/{$order->id}/cancel", ['reason' => 'Out of milk', 'return_stock' => false])->assertSessionHasNoErrors();
+        $this->pastCancellation($order, $this->manager, 'Out of milk');
 
         $void = Refund::query()->sole();
         $this->assertSame([RefundKind::Void, '220.00', 'Out of milk', $this->manager->id], [$void->kind, $void->amount, $void->reason, $void->approved_by]);
         $this->assertSame(['2.000'], $void->items()->pluck('quantity')->all());
-        $this->assertDatabaseHas('audit_logs', ['event' => 'order.voided', 'auditable_id' => $void->id]);
         // The cancelled payment left cash sales; no extra cash refund on top.
         $this->assertSame(0, CashMovement::query()->count());
         $this->assertSame('1000.00', app(ExpectedCash::class)->for($this->shiftOf($this->cashier))->toDecimal());
@@ -320,7 +312,7 @@ class RefundTest extends TestCase
                 ->where('receipt.refunds.0.amount', '38.50'));
 
         // Someone who may not refund sees the history but no refund form.
-        $prep = $this->staff(PermissionCatalog::PREPARATION_STAFF);
+        $prep = $this->staff($this->bakerRole());
         $this->actingAs($prep)->get("/pos/orders/{$order->id}")->assertOk()
             ->assertInertia(fn (AssertableInertia $page) => $page->where('workflow.refund', null)->has('workflow.refunds', 1));
     }

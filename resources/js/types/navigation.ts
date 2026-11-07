@@ -13,6 +13,4 @@ export type NavItem = {
     isActive?: boolean;
     /** Server-enforced permission; used here only to hide links. */
     permission?: string;
-    /** Hidden while this feature is switched off (D-164). */
-    feature?: 'tax_rules';
 };

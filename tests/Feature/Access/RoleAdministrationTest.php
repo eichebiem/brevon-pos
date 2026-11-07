@@ -6,6 +6,7 @@ use App\Domain\Access\PermissionCatalog;
 use App\Models\AuditLog;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 use Tests\Concerns\InteractsWithStaff;
 use Tests\TestCase;
 
@@ -29,7 +30,33 @@ class RoleAdministrationTest extends TestCase
         foreach (PermissionCatalog::defaultRoles() as $role => $permissions) {
             $this->assertSame(count($permissions), $counts[$role], $role);
         }
-        $this->assertFalse(Role::findByName(PermissionCatalog::ADMIN)->hasPermissionTo('roles.manage'));
+        // D-176: three built-in roles; Owner absorbed Admin, Preparation Staff is gone.
+        $this->assertEqualsCanonicalizing([PermissionCatalog::OWNER, PermissionCatalog::MANAGER, PermissionCatalog::CASHIER], array_keys($counts));
+    }
+
+    public function test_the_role_migration_moves_admins_to_owner_and_refuses_while_preparation_staff_is_in_use(): void
+    {
+        $migration = require database_path('migrations/2026_11_07_100500_merge_admin_into_owner_and_remove_preparation_staff.php');
+        Role::create(['name' => 'Admin', 'guard_name' => 'web'])->givePermissionTo('users.manage');
+        Role::create(['name' => 'Preparation Staff', 'guard_name' => 'web']);
+        $admin = $this->staff('Admin');
+        $baker = $this->staff('Preparation Staff');
+
+        try {
+            $migration->up();
+            $this->fail('Expected the migration to refuse while someone has Preparation Staff.');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('Preparation Staff', $e->getMessage());
+        }
+        $this->assertTrue(Role::query()->where('name', 'Admin')->exists(), 'nothing changed');
+
+        $baker->syncRoles([PermissionCatalog::CASHIER]);
+        $migration->up();
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+        $this->assertSame([PermissionCatalog::OWNER], $admin->refresh()->getRoleNames()->all());
+        $this->assertFalse(Role::query()->whereIn('name', ['Admin', 'Preparation Staff'])->exists());
+        $this->assertSame([PermissionCatalog::CASHIER], $baker->refresh()->getRoleNames()->all());
     }
 
     public function test_seeding_twice_is_idempotent(): void

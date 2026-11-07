@@ -71,7 +71,7 @@ class OperationsReportTest extends TestCase
         $coffee = $this->coffee();
         $this->checkout($this->cashier, $this->payload([['product_id' => $coffee['product']->id, 'variant_id' => $coffee['iced']->id, 'quantity' => 1]]))->assertSessionHasNoErrors();
         $cancelled = Order::query()->latest('id')->firstOrFail();
-        $this->actingAs($this->manager)->post("/orders/{$cancelled->id}/cancel", ['reason' => 'Out of milk', 'return_stock' => false])->assertSessionHasNoErrors();
+        $this->pastCancellation($cancelled, $this->manager, 'Out of milk');
 
         return $sale;
     }
@@ -195,7 +195,7 @@ class OperationsReportTest extends TestCase
     public function test_permissions_and_exports(): void
     {
         $this->fixture();
-        $prep = $this->staff(PermissionCatalog::PREPARATION_STAFF);
+        $prep = $this->staff($this->bakerRole());
         foreach (['refunds', 'discounts', 'cash-variance', 'stock-movements', 'production', 'waste'] as $report) {
             $this->actingAs($this->cashier)->get("/admin/reports/{$report}")->assertForbidden();
             $this->actingAs($prep)->get("/admin/reports/{$report}")->assertForbidden();

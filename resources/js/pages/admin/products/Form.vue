@@ -39,11 +39,9 @@ const props = defineProps<{
         image_url: string | null;
         stock_item: { sku: string; name: string; unit: string | null } | null;
         variants: Variant[];
-        option_group_ids: number[];
         location_ids: number[];
     } | null;
     categories: { id: number; name: string; is_active: boolean }[];
-    optionGroups: { id: number; name: string; is_active: boolean }[];
     locations: {
         id: number;
         code: string;
@@ -73,7 +71,6 @@ const form = useForm<{
     image: File | null;
     remove_image: boolean;
     variants: Variant[];
-    option_group_ids: number[];
     location_ids: number[];
 }>({
     name: props.product?.name ?? '',
@@ -89,7 +86,6 @@ const form = useForm<{
     image: null,
     remove_image: false,
     variants: [...(props.product?.variants ?? [])],
-    option_group_ids: [...(props.product?.option_group_ids ?? [])],
     location_ids: props.product
         ? [...props.product.location_ids]
         : main
@@ -440,36 +436,6 @@ const error = (key: string): string | undefined =>
                     @click="addVariant"
                     ><Plus aria-hidden="true" /> Add variant</Button
                 >
-            </div>
-        </section>
-
-        <section
-            class="grid gap-3 rounded-xl border border-border bg-card p-5"
-            aria-labelledby="options-heading"
-        >
-            <h2 id="options-heading" class="font-semibold">
-                Options &amp; add-ons
-            </h2>
-            <p
-                v-if="optionGroups.length === 0"
-                class="text-sm text-muted-foreground"
-            >
-                No option groups exist yet.
-            </p>
-            <div class="flex flex-wrap gap-3">
-                <label
-                    v-for="g in optionGroups"
-                    :key="g.id"
-                    class="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-border px-3 has-[:checked]:border-primary has-[:checked]:bg-secondary"
-                >
-                    <input
-                        type="checkbox"
-                        class="size-4 accent-brevon-navy"
-                        :checked="form.option_group_ids.includes(g.id)"
-                        @change="toggle(form.option_group_ids, g.id)"
-                    />
-                    {{ g.name }}{{ g.is_active ? '' : ' (inactive)' }}
-                </label>
             </div>
         </section>
 

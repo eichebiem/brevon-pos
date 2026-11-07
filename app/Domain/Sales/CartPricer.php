@@ -7,12 +7,8 @@ use App\Domain\Catalog\PriceResolver;
 use App\Domain\Discounts\DiscountCalculator;
 use App\Domain\Discounts\DiscountRequest;
 use App\Domain\Shared\Money;
-use App\Domain\Tax\TaxCalculator;
-use App\Enums\OptionSelectionType;
 use App\Models\Branch;
-use App\Models\OptionGroup;
 use App\Models\Product;
-use App\Models\ProductOption;
 use App\Models\ProductVariant;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
@@ -21,10 +17,10 @@ use Illuminate\Validation\ValidationException;
  * Validates a cart against the current catalog and prices it on the server
  * (FR-026, FR-027, BR-003): the product must be sellable at the location
  * (active, on the POS, in an active category, enabled here, finished stock
- * at a pop-up), the variant and options must be valid and active, and the
- * price is the one in force now. Line total = quantity × (unit price +
- * options), rounded half-up to the centavo (D-034). A discount and any
- * tax rules in effect are applied after (D-147, D-149). Errors are keyed
+ * at a pop-up), the variant must be valid and active, and the price is
+ * the one in force now. Line total = quantity × unit price, rounded half-up
+ * to the centavo (D-034); there are no add-ons (D-166). A discount is applied
+ * after (D-147); no tax is charged (D-165). Errors are keyed
  * `items.{index}` so the POS can point at the line.
  */
 class CartPricer
@@ -35,7 +31,6 @@ class CartPricer
         private readonly CatalogQuery $catalog,
         private readonly PriceResolver $prices,
         private readonly DiscountCalculator $discounts,
-        private readonly TaxCalculator $taxes,
     ) {}
 
     /**
@@ -56,7 +51,7 @@ class CartPricer
         /** @var Collection<int, Product> $products */
         $products = $this->catalog->sellableAt($location)
             ->whereKey($ids)
-            ->with(['variants', 'optionGroups' => fn ($q) => $q->where('is_active', true), 'optionGroups.options'])
+            ->with(['variants'])
             ->get()
             ->keyBy('id');
 
@@ -90,26 +85,7 @@ class CartPricer
         }
         $discountTotal = $applied->amount ?? Money::zero();
 
-        // Tax on what is left after the discount (D-149), spread the same way.
-        $net = [];
-        foreach ($priced as $i => $line) {
-            $net[$i] = $line->lineTotal->subtract($lineDiscounts[$i]);
-        }
-        $taxes = $this->taxes->apply($subtotal->subtract($discountTotal));
-        $lineTaxes = array_fill(0, count($priced), Money::zero());
-        $taxTotal = Money::zero();
-        $added = Money::zero();
-        foreach ($taxes as $tax) {
-            foreach (DiscountCalculator::allocate($tax->amount, $net) as $i => $part) {
-                $lineTaxes[$i] = $lineTaxes[$i]->add($part);
-            }
-            $taxTotal = $taxTotal->add($tax->amount);
-            if (! $tax->rule->inclusive) {
-                $added = $added->add($tax->amount);
-            }
-        }
-
-        return new PricedCart($priced, $subtotal, $discountTotal, $taxTotal, $subtotal->subtract($discountTotal)->add($added), $applied, array_values($lineDiscounts), array_values($lineTaxes), $taxes);
+        return new PricedCart($priced, $subtotal, $discountTotal, $subtotal->subtract($discountTotal), $applied, array_values($lineDiscounts));
     }
 
     private function line(Branch $location, ?Product $product, CartLine $line): PricedLine
@@ -129,17 +105,12 @@ class CartPricer
             throw new CartLineInvalid(__(':item has no price here.', ['item' => $product->name]));
         }
 
-        $options = $this->options($product, $line->optionIds);
-        $optionTotal = Money::sum(array_map(fn (array $o) => Money::fromDecimal($o['option']->price_delta), $options));
-
         return new PricedLine(
             product: $product,
             variant: $variant,
             quantity: $line->quantity,
             unitPrice: $unitPrice,
-            options: $options,
-            optionTotal: $optionTotal,
-            lineTotal: $unitPrice->add($optionTotal)->multiply($line->quantity),
+            lineTotal: $unitPrice->multiply($line->quantity),
             notes: $line->notes,
         );
     }
@@ -162,46 +133,5 @@ class CartPricer
         }
 
         return $variant;
-    }
-
-    /**
-     * @param  list<int>  $optionIds
-     * @return list<array{group: OptionGroup, option: ProductOption}>
-     */
-    private function options(Product $product, array $optionIds): array
-    {
-        if (count($optionIds) !== count(array_unique($optionIds))) {
-            throw new CartLineInvalid(__('An option was chosen twice for :item.', ['item' => $product->name]));
-        }
-
-        $chosen = [];
-        $remaining = array_flip($optionIds);
-
-        foreach ($product->optionGroups as $group) {
-            $picked = $group->options->filter(fn (ProductOption $o) => isset($remaining[$o->id]));
-
-            if ($picked->contains(fn (ProductOption $o) => ! $o->is_active)) {
-                throw new CartLineInvalid(__('An option chosen for :item is no longer available.', ['item' => $product->name]));
-            }
-
-            $max = $group->selection_type === OptionSelectionType::Single ? 1 : $group->max_selections;
-            if ($picked->count() < $group->min_selections) {
-                throw new CartLineInvalid(__('Choose :group for :item.', ['group' => $group->name, 'item' => $product->name]));
-            }
-            if ($max !== null && $picked->count() > $max) {
-                throw new CartLineInvalid(__('Too many choices for :group on :item.', ['group' => $group->name, 'item' => $product->name]));
-            }
-
-            foreach ($picked as $option) {
-                unset($remaining[$option->id]);
-                $chosen[] = ['group' => $group, 'option' => $option];
-            }
-        }
-
-        if ($remaining !== []) {
-            throw new CartLineInvalid(__('An option chosen for :item does not apply to it.', ['item' => $product->name]));
-        }
-
-        return $chosen;
     }
 }

@@ -69,20 +69,6 @@ function printReceipt(): void {
                     >Received {{ formatMoney(order.amount_tendered) }}</span
                 >
             </p>
-            <p
-                v-else-if="order.payment_status === 'pending_verification'"
-                class="rounded-lg bg-amber-100 px-3 py-2 text-center text-sm text-amber-900"
-            >
-                {{ order.payment_method }} ref
-                <strong class="font-mono">{{ order.reference_number }}</strong>
-                is waiting for verification.
-            </p>
-            <p
-                v-if="order.status === 'confirmed'"
-                class="text-center text-sm text-muted-foreground"
-            >
-                Sent for preparation.
-            </p>
 
             <DialogFooter class="gap-2 sm:justify-center">
                 <Button

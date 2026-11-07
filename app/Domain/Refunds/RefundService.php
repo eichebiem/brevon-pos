@@ -168,44 +168,13 @@ class RefundService
         });
     }
 
-    /**
-     * The void record a cancellation writes for each payment it hands back
-     * (FR-041, BR-005; D-154). Called inside the cancellation transaction
-     * after the order and payments are locked. The drawer effect is the
-     * payment dropping out of its shift's cash sales, so no cash movement.
-     */
-    public function recordVoid(User $actor, Order $order, Payment $payment, string $reason, bool $returnedStock): Refund
-    {
-        /** @var Branch $location */
-        $location = $order->branch()->firstOrFail();
-        $isCash = $payment->method?->type === PaymentMethodType::Cash;
-        $shift = $isCash && $order->cashier_shift_id !== null ? CashierShift::query()->find($order->cashier_shift_id) : null;
-
-        $refund = $this->create($order, $payment, $location, RefundKind::Void, Money::fromDecimal($payment->amount), $reason, $actor, $actor, $shift, null);
-        foreach ($this->refundables->for($order) as $line) {
-            if ($line->remainingQuantity()->isPositive()) {
-                $this->item($refund, $line->item->id, $line->remainingQuantity()->toString(), $line->remainingAmount(), $returnedStock);
-            }
-        }
-
-        $this->audit->record('order.voided', $refund, null, [
-            'refund_number' => $refund->refund_number,
-            'order_number' => $order->order_number,
-            'amount' => $refund->amount,
-            'method' => $payment->method?->name,
-            'reason' => $reason,
-        ], $order->branch_id, $actor);
-
-        return $refund;
-    }
-
     private function assertRefundable(Order $order): void
     {
         $error = match ($order->status) {
             OrderStatus::Completed => null,
             OrderStatus::Refunded => __('Order :number was already refunded in full.', ['number' => $order->order_number]),
             OrderStatus::Cancelled => __('Order :number was cancelled, so its payment was already handed back.', ['number' => $order->order_number]),
-            default => __('Order :number is not completed yet. Cancel it instead while it is being prepared.', ['number' => $order->order_number]),
+            default => __('Order :number is not completed, so it cannot be refunded.', ['number' => $order->order_number]),
         };
         if ($error !== null) {
             throw ValidationException::withMessages(['refund' => $error]);
@@ -220,9 +189,7 @@ class RefundService
             return $payment;
         }
 
-        throw ValidationException::withMessages(['refund' => $payments->contains(fn (Payment $p) => $p->status === PaymentStatus::Pending)
-            ? __('Check the :method payment first: it is not confirmed as received yet.', ['method' => $payments->first()?->method->name ?? 'e-wallet'])
-            : __('This order has no payment left to refund.')]);
+        throw ValidationException::withMessages(['refund' => __('This order has no payment left to refund.')]);
     }
 
     private function create(Order $order, Payment $payment, Branch $location, RefundKind $kind, Money $amount, string $reason, User $actor, ?User $approver, ?CashierShift $shift, ?string $reference): Refund

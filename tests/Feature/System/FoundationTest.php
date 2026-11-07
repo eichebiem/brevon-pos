@@ -74,7 +74,7 @@ class FoundationTest extends TestCase
         return [
             'admin dashboard' => ['/admin/dashboard', 'admin/Dashboard'],
             'pos' => ['/pos', 'pos/Index'],
-            'preparation' => ['/staff/preparation', 'staff/Preparation'],
+            'production' => ['/admin/production', 'admin/production/batches/Index'],
         ];
     }
 

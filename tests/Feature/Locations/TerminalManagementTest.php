@@ -24,7 +24,7 @@ class TerminalManagementTest extends TestCase
 
     public function test_terminal_codes_are_assigned_in_order_across_all_locations(): void
     {
-        $admin = $this->staff(PermissionCatalog::ADMIN);
+        $admin = $this->staff(PermissionCatalog::OWNER);
         $popUp = Branch::factory()->popUp()->create();
         Terminal::query()->create(['branch_id' => $popUp->id, 'terminal_code' => 'STALL-A', 'name' => 'Older custom code']);
 
@@ -41,7 +41,7 @@ class TerminalManagementTest extends TestCase
 
     public function test_reassignment_is_audited_and_only_to_operating_locations(): void
     {
-        $admin = $this->staff(PermissionCatalog::ADMIN);
+        $admin = $this->staff(PermissionCatalog::OWNER);
         $terminal = $this->mainLocation()->terminals()->firstOrFail();
         $closed = Branch::factory()->popUp()->inactive()->create();
         $future = Branch::factory()->popUp()->create(['operating_starts_on' => now('Asia/Manila')->addDays(3)->toDateString()]);
@@ -62,7 +62,7 @@ class TerminalManagementTest extends TestCase
     /** Only possible with codes typed before D-122; new codes never clash. */
     public function test_reassignment_refuses_a_code_clash_at_the_destination(): void
     {
-        $admin = $this->staff(PermissionCatalog::ADMIN);
+        $admin = $this->staff(PermissionCatalog::OWNER);
         $terminal = $this->mainLocation()->terminals()->firstOrFail();
         $popUp = Branch::factory()->popUp()->create();
         Terminal::query()->create(['branch_id' => $popUp->id, 'terminal_code' => 'POS-1', 'name' => 'Stall']);
@@ -73,7 +73,7 @@ class TerminalManagementTest extends TestCase
 
     public function test_terminal_rename_and_deactivation_are_audited(): void
     {
-        $admin = $this->staff(PermissionCatalog::ADMIN);
+        $admin = $this->staff(PermissionCatalog::OWNER);
         $terminal = $this->mainLocation()->terminals()->firstOrFail();
 
         $this->actingAs($admin)->put("/admin/terminals/{$terminal->id}", ['name' => 'Window', 'is_active' => false])->assertSessionHasNoErrors();

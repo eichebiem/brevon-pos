@@ -17,7 +17,6 @@ const props = defineProps<{
         unit_of_measure_id: number;
         reorder_level: string;
         is_perishable: boolean;
-        track_lot: boolean;
         is_active: boolean;
         product: string | null;
     } | null;
@@ -40,7 +39,6 @@ const form = useForm({
     ),
     reorder_level: props.item?.reorder_level ?? '0',
     is_perishable: props.item?.is_perishable ?? false,
-    track_lot: props.item?.track_lot ?? false,
     is_active: props.item?.is_active ?? true,
 });
 
@@ -56,7 +54,6 @@ function submit(): void {
             ? {
                   reorder_level: data.reorder_level,
                   is_perishable: data.is_perishable,
-                  track_lot: data.track_lot,
               }
             : data,
     ).put(update(props.item.id).url);
@@ -172,20 +169,6 @@ function submit(): void {
                         class="size-4 accent-brevon-navy"
                     />
                     Perishable
-                </label>
-                <label class="flex items-start gap-2">
-                    <input
-                        v-model="form.track_lot"
-                        type="checkbox"
-                        class="mt-0.5 size-4 accent-brevon-navy"
-                    />
-                    <span
-                        >Record lot and expiry when received
-                        <span class="block text-xs text-muted-foreground"
-                            >Receiving asks for a lot number or expiry
-                            date.</span
-                        ></span
-                    >
                 </label>
                 <label v-if="item && !linked" class="flex items-center gap-2">
                     <input

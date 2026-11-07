@@ -19,7 +19,6 @@ type Row = {
     unit: string | null;
     reorder_level: string;
     is_perishable: boolean;
-    track_lot: boolean;
     is_active: boolean;
     product: string | null;
 };
@@ -170,9 +169,7 @@ const typeLabel = (value: string) =>
                             >
                         </td>
                         <td class="px-4 py-3 text-xs text-muted-foreground">
-                            <template v-if="row.track_lot"
-                                >Lots &amp; expiry</template
-                            ><template v-else-if="row.is_perishable"
+                            <template v-if="row.is_perishable"
                                 >Perishable</template
                             >
                         </td>

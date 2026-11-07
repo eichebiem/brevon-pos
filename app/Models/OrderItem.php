@@ -22,9 +22,7 @@ use LogicException;
  * @property string $product_type_snapshot
  * @property string $quantity
  * @property string $unit_price
- * @property string $option_total
  * @property string $discount_amount
- * @property string $tax_amount
  * @property string $line_total
  * @property string|null $notes
  * @property CarbonImmutable $created_at
@@ -68,13 +66,5 @@ class OrderItem extends Model
     public function refundItems(): HasMany
     {
         return $this->hasMany(RefundItem::class);
-    }
-
-    /**
-     * @return HasMany<OrderItemOption, $this>
-     */
-    public function options(): HasMany
-    {
-        return $this->hasMany(OrderItemOption::class)->orderBy('id');
     }
 }

@@ -4,20 +4,20 @@ Point of Sale and Store Management System for **Brevon Doughnuts & Coffee**.
 Requirements: [`docs/BREVON-SRS-v1.1.md`](docs/BREVON-SRS-v1.1.md) (SRS v1.1, prepared by Harris).
 Progress: [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md).
 
-> **Status:** Phase 10b (operational reports). Staff sign-in, users, roles, audit log, catalog and prices, store
+> **Status:** Phase 11a (feature removals: tax, add-ons, lots, GCash check and preparation are gone; three roles: Owner, Manager, Cashier). Staff sign-in, users, roles, audit log, catalog and prices, store
 > settings, payment methods, pop-up locations, terminals, opening stock, stock on hand/movements and cashier shifts
-> work. Cashiers sell from the POS screen and print 80 mm order receipts; preparation staff work orders through
-> New → Preparing → Ready → Handed over; managers cancel orders with a reason and confirm GCash transfers.
+> work. Cashiers sell from the POS screen and print 80 mm order receipts; every sale is completed at the counter,
+> and a GCash sale needs its reference and the cashier's tick that the transfer arrived.
 > Managers record cash in / out / paid-outs (large ones need approval), cashiers close with a blind count, and
 > managers review shifts and add corrections without changing the closed figures. Staff count stock, adjust
 > it (with approval), write off waste, see low-stock alerts and dispatch doughnuts from the main branch to pop-ups.
-> Managers order from suppliers, receive deliveries in full or in parts with lot and expiry dates, and see
-> the value of stock at weighted average cost. Owners keep versioned recipes; bakers record doughnut batches
-> (ingredients out, good pieces in, rejects noted) and a manager posts them; drinks with a recipe take their
+> Managers order from suppliers, receive deliveries in full or in parts, and see
+> the value of stock at weighted average cost. Owners keep versioned recipes; managers record doughnut batches
+> (ingredients out, good pieces in, rejects noted) and post them; drinks with a recipe take their
 > ingredients at the counter. Cashiers give preset discounts (big ones approved by a manager at the counter) and
-> the Senior Citizen / PWD discount with masked beneficiary details; tax rules are a later feature, switched off (D-164). Completed
+> the Senior Citizen / PWD discount with masked beneficiary details; no tax is charged (non-VAT business, D-165). Completed
 > sales are refunded by item with a manager's approval (cash from the drawer, GCash with the reference sent back,
-> goods back in stock only when ticked); cancellations leave a void record. The dashboard shows sales, orders, average order and low stock; the sales
+> goods back in stock only when ticked); every correction is a refund (D-169). The dashboard shows sales, orders, average order and low stock; the sales
 > report breaks sales down by period, product, category, cashier and payment method, per location (closed pop-ups
 > included). Operational reports cover refunds and voids, discounts given, cash differences, stock in and out,
 > production and waste. Every report table exports to CSV or Excel and prints.
@@ -79,7 +79,9 @@ resets an existing account's password or overwrites a product.
 > (Settings → Password). Their emails (`…@brevon.test`) are placeholders: set real ones in **Administration → Users**,
 > or password resets cannot reach them.
 
-**Local only (D-100):** when `APP_ENV=local`, seeding also creates Cashier 1 (`cashier1` / `password`). It is never
+**Local only (D-100, D-178):** when `APP_ENV=local`, seeding also creates the **SM Rosales** pop-up (next free
+pop-up code, e.g. `POP01`) with its terminal **SM Rosales POS**, selling the same doughnuts as the main branch, plus
+Cashier 1 (`cashier1` / `password`, main branch) and Cashier 2 (`cashier2` / `password`, SM Rosales). None of these is
 created in testing, staging or production.
 
 **Menu (D-101):** all environments get the shop's 36 menu items, with Harris recorded as the one who set the prices. Running `MenuSeeder` on its own also creates the default Owners if they are missing.

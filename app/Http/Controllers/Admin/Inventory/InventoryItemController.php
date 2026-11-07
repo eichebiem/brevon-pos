@@ -43,7 +43,6 @@ class InventoryItemController extends Controller
                     'unit' => $item->unit?->code,
                     'reorder_level' => $item->reorder_level,
                     'is_perishable' => $item->is_perishable,
-                    'track_lot' => $item->track_lot,
                     'is_active' => $item->is_active,
                     'product' => $item->product?->name,
                 ]),
@@ -72,7 +71,6 @@ class InventoryItemController extends Controller
             'unit_of_measure_id' => ['required', 'integer', 'exists:units_of_measure,id'],
             'reorder_level' => ['required', 'string', 'max:20'],
             'is_perishable' => ['boolean'],
-            'track_lot' => ['boolean'],
         ], ['sku.regex' => __('Use letters, numbers and dashes only.')]);
 
         /** @var User $actor */
@@ -84,7 +82,6 @@ class InventoryItemController extends Controller
             'unit_of_measure_id' => (int) $data['unit_of_measure_id'],
             'reorder_level' => (string) $data['reorder_level'],
             'is_perishable' => (bool) ($data['is_perishable'] ?? false),
-            'track_lot' => (bool) ($data['track_lot'] ?? false),
         ]);
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Stock item :sku added.', ['sku' => $item->sku])]);
 
@@ -97,7 +94,7 @@ class InventoryItemController extends Controller
 
         return Inertia::render('admin/inventory/items/Form', [
             'item' => [
-                ...$item->only(['id', 'sku', 'name', 'unit_of_measure_id', 'reorder_level', 'is_perishable', 'track_lot', 'is_active']),
+                ...$item->only(['id', 'sku', 'name', 'unit_of_measure_id', 'reorder_level', 'is_perishable', 'is_active']),
                 'item_type' => $item->item_type->value,
                 'product' => $item->product?->name,
             ],
@@ -115,7 +112,6 @@ class InventoryItemController extends Controller
             'unit_of_measure_id' => ['sometimes', 'required', 'integer', 'exists:units_of_measure,id'],
             'reorder_level' => ['required', 'string', 'max:20'],
             'is_perishable' => ['boolean'],
-            'track_lot' => ['boolean'],
             'is_active' => ['sometimes', 'boolean'],
         ]);
 

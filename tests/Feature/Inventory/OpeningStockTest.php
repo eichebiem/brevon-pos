@@ -151,7 +151,7 @@ class OpeningStockTest extends TestCase
     {
         $glazed = $this->doughnutItem();
 
-        foreach ([PermissionCatalog::CASHIER, PermissionCatalog::PREPARATION_STAFF] as $role) {
+        foreach ([PermissionCatalog::CASHIER, $this->bakerRole()] as $role) {
             $this->actingAs($this->staff($role))->post('/admin/inventory/opening-stock', ['lines' => [
                 ['inventory_item_id' => $glazed->id, 'quantity' => '5', 'unit_cost' => ''],
             ]])->assertForbidden();

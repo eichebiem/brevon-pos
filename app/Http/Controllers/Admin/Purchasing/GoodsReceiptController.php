@@ -69,7 +69,6 @@ class GoodsReceiptController extends Controller
                     'name' => $l->item?->name,
                     'unit' => $l->item?->unit?->code,
                     'precision' => $l->item->unit->precision ?? 3,
-                    'track_lot' => (bool) $l->item?->track_lot,
                     'quantity_ordered' => $l->quantity_ordered,
                     'quantity_received' => $l->quantity_received,
                     'quantity_due' => $this->due($l),
@@ -99,8 +98,6 @@ class GoodsReceiptController extends Controller
             'lines.*.unit_cost' => ['nullable', 'string', 'max:20'],
             'lines.*.rejected_quantity' => ['nullable', 'string', 'max:20'],
             'lines.*.rejected_condition' => ['nullable', 'string', 'max:20'],
-            'lines.*.lot_number' => ['nullable', 'string', 'max:80'],
-            'lines.*.expires_at' => ['nullable', 'string', 'max:10'],
         ], ['lines.required' => __('Enter what was delivered for at least one item.')]);
 
         $order = isset($data['purchase_order_id']) ? PurchaseOrder::query()->findOrFail((int) $data['purchase_order_id']) : null;
@@ -120,8 +117,6 @@ class GoodsReceiptController extends Controller
             'unit_cost' => $l['unit_cost'] ?? null,
             'rejected_quantity' => $l['rejected_quantity'] ?? null,
             'rejected_condition' => $l['rejected_condition'] ?? null,
-            'lot_number' => $l['lot_number'] ?? null,
-            'expires_at' => $l['expires_at'] ?? null,
         ], $data['lines'])));
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Delivery :number received.', ['number' => $receipt->receipt_number])]);
@@ -132,7 +127,7 @@ class GoodsReceiptController extends Controller
     public function show(Request $request, GoodsReceipt $receipt): Response
     {
         abort_unless($this->user($request)->worksAt($receipt->branch_id), 404);
-        $receipt->load(['supplier:id,supplier_code,name', 'purchaseOrder:id,po_number', 'receiver:id,name', 'overReceiptApprover:id,name', 'branch:id,code,name', 'items.item.unit', 'items.lot']);
+        $receipt->load(['supplier:id,supplier_code,name', 'purchaseOrder:id,po_number', 'receiver:id,name', 'overReceiptApprover:id,name', 'branch:id,code,name', 'items.item.unit']);
 
         return Inertia::render('admin/purchasing/receipts/Show', [
             'receipt' => [
@@ -149,8 +144,6 @@ class GoodsReceiptController extends Controller
                     'unit_cost' => $l->unit_cost,
                     'condition' => $l->condition->value,
                     'condition_label' => $l->condition->label(),
-                    'lot_number' => $l->lot?->lot_number,
-                    'expires_at' => $l->lot?->expires_at?->toDateString(),
                 ])->values(),
             ],
         ]);

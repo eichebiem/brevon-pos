@@ -18,12 +18,10 @@ use App\Models\AuditLog;
 use App\Models\Branch;
 use App\Models\InventoryItem;
 use App\Models\InventoryMovement;
-use App\Models\OptionGroup;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Payment;
 use App\Models\PaymentMethod;
-use App\Models\ProductOption;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
@@ -67,10 +65,10 @@ class CheckoutTest extends TestCase
         $this->assertSame($shift->terminal_id, $order->terminal_id);
         $this->assertSame('132.00', $order->grand_total);
         $this->assertSame('0.00', $order->amount_due);
-        // Doughnuts need no preparation: the order completes at once (D-044).
+        // Every sale completes at the counter (D-169).
         $this->assertSame(OrderStatus::Completed, $order->status);
         $this->assertSame(OrderPaymentStatus::Paid, $order->payment_status);
-        $this->assertSame(['confirmed', 'completed'], $order->statusHistory()->get()->map(fn ($h) => $h->to_status->value)->all());
+        $this->assertSame(['completed'], $order->statusHistory()->get()->map(fn ($h) => $h->to_status->value)->all());
 
         $payment = Payment::query()->sole();
         $this->assertSame('132.00', $payment->amount, 'the payment is the amount applied, not the cash handed over');
@@ -91,27 +89,26 @@ class CheckoutTest extends TestCase
         $this->assertSame(['order.created', 'payment.recorded'], AuditLog::query()->whereIn('event', ['order.created', 'payment.recorded'])->orderBy('id')->pluck('event')->all());
     }
 
-    public function test_prices_variants_and_options_are_worked_out_on_the_server(): void
+    public function test_prices_and_variants_are_worked_out_on_the_server(): void
     {
         $cashier = $this->cashierOnShift();
-        ['product' => $latte, 'iced' => $iced, 'hot' => $hot, 'shot' => $shot, 'oat' => $oat] = $this->coffee();
+        ['product' => $latte, 'iced' => $iced, 'hot' => $hot] = $this->coffee();
 
         $this->checkout($cashier, $this->payload([
-            ['product_id' => $latte->id, 'variant_id' => $hot->id, 'quantity' => 2, 'option_ids' => [$shot->id, $oat->id], 'notes' => 'Less sweet', 'unit_price' => '1.00'],
+            ['product_id' => $latte->id, 'variant_id' => $hot->id, 'quantity' => 2, 'option_ids' => [999], 'notes' => 'Less sweet', 'unit_price' => '1.00'],
             ['product_id' => $latte->id, 'variant_id' => $iced->id, 'quantity' => 1],
         ], ['method' => 'CASH', 'amount_tendered' => '500'], ['grand_total' => '5.00', 'customer_name' => 'Juan', 'customer_phone' => '0917']))->assertSessionHasNoErrors();
 
         $order = Order::query()->sole();
-        // 2 × (120 + 25 + 30) + 110: client-sent prices are ignored (BR-003).
-        $this->assertSame('460.00', $order->grand_total);
-        $this->assertSame(OrderStatus::Confirmed, $order->status, 'drinks go to preparation');
+        // 2 × 120 + 110: client-sent prices and add-ons are ignored (BR-003, D-166).
+        $this->assertSame('350.00', $order->grand_total);
+        $this->assertSame(OrderStatus::Completed, $order->status, 'drinks are completed at checkout too (D-169)');
 
         $hotLine = OrderItem::query()->where('variant_id', $hot->id)->sole();
-        $this->assertSame(['CF-LATTE-HOT', 'Latte', 'Hot 12oz', '120.00', '55.00', '350.00', 'Less sweet'], [
+        $this->assertSame(['CF-LATTE-HOT', 'Latte', 'Hot 12oz', '120.00', '240.00', 'Less sweet'], [
             $hotLine->sku_snapshot, $hotLine->product_name_snapshot, $hotLine->variant_name_snapshot,
-            $hotLine->unit_price, $hotLine->option_total, $hotLine->line_total, $hotLine->notes,
+            $hotLine->unit_price, $hotLine->line_total, $hotLine->notes,
         ]);
-        $this->assertSame(['Extra shot', 'Oat milk'], $hotLine->options()->pluck('option_name_snapshot')->all());
         $this->assertSame(0, InventoryMovement::query()->where('movement_type', InventoryMovementType::Sale)->count(), 'untracked drinks move no stock');
     }
 
@@ -223,7 +220,7 @@ class CheckoutTest extends TestCase
         $this->assertTrue(app(InventoryLedger::class)->reconcile()->isEmpty());
     }
 
-    public function test_gcash_payment_needs_a_reference_and_waits_for_verification(): void
+    public function test_gcash_payment_needs_a_reference_and_is_confirmed_at_the_sale(): void
     {
         $cashier = $this->cashierOnShift();
         $doughnut = $this->doughnut('44.00');
@@ -231,15 +228,15 @@ class CheckoutTest extends TestCase
 
         $this->checkout($cashier, $this->payload($item, ['method' => 'GCASH']))->assertSessionHasErrors('payment.reference');
         $this->checkout($cashier, $this->payload($item, ['method' => 'GCASH', 'reference' => '12-34']))->assertSessionHasErrors('payment.reference');
-        // A cashier may not mark it verified (D-039: needs payments.verify-ewallet).
-        $this->checkout($cashier, $this->payload($item, ['method' => 'GCASH', 'reference' => 'abc123456', 'verified' => true]))->assertSessionHasErrors('payment.verified');
-
         $this->checkout($cashier, $this->payload($item, ['method' => 'GCASH', 'reference' => ' abc123456 ']))->assertSessionHasNoErrors();
 
         $order = Order::query()->sole();
         $payment = Payment::query()->sole();
-        $this->assertSame(OrderPaymentStatus::PendingVerification, $order->payment_status);
-        $this->assertSame(PaymentStatus::Pending, $payment->status);
+        // D-168: the cashier confirmed the transfer at the sale, so it is paid and verified at once.
+        $this->assertSame(OrderPaymentStatus::Paid, $order->payment_status);
+        $this->assertSame(PaymentStatus::Verified, $payment->status);
+        $this->assertSame($cashier->id, $payment->verified_by);
+        $this->assertNotNull($payment->verified_at);
         $this->assertSame('ABC123456', $payment->reference_number);
         $this->assertNull($payment->amount_tendered);
         // GCash never enters the drawer (BR-007).
@@ -290,20 +287,6 @@ class CheckoutTest extends TestCase
         Payment::query()->update(['payment_method_id' => Payment::query()->value('payment_method_id')]);
 
         $this->assertTrue(true);
-    }
-
-    public function test_a_manager_can_verify_gcash_at_checkout(): void
-    {
-        $manager = $this->cashierOnShift(role: PermissionCatalog::MANAGER);
-        $doughnut = $this->doughnut('44.00');
-
-        $this->checkout($manager, $this->payload([['product_id' => $doughnut->id, 'quantity' => 1]], ['method' => 'GCASH', 'reference' => 'REF0001', 'verified' => true]))
-            ->assertSessionHasNoErrors();
-
-        $payment = Payment::query()->sole();
-        $this->assertSame(PaymentStatus::Verified, $payment->status);
-        $this->assertSame($manager->id, $payment->verified_by);
-        $this->assertSame(OrderPaymentStatus::Paid, Order::query()->sole()->payment_status);
     }
 
     public function test_cash_must_cover_the_total(): void
@@ -370,25 +353,6 @@ class CheckoutTest extends TestCase
         $this->assertSame(0, Order::query()->count());
     }
 
-    public function test_option_rules_are_enforced(): void
-    {
-        $cashier = $this->cashierOnShift();
-        ['product' => $latte, 'iced' => $iced, 'shot' => $shot, 'oat' => $oat, 'group' => $group] = $this->coffee();
-        $stranger = ProductOption::query()->create(['option_group_id' => OptionGroup::query()->create(['name' => 'Toppings', 'selection_type' => 'multiple', 'min_selections' => 0, 'is_active' => true])->id, 'name' => 'Sprinkles', 'price_delta' => '5', 'is_active' => true, 'sort_order' => 0]);
-        $line = fn (array $options) => [['product_id' => $latte->id, 'variant_id' => $iced->id, 'quantity' => 1, 'option_ids' => $options]];
-
-        $this->checkout($cashier, $this->payload($line([$stranger->id])))->assertSessionHasErrors(['items.0' => 'An option chosen for Latte does not apply to it.']);
-        $this->checkout($cashier, $this->payload($line([$shot->id, $shot->id])))->assertSessionHasErrors(['items.0' => 'An option was chosen twice for Latte.']);
-
-        $group->forceFill(['min_selections' => 1, 'max_selections' => 1])->save();
-        $this->checkout($cashier, $this->payload($line([])))->assertSessionHasErrors(['items.0' => 'Choose Add-ons for Latte.']);
-        $this->checkout($cashier, $this->payload($line([$shot->id, $oat->id])))->assertSessionHasErrors(['items.0' => 'Too many choices for Add-ons on Latte.']);
-
-        $shot->forceFill(['is_active' => false])->save();
-        $this->checkout($cashier, $this->payload($line([$shot->id])))->assertSessionHasErrors(['items.0' => 'An option chosen for Latte is no longer available.']);
-        $this->assertSame(0, Order::query()->count());
-    }
-
     public function test_checkout_needs_an_open_shift(): void
     {
         $cashier = $this->staff(PermissionCatalog::CASHIER);
@@ -449,25 +413,6 @@ class CheckoutTest extends TestCase
         $this->assertSame(0, Order::query()->count());
     }
 
-    public function test_advance_pickup_needs_a_future_time_and_waits_in_confirmed(): void
-    {
-        $cashier = $this->cashierOnShift();
-        $doughnut = $this->doughnut('44.00', '24');
-        $item = [['product_id' => $doughnut->id, 'quantity' => 12]];
-
-        $this->checkout($cashier, $this->payload($item, extra: ['order_type' => 'advance_pickup']))->assertSessionHasErrors('pickup_at');
-        $this->checkout($cashier, $this->payload($item, extra: ['order_type' => 'advance_pickup', 'pickup_at' => now()->subHour()->toIso8601String()]))->assertSessionHasErrors('pickup_at');
-
-        $pickup = CarbonImmutable::now('Asia/Manila')->addDay()->setTime(10, 0);
-        $this->checkout($cashier, $this->payload($item, ['method' => 'CASH', 'amount_tendered' => '528'], ['order_type' => 'advance_pickup', 'pickup_at' => $pickup->format('Y-m-d H:i')]))
-            ->assertSessionHasNoErrors();
-
-        $order = Order::query()->sole();
-        $this->assertSame(OrderStatus::Confirmed, $order->status);
-        $this->assertNull($order->completed_at);
-        $this->assertTrue($pickup->equalTo($order->pickup_at));
-    }
-
     public function test_order_numbers_count_up_per_location_and_day(): void
     {
         $cashier = $this->cashierOnShift();
@@ -484,13 +429,13 @@ class CheckoutTest extends TestCase
     public function test_quote_returns_server_totals_without_saving(): void
     {
         $cashier = $this->cashierOnShift();
-        ['product' => $latte, 'hot' => $hot, 'shot' => $shot] = $this->coffee();
+        ['product' => $latte, 'hot' => $hot] = $this->coffee();
 
-        $this->actingAs($cashier)->postJson('/pos/quote', ['items' => [['product_id' => $latte->id, 'variant_id' => $hot->id, 'quantity' => 2, 'option_ids' => [$shot->id]]]])
+        $this->actingAs($cashier)->postJson('/pos/quote', ['items' => [['product_id' => $latte->id, 'variant_id' => $hot->id, 'quantity' => 2]]])
             ->assertOk()
-            ->assertJsonPath('grand_total', '290.00')
+            ->assertJsonPath('grand_total', '240.00')
             ->assertJsonPath('lines.0.unit_price', '120.00')
-            ->assertJsonPath('lines.0.option_total', '25.00');
+            ->assertJsonPath('lines.0.line_total', '240.00');
 
         $this->assertSame(0, Order::query()->count());
     }
@@ -498,7 +443,7 @@ class CheckoutTest extends TestCase
     public function test_only_staff_who_may_sell_can_check_out(): void
     {
         $doughnut = $this->doughnut('44.00');
-        $prep = $this->staff(PermissionCatalog::PREPARATION_STAFF);
+        $prep = $this->staff($this->bakerRole());
 
         $this->checkout($prep, $this->payload([['product_id' => $doughnut->id, 'quantity' => 1]]))->assertForbidden();
         $this->actingAs($prep)->postJson('/pos/quote', ['items' => [['product_id' => $doughnut->id, 'quantity' => 1]]])->assertForbidden();

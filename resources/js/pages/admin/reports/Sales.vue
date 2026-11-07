@@ -36,7 +36,6 @@ const props = defineProps<{
         rows: CollectionRow[];
         total: {
             received: string;
-            waiting: string;
             given_back: string;
             net: string;
         };
@@ -175,9 +174,9 @@ const cell = (row: SalesFigures, key: keyof SalesFigures): string =>
                 </summary>
                 <ul class="mt-2 grid list-disc gap-1 pl-5">
                     <li>
-                        A sale counts on its business date if it was paid (or is
-                        waiting for its GCash check) and was not cancelled. A
-                        GCash payment marked "not received" is left out.
+                        A sale counts on its business date if it was paid and
+                        was not cancelled. GCash is confirmed by the cashier at
+                        the sale.
                     </li>
                     <li>
                         <strong>Gross sales</strong>: item prices × quantity,
@@ -191,10 +190,7 @@ const cell = (row: SalesFigures, key: keyof SalesFigures): string =>
                     <li>
                         <strong>Net sales</strong> = gross − discounts −
                         refunds. <strong>Average order</strong> = net sales ÷
-                        orders.<template v-if="$page.props.features?.tax_rules">
-                            Tax shown apart:
-                            {{ formatMoney(summary.tax) }}.</template
-                        >
+                        orders.
                     </li>
                     <li>
                         <strong>Collected</strong> (below): payments received on
@@ -597,12 +593,6 @@ const cell = (row: SalesFigures, key: keyof SalesFigures): string =>
                                 scope="col"
                                 class="px-4 py-2 text-right font-semibold"
                             >
-                                Waiting for check
-                            </th>
-                            <th
-                                scope="col"
-                                class="px-4 py-2 text-right font-semibold"
-                            >
                                 Given back
                             </th>
                             <th
@@ -631,9 +621,6 @@ const cell = (row: SalesFigures, key: keyof SalesFigures): string =>
                                 {{ formatMoney(row.received) }}
                             </td>
                             <td class="px-4 py-2 text-right tabular-nums">
-                                {{ formatMoney(row.waiting) }}
-                            </td>
-                            <td class="px-4 py-2 text-right tabular-nums">
                                 {{ minus(row.given_back) }}
                             </td>
                             <td class="px-4 py-2 text-right tabular-nums">
@@ -644,9 +631,6 @@ const cell = (row: SalesFigures, key: keyof SalesFigures): string =>
                             <th scope="row" class="px-4 py-2">Total</th>
                             <td class="px-4 py-2 text-right tabular-nums">
                                 {{ formatMoney(payments.total.received) }}
-                            </td>
-                            <td class="px-4 py-2 text-right tabular-nums">
-                                {{ formatMoney(payments.total.waiting) }}
                             </td>
                             <td class="px-4 py-2 text-right tabular-nums">
                                 {{ minus(payments.total.given_back) }}

@@ -1,6 +1,6 @@
 # Brevon POS — Implementation Status
 
-Last updated: 2026-11-06 · Baseline: SRS **v1.1** (`docs/BREVON-SRS-v1.1.md`) · Prompt: `CLAUDE_CODE_PROMPT_BREVON_POS_v1.1.md` (v1.3)
+Last updated: 2026-11-07 · Baseline: SRS **v1.1** (`docs/BREVON-SRS-v1.1.md`) · Prompt: `CLAUDE_CODE_PROMPT_BREVON_POS_v1.1.md` (v1.3)
 
 | Phase                                         | Status                                          | Notes                                                                  |
 | --------------------------------------------- | ----------------------------------------------- | ---------------------------------------------------------------------- |
@@ -16,11 +16,12 @@ Last updated: 2026-11-06 · Baseline: SRS **v1.1** (`docs/BREVON-SRS-v1.1.md`) �
 | 7a — Stock control                            | ✅ Passed                                       | Approved 2026-11-06 (D-131–D-134)                                      |
 | 7b — Purchasing                               | ✅ Passed                                       | Approved 2026-11-06; re-review at end of development (client changes)  |
 | 8 — Recipes and production                    | ✅ Passed                                       | Approved 2026-11-06; re-review at end of development (client feedback) |
-| 9a — Discounts and tax                        | ✅ Passed                                       | Approved 2026-11-06; SC/PWD off until accountant confirms              |
+| 9a — Discounts and tax                        | ✅ Passed                                       | Approved 2026-11-06; SC/PWD seeded on since D-175                      |
 | 9b — Refunds and voids                        | ✅ Passed                                       | Approved 2026-11-06; refund approval limit ₱0.00 TBC                   |
 | 10a — Dashboard and sales reports             | ✅ Passed                                       | Approved 2026-11-06; definitions TBC (held for Phase 11)               |
-| 10b — Operational reports                     | 🟡 Finished — awaiting review                   | Six reports; CSV and Excel; print                                      |
-| 11 — Hardening and release readiness          | ⏳ Not started                                  | Includes 5 removals (D-165–D-169)                                      |
+| 10b — Operational reports                     | ✅ Passed                                       | Approved 2026-11-06                                                    |
+| 11a — Feature removals                        | ✅ Built — awaiting approval                    | Tax, options, lots, GCash check, preparation removed                   |
+| 11b — Hardening and release readiness         | ⏳ Not started                                  | Security, a11y, performance, backup, deploy                            |
 
 ## Phase 0 log
 
@@ -608,4 +609,48 @@ Still to confirm: boxes/combo at pop-ups (D-089), hot vs iced coffee prices. Pha
 
 **Change after review (2026-11-06): tax rules made a later feature (D-164).** The client does not need tax now. A new setting, `BREVON_FEATURE_TAX_RULES` (default off; `EnsureFeatureEnabled` middleware with the `feature:` alias), hides the Tax rules screen (404 and no sidebar link) and makes checkout ignore every tax rule. The sales report and its exports drop the Tax column. The code and tables stay for later. `composer check`: **341 passed**. Browser (scratch): no Tax rules link, `/admin/tax-rules` 404, sales report without tax text.
 
-**Next step:** Phase 11 — after user review. It includes removing tax (D-165), options & add-ons (D-166), lots & expiry (D-167), the GCash check (D-168) and preparation (D-169); plan in IMPLEMENTATION_PLAN.md.
+**Next step:** Phase 11 (10b approved 2026-11-06). Split into **11a** feature removals and **11b** hardening and release readiness. 11a covers removing tax (D-165), options & add-ons (D-166), lots & expiry (D-167), the GCash check (D-168) and preparation (D-169); plan in IMPLEMENTATION_PLAN.md.
+
+## Phase 11a log — Feature removals (2026-11-07)
+
+**Objective:** remove five features the client does not need: tax (D-165), options & add-ons (D-166), lots & expiry (D-167), the GCash check (D-168), and preparation with the Cancel action (D-169). Each removal was followed by the full test suite.
+**Approved:** "Approve, start 11" (2026-11-06).
+
+**Implemented**
+
+- **Tax (D-165):** deleted `app/Domain/Tax`, `TaxRule`, `OrderTaxLine`, `TaxRuleController`, the tax screen, routes and sidebar link, the D-164 feature flag (`config`, `.env.example`, `EnsureFeatureEnabled`, shared `features` prop). Grand total = subtotal − discount. Receipts, sales report and exports have no tax. Migration `2026_11_07_100000_remove_tax`.
+- **Options & add-ons (D-166):** deleted option groups, product options, `OptionGroupService`, their screen, routes and sidebar link. The POS item dialog has sizes, quantity and instructions only; line total = unit price × quantity. Migration `2026_11_07_100100_remove_options`.
+- **Lots & expiry (D-167):** deleted `InventoryLot`, `Lots`, the Lots & expiry screen and the expiry alert; deliveries take no lot or expiry; "Track lots" is gone from stock items. `is_perishable`, the "expired" rejection and waste write-offs stay. Migration `2026_11_07_100200_remove_lots`.
+- **GCash check (D-168):** deleted `PaymentCheckController`, the GCash to check page and routes, `payments.verify-ewallet`, the "waiting" figures in reports and the shift summary. The POS payment dialog needs "I checked that this payment arrived" (D-172). Migration `2026_11_07_100300_remove_gcash_check`.
+- **Preparation and Cancel (D-169):** deleted `PreparationBoard`, `PreparationController`, `OrderStatusController`, `OrderWorkflow`, the preparation page, `PrepOrderCard`, `CancelOrderDialog`, `StaffLayout`, the routes, `orders.update-status` and `orders.cancel`. Every sale is `completed` at checkout; no pickup time; the order page offers Refund only. Preparation Staff land on Production (D-173). Migration `2026_11_07_100400_remove_preparation`.
+- **Migrations (D-170, D-171):** each refuses to run if data would be lost (tax lines, sales with add-ons, GCash waiting, orders in progress); lots are dropped as accepted. `orders.pickup_at` is dropped only if empty.
+- Docs: DECISIONS (D-165–D-169 done, replaced decisions marked, §AE D-170–D-173), ERD, TEST_PLAN 11a map, README.
+
+**Verification (all run 2026-11-07)**
+
+| Command                                                            | Result                                                   |
+| ------------------------------------------------------------------ | -------------------------------------------------------- |
+| `composer check` → build, `vp check`, `vue-tsc`, Pint, Larastan L7 | all pass, 0 errors                                       |
+| → `php artisan test` (MySQL)                                       | **330 passed** (was 341; removed-feature tests replaced) |
+
+**Manual checks (browser, scratch DB `brevon_pos_test`, freshly migrated and seeded):** as `cashier1`, the coffee item dialog shows sizes, quantity and "How to make it" only. An Advance pickup order shows no pickup field. GCash needed the reference and the "payment arrived" tick, and the sale finished as **Completed** with no "Sent for preparation" line. The order page offered only **Refund**, the status history had one step (Completed), and the receipt had no tax or pickup line. As `harris`, the sidebar has no Preparation, GCash to check, Options, Lots or Tax rules links. The sales report showed ₱286.00 (₱176.00 + ₱110.00). No console errors on a fresh load. The user's `brevon_pos` was not touched.
+
+**For the user's `brevon_pos` (not run by Claude):** the five migrations stop with a message if data would be lost. A read-only check found no add-ons, tax lines, lots or pickup times, but **3 orders still New** (BRV01-20261106-0002, -0003, -0004) and **1 GCash payment waiting** (-0004, ₱110.00). The old screens are gone, so the new one-off command `brevon:finish-open-orders` settles them (D-174). The list-only run shows exactly those four changes. Steps: `composer install` → `php artisan brevon:finish-open-orders --user=harris --force` → `php artisan migrate`.
+
+**Change (2026-11-07): SC/PWD discount seeded on (D-175).** `DiscountSeeder` now creates it switched on; an existing discount is left as it is, so the user's `brevon_pos` keeps its current setting (turn it on under Discounts). `DiscountTest::test_the_pos_offers_discounts_that_are_on_and_the_seeded_sc_pwd_starts_on` checks it starts on and that re-seeding keeps an owner's off switch.
+
+**Change (2026-11-07): three built-in roles (D-176).** Admin merged into Owner and Preparation Staff removed (`PermissionCatalog`, `AccessGuard::SYSTEM_ROLES`, migration `2026_11_07_100500_merge_admin_into_owner_and_remove_preparation_staff`: Admin holders become Owners; refuses while anyone holds Preparation Staff). Tests that used those roles now use custom roles from `InteractsWithStaff` (`officeRole()` = the old Admin permissions, `bakerRole()` = the old Preparation Staff permissions), so the Owner protections and permission checks stay covered; `RoleAdministrationTest` checks the three roles and the migration. `composer check`: **331 passed** (the role matrix lost two roles). Browser (scratch): Roles shows Cashier, Manager, Owner; the new-user form offers the same three. The user's `brevon_pos` has no Admin or Preparation Staff users, so the migration will run cleanly there; it runs with the other 11a migrations.
+
+**Change (2026-11-07): sidebar.** Catalog moved just above Administration.
+
+**Change (2026-11-07): seven categories (D-177).** Regular, Premium, Assorted boxes, Coffee, Matcha series, Lemonade series and Combos, all top level; Doughnuts, Cold Drinks and Other removed (`CatalogReferenceSeeder`, `MenuSeeder`, migration `2026_11_07_100600_flatten_categories`). The POS shows one tab per category; on All and in search results each category gets its own heading (`pos/Index.vue`). Browser (scratch): tabs All, Regular, Premium, Assorted boxes, Coffee, Matcha series, Lemonade series, Combos; All shows the seven headings in that order.
+
+**Change (2026-11-07): local SM Rosales pop-up and Cashier 2 (D-178).** New `LocalLocationsSeeder` (local only: pop-up SM Rosales and terminal SM Rosales POS, with the main branch's doughnuts copied); `LocalUsersSeeder` adds Cashier 2 at SM Rosales; `DatabaseSeeder` runs them after `MenuSeeder`. `AccountSeedersTest` checks the location, terminal, copied doughnuts, audit entries and both cashiers' locations and sign-in, and that none of it is created outside local. `composer check`: **332 passed**. Browser (scratch, `migrate:fresh --seed`): seeding printed `SM Rosales (POP01)` and `SM Rosales POS (POS-2)`; `cashier2` was offered only POS-2, opened a shift and the POS showed `POP01 · SM Rosales` with the 14 doughnuts (Regular, Premium), sold out until stock is dispatched. The user's `brevon_pos` was not touched; run `php artisan db:seed --class=LocalUsersSeeder` there to add them.
+
+**Change (2026-11-07): copy skips archived products (D-179).** `copyAvailabilityFromMain` adds `is_active = true`. `PopUpManagementTest::test_copying_availability_only_brings_active_finished_stock_products_on_sale_at_main` checks that archived, switched-off-at-main, not-at-main and non-stock products are skipped, both when a pop-up is created and by the button. `composer check`: **332 passed**. `MenuSeederTest` checks the seven and the migration (flattens an older layout, keeps an owner's own category, refuses while an old group holds a product); `ProductManagementTest` checks the reference seed. The user's `brevon_pos` has nothing in the old groups, so the migration will run cleanly there with the others.
+
+**Change after review (2026-11-07): finish command (D-174).** `app/Console/Commands/FinishOpenOrdersCommand.php` plus `tests/Feature/Orders/FinishOpenOrdersCommandTest.php` (3 tests: list-only by default; waiting GCash received and paid orders completed with history and audit; needs an Owner or Manager and leaves unpaid orders). `composer check`: **333 passed**.
+
+**Known issues / deferred:** none new. Held client questions are raised in the 11b report.
+
+**Next step:** approval of 11a, then 11b (hardening and release readiness).

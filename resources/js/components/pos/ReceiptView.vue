@@ -61,12 +61,6 @@ const paymentStatus: Record<string, string> = {
             </dd>
             <dt>Type</dt>
             <dd class="text-right">{{ receipt.order.order_type_label }}</dd>
-            <template v-if="receipt.order.pickup_at">
-                <dt>Pickup</dt>
-                <dd class="text-right font-bold">
-                    {{ formatDateTime(receipt.order.pickup_at) }}
-                </dd>
-            </template>
             <dt>Cashier</dt>
             <dd class="text-right">
                 {{ receipt.order.cashier }}
@@ -97,16 +91,6 @@ const paymentStatus: Record<string, string> = {
                         </td>
                         <td class="pt-1 text-right align-top whitespace-nowrap">
                             {{ formatMoney(item.line_total) }}
-                        </td>
-                    </tr>
-                    <tr v-for="(option, j) in item.options" :key="`${i}-${j}`">
-                        <td class="pl-3" colspan="2">
-                            + {{ option.name }}
-                            <template v-if="Number(option.price_delta) !== 0"
-                                >({{
-                                    formatMoney(option.price_delta)
-                                }})</template
-                            >
                         </td>
                     </tr>
                     <tr v-if="Number(item.quantity) !== 1">
@@ -140,14 +124,6 @@ const paymentStatus: Record<string, string> = {
                 <dd class="text-right">
                     −{{ formatMoney(receipt.order.discount_total) }}
                 </dd>
-            </template>
-            <template v-for="(tax, i) in receipt.taxes" :key="i">
-                <dt>
-                    {{ tax.name }} {{ tax.rate }}%{{
-                        tax.inclusive ? ' (included)' : ''
-                    }}
-                </dt>
-                <dd class="text-right">{{ formatMoney(tax.amount) }}</dd>
             </template>
             <dt class="text-sm font-bold">TOTAL</dt>
             <dd class="text-right text-sm font-bold">

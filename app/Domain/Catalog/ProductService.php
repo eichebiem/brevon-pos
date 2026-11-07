@@ -21,13 +21,13 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Products, variants, option groups and per-location availability
+ * Products, variants and per-location availability
  * (FR-016–FR-018, FR-020, FR-021; D-025, D-063, D-064, D-085, D-086).
  *
  * Expected $data keys: category_id, sku, name, description, product_type,
  * inventory_tracking_mode, base_unit, is_available_for_pos,
  * variants (list of {id?, name, sku?, is_default, is_active}),
- * option_group_ids (ordered list), location_ids (list), and on create base_price.
+ * location_ids (list), and on create base_price.
  */
 class ProductService
 {
@@ -58,7 +58,6 @@ class ProductService
                 $product->save();
 
                 $this->syncVariants($product, $data['variants'] ?? []);
-                $this->syncOptionGroups($product, $data['option_group_ids'] ?? []);
                 $this->syncLocations($product, $data['location_ids'] ?? []);
 
                 $this->audit->record('product.created', $product, null, $this->snapshot($product), actor: $actor);
@@ -93,7 +92,6 @@ class ProductService
                 $product->save();
 
                 $this->syncVariants($product, $data['variants'] ?? []);
-                $this->syncOptionGroups($product, $data['option_group_ids'] ?? []);
                 $this->syncLocations($product, $data['location_ids'] ?? []);
 
                 [$old, $new] = AuditDiff::between($before, $this->snapshot($product->refresh()));
@@ -157,7 +155,8 @@ class ProductService
 
         if (! in_array($mode, $type->allowedTrackingModes(), true)) {
             throw ValidationException::withMessages(['inventory_tracking_mode' => __('":mode" is not allowed for :type products.', [
-                'mode' => $mode->label(), 'type' => strtolower($type->label()),
+                'mode' => $mode->label(),
+                'type' => strtolower($type->label()),
             ])]);
         }
 
@@ -276,14 +275,6 @@ class ProductService
     }
 
     /**
-     * @param  list<int>  $groupIds
-     */
-    private function syncOptionGroups(Product $product, array $groupIds): void
-    {
-        $product->optionGroups()->sync(collect($groupIds)->values()->mapWithKeys(fn ($id, $i) => [(int) $id => ['sort_order' => $i]])->all());
-    }
-
-    /**
      * Rows are kept (is_available toggled) so availability history is preserved.
      *
      * @param  list<int>  $locationIds
@@ -310,14 +301,13 @@ class ProductService
      */
     private function snapshot(Product $product): array
     {
-        $product->load(['variants', 'optionGroups', 'locations']);
+        $product->load(['variants', 'locations']);
 
         return [
             ...$product->only(['sku', 'name', 'description', 'category_id', 'base_unit', 'image_path', 'is_available_for_pos', 'inventory_item_id']),
             'product_type' => $product->product_type->value,
             'inventory_tracking_mode' => $product->inventory_tracking_mode->value,
             'variants' => $product->variants->map(fn (ProductVariant $v) => $v->name.($v->is_default ? ' (default)' : '').($v->is_active ? '' : ' (inactive)'))->all(),
-            'option_groups' => $product->optionGroups->pluck('name')->all(),
             'locations' => $product->locations->filter(fn (Branch $b) => (bool) $b->getRelationValue('pivot')?->getAttribute('is_available'))->pluck('code')->values()->all(),
         ];
     }

@@ -42,7 +42,7 @@ class StockControlTest extends TestCase
         $this->seedAccess();
         $this->main = $this->mainLocation();
         $this->manager = $this->staff(PermissionCatalog::MANAGER);
-        $this->clerk = $this->staff(PermissionCatalog::PREPARATION_STAFF);
+        $this->clerk = $this->staff($this->bakerRole());
         $this->clerk->givePermissionTo('inventory.adjust');
     }
 
@@ -260,7 +260,7 @@ class StockControlTest extends TestCase
     public function test_stock_items_are_managed_with_linked_items_locked(): void
     {
         $gram = $this->ingredientItem()->unit_of_measure_id;
-        $item = ['sku' => 'pkg-box6', 'name' => 'Box of 6', 'item_type' => 'packaging', 'unit_of_measure_id' => $gram, 'reorder_level' => '50', 'is_perishable' => false, 'track_lot' => false];
+        $item = ['sku' => 'pkg-box6', 'name' => 'Box of 6', 'item_type' => 'packaging', 'unit_of_measure_id' => $gram, 'reorder_level' => '50', 'is_perishable' => false];
 
         $this->actingAs($this->manager)->post('/admin/inventory/items', [...$item, 'item_type' => 'finished_good'])->assertSessionHasErrors('item_type');
         $this->actingAs($this->manager)->post('/admin/inventory/items', [...$item, 'reorder_level' => '-1'])->assertSessionHasErrors('reorder_level');
@@ -270,7 +270,7 @@ class StockControlTest extends TestCase
 
         $glazed = $this->doughnutItem();
         $name = $glazed->name;
-        $this->actingAs($this->manager)->put("/admin/inventory/items/{$glazed->id}", ['name' => 'Renamed', 'reorder_level' => '24', 'is_perishable' => true, 'track_lot' => false])->assertSessionHasNoErrors();
+        $this->actingAs($this->manager)->put("/admin/inventory/items/{$glazed->id}", ['name' => 'Renamed', 'reorder_level' => '24', 'is_perishable' => true])->assertSessionHasNoErrors();
         $glazed->refresh();
         $this->assertSame($name, $glazed->name, 'Doughnut names come from the product.');
         $this->assertSame('24.000', $glazed->reorder_level);
@@ -279,7 +279,7 @@ class StockControlTest extends TestCase
         $pc = InventoryItem::query()->whereKey($glazed->id)->value('unit_of_measure_id');
         $this->actingAs($this->manager)->put("/admin/inventory/items/{$box->id}", ['unit_of_measure_id' => $pc, 'reorder_level' => '5'])->assertSessionHasErrors('unit_of_measure_id');
 
-        $this->actingAs($this->staff(PermissionCatalog::PREPARATION_STAFF))->post('/admin/inventory/items', [...$item, 'sku' => 'PKG-2'])->assertForbidden();
+        $this->actingAs($this->staff($this->bakerRole()))->post('/admin/inventory/items', [...$item, 'sku' => 'PKG-2'])->assertForbidden();
     }
 
     public function test_adjustment_pages_are_scoped_to_the_users_locations(): void

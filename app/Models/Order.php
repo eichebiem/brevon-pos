@@ -27,13 +27,11 @@ use LogicException;
  * @property OrderPaymentStatus $payment_status
  * @property string $subtotal
  * @property string $discount_total
- * @property string $tax_total
  * @property string $service_charge
  * @property string $grand_total
  * @property string $amount_paid
  * @property string $amount_due
  * @property string|null $notes
- * @property CarbonImmutable|null $pickup_at
  * @property int $created_by
  * @property CarbonImmutable|null $completed_at
  * @property CarbonImmutable|null $cancelled_at
@@ -54,7 +52,6 @@ class Order extends Model
             'status' => OrderStatus::class,
             'payment_status' => OrderPaymentStatus::class,
             'business_date' => 'date',
-            'pickup_at' => 'datetime',
             'completed_at' => 'datetime',
             'cancelled_at' => 'datetime',
         ];
@@ -135,14 +132,6 @@ class Order extends Model
     public function discount(): HasOne
     {
         return $this->hasOne(OrderDiscount::class);
-    }
-
-    /**
-     * @return HasMany<OrderTaxLine, $this>
-     */
-    public function taxLines(): HasMany
-    {
-        return $this->hasMany(OrderTaxLine::class);
     }
 
     /**

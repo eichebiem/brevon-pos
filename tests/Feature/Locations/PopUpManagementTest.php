@@ -38,7 +38,7 @@ class PopUpManagementTest extends TestCase
 
     public function test_admin_creates_a_pop_up_and_it_is_audited(): void
     {
-        $admin = $this->staff(PermissionCatalog::ADMIN);
+        $admin = $this->staff(PermissionCatalog::OWNER);
 
         $response = $this->actingAs($admin)->post('/admin/locations', $this->popUp(['operating_starts_on' => '2026-12-01', 'operating_ends_on' => '2026-12-31']));
 
@@ -52,7 +52,7 @@ class PopUpManagementTest extends TestCase
 
     public function test_pop_up_input_is_validated(): void
     {
-        $admin = $this->staff(PermissionCatalog::ADMIN);
+        $admin = $this->staff(PermissionCatalog::OWNER);
 
         $this->actingAs($admin)->post('/admin/locations', $this->popUp(['name' => '']))->assertSessionHasErrors('name');
         $this->actingAs($admin)->post('/admin/locations', $this->popUp(['operating_starts_on' => '2026-12-10', 'operating_ends_on' => '2026-12-01']))
@@ -64,7 +64,7 @@ class PopUpManagementTest extends TestCase
 
     public function test_code_and_type_cannot_change_and_edits_are_audited(): void
     {
-        $admin = $this->staff(PermissionCatalog::ADMIN);
+        $admin = $this->staff(PermissionCatalog::OWNER);
         $popUp = Branch::factory()->popUp()->create(['code' => 'POP-A']);
 
         // A code sent with an edit is ignored: the code never changes (D-057, D-121).
@@ -80,7 +80,7 @@ class PopUpManagementTest extends TestCase
 
     public function test_the_permanent_branch_has_no_dates_and_cannot_be_deactivated(): void
     {
-        $admin = $this->staff(PermissionCatalog::ADMIN);
+        $admin = $this->staff(PermissionCatalog::OWNER);
         $main = $this->mainLocation();
 
         $this->actingAs($admin)->put("/admin/locations/{$main->id}", ['name' => 'Main', 'operating_ends_on' => '2026-12-01'])->assertSessionHasNoErrors();
@@ -92,7 +92,7 @@ class PopUpManagementTest extends TestCase
 
     public function test_deactivating_a_pop_up_keeps_its_records_and_blocks_new_operations(): void
     {
-        $admin = $this->staff(PermissionCatalog::ADMIN);
+        $admin = $this->staff(PermissionCatalog::OWNER);
         $popUp = Branch::factory()->popUp()->create();
         $terminal = Terminal::query()->create(['branch_id' => $popUp->id, 'terminal_code' => 'POS-1', 'name' => 'Stall']);
 
@@ -113,21 +113,32 @@ class PopUpManagementTest extends TestCase
         $this->assertDatabaseHas('audit_logs', ['event' => 'location.reactivated', 'auditable_id' => $popUp->id]);
     }
 
-    public function test_copying_availability_only_brings_finished_stock_products(): void
+    public function test_copying_availability_only_brings_active_finished_stock_products_on_sale_at_main(): void
     {
-        $admin = $this->staff(PermissionCatalog::ADMIN);
+        $admin = $this->staff(PermissionCatalog::OWNER);
         $main = $this->mainLocation();
         $doughnut = Product::factory()->finishedStock()->create();
         $coffee = Product::factory()->create();
         $notAtMain = Product::factory()->finishedStock()->create();
+        $switchedOff = Product::factory()->finishedStock()->create();
+        $archived = Product::factory()->finishedStock()->create(['is_active' => false]);
         $doughnut->locations()->attach($main->id, ['is_available' => true]);
         $coffee->locations()->attach($main->id, ['is_available' => true]);
+        $switchedOff->locations()->attach($main->id, ['is_available' => false]);
+        $archived->locations()->attach($main->id, ['is_available' => true]);
 
         $this->actingAs($admin)->post('/admin/locations', $this->popUp(['copy_availability' => true]));
 
         $popUp = Branch::query()->where('code', 'POP01')->firstOrFail();
         $this->assertEqualsCanonicalizing([$doughnut->id], $popUp->products()->wherePivot('is_available', true)->pluck('products.id')->all());
-        $this->assertFalse($notAtMain->locations()->where('branches.id', $popUp->id)->exists());
+        foreach ([$notAtMain, $switchedOff, $archived] as $skipped) {
+            $this->assertFalse($skipped->locations()->where('branches.id', $popUp->id)->exists());
+        }
+
+        // The button on an existing pop-up follows the same rule (D-179).
+        $this->actingAs($admin)->post("/admin/locations/{$popUp->id}/copy-availability")->assertSessionHasNoErrors();
+        $this->assertEqualsCanonicalizing([$doughnut->id], $popUp->products()->wherePivot('is_available', true)->pluck('products.id')->all());
+        $this->assertFalse($archived->locations()->where('branches.id', $popUp->id)->exists());
     }
 
     public function test_out_of_period_pop_ups_cannot_be_selected_as_working_location(): void
@@ -156,7 +167,7 @@ class PopUpManagementTest extends TestCase
 
     public function test_location_edit_page_keeps_the_shared_location_context(): void
     {
-        $admin = $this->staff(PermissionCatalog::ADMIN);
+        $admin = $this->staff(PermissionCatalog::OWNER);
         $this->actingAs($admin)->post('/admin/locations', $this->popUp());
         $popUp = Branch::query()->where('code', 'POP01')->firstOrFail();
 
@@ -171,7 +182,7 @@ class PopUpManagementTest extends TestCase
 
     public function test_pop_up_codes_are_assigned_in_order_and_never_taken_from_the_form(): void
     {
-        $admin = $this->staff(PermissionCatalog::ADMIN);
+        $admin = $this->staff(PermissionCatalog::OWNER);
         Branch::factory()->popUp()->create(['code' => 'POP07']);
         Branch::factory()->popUp()->create(['code' => 'POP-OLD']);
 

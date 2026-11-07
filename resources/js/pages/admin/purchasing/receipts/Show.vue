@@ -19,8 +19,6 @@ type Line = {
     unit_cost: string | null;
     condition: 'accepted' | 'damaged' | 'expired';
     condition_label: string;
-    lot_number: string | null;
-    expires_at: string | null;
 };
 
 defineProps<{
@@ -112,9 +110,6 @@ defineOptions({
                         <th scope="col" class="px-4 py-3 font-semibold">
                             Condition
                         </th>
-                        <th scope="col" class="px-4 py-3 font-semibold">
-                            Lot / expiry
-                        </th>
                     </tr>
                 </thead>
                 <tbody>
@@ -147,12 +142,6 @@ defineOptions({
                                         ? 'Added to stock'
                                         : `${line.condition_label} — not added`
                                 }}</StatusBadge
-                            >
-                        </td>
-                        <td class="px-4 py-3 text-xs">
-                            <template v-if="line.lot_number || line.expires_at"
-                                >{{ line.lot_number ?? '—' }} · expires
-                                {{ formatDate(line.expires_at) }}</template
                             >
                         </td>
                     </tr>

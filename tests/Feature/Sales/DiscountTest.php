@@ -17,8 +17,6 @@ use App\Models\Order;
 use App\Models\OrderDiscount;
 use App\Models\OrderDiscountBeneficiary;
 use App\Models\OrderItem;
-use App\Models\OrderTaxLine;
-use App\Models\TaxRule;
 use App\Models\Terminal;
 use App\Models\User;
 use Database\Seeders\DiscountSeeder;
@@ -32,7 +30,7 @@ use LogicException;
 use Tests\Concerns\InteractsWithCheckout;
 use Tests\TestCase;
 
-/** Phase 9a: discounts, SC/PWD and the tax framework (FR-083–FR-086, FR-044; T-DSC-1, T-SCD-1/2, T-TAX-1, T-PRIV-1; D-145–D-149). */
+/** Phase 9a: discounts and SC/PWD (FR-083–FR-085, FR-044; T-DSC-1, T-SCD-1/2, T-PRIV-1; D-145–D-149). */
 class DiscountTest extends TestCase
 {
     use InteractsWithCheckout;
@@ -72,10 +70,8 @@ class DiscountTest extends TestCase
     private function seniorPwd(): Discount
     {
         $this->seed(DiscountSeeder::class);
-        $discount = Discount::query()->where('kind', DiscountKind::SeniorPwd)->sole();
-        $discount->forceFill(['is_active' => true])->save();
 
-        return $discount;
+        return Discount::query()->where('kind', DiscountKind::SeniorPwd)->sole();
     }
 
     /**
@@ -149,16 +145,15 @@ class DiscountTest extends TestCase
         $this->sell($line, ['id' => $this->discount(['ends_at' => now()->subMinute()])->id])->assertSessionHasErrors('discount');
         $this->sell($line, ['id' => 999999])->assertSessionHasErrors('discount');
 
-        // A drink waits for preparation, so its order can still be cancelled.
         ['product' => $latte, 'hot' => $hot] = $this->coffee();
         $drink = [['product_id' => $latte->id, 'variant_id' => $hot->id, 'quantity' => 1]];
         $once = $this->discount(['max_uses' => 1]);
         $this->sell($drink, ['id' => $once->id])->assertSessionHasNoErrors();
         $this->sell($drink, ['id' => $once->id])->assertSessionHasErrors('discount');
 
-        // A cancelled order gives its use back.
+        // An order cancelled before D-169 gives its use back.
         $order = Order::query()->sole();
-        $this->actingAs($this->manager)->post("/orders/{$order->id}/cancel", ['reason' => 'Wrong order', 'return_stock' => true])->assertSessionHasNoErrors();
+        $this->pastCancellation($order, $this->manager, 'Wrong order');
         $this->sell($drink, ['id' => $once->id])->assertSessionHasNoErrors();
         $this->assertSame(2, Order::query()->count());
     }
@@ -235,7 +230,7 @@ class DiscountTest extends TestCase
         // Only the latte (₱120) is the senior's: 12% = 14.40; VAT is disregarded (D-068).
         $this->sell($items, ['id' => $scpwd->id, 'lines' => [1], 'beneficiary' => $this->person()])->assertSessionHasNoErrors();
         $order = Order::query()->sole();
-        $this->assertSame(['208.00', '14.40', '0.00', '193.60'], [$order->subtotal, $order->discount_total, $order->tax_total, $order->grand_total]);
+        $this->assertSame(['208.00', '14.40', '193.60'], [$order->subtotal, $order->discount_total, $order->grand_total]);
         $this->assertSame(['0.00', '14.40'], OrderItem::query()->orderBy('id')->pluck('discount_amount')->all());
 
         $person = OrderDiscountBeneficiary::query()->sole();
@@ -292,47 +287,19 @@ class DiscountTest extends TestCase
         }
     }
 
-    public function test_tax_is_off_by_default_and_applies_after_discounts_when_switched_on(): void
+    public function test_no_tax_is_charged_and_the_total_is_subtotal_less_discount(): void
     {
+        // Non-VAT business (D-165): the tax feature and its tables are gone.
+        $this->assertFalse(Schema::hasTable('tax_rules'));
+        $this->assertFalse(Schema::hasTable('order_tax_lines'));
+        $this->assertFalse(Schema::hasColumn('orders', 'tax_total'));
+        $this->assertFalse(Schema::hasColumn('order_items', 'tax_amount'));
+
         $doughnut = $this->doughnut('112.00', '20');
-        $line = [['product_id' => $doughnut->id, 'quantity' => 1]];
-
-        $this->sell($line, [])->assertSessionHasNoErrors();
-        $this->assertSame(['0.00', '112.00'], [Order::query()->sole()->tax_total, Order::query()->sole()->grand_total]);
-        $this->assertSame(0, OrderTaxLine::query()->count());
-
-        // Tax rules are a later feature (D-164): while off, even a rule left on charges nothing.
-        $vat = new TaxRule;
-        $vat->forceFill(['name' => 'VAT', 'rate' => '12.0000', 'inclusive' => true, 'effective_from' => now()->subDay()->toDateString(), 'is_active' => true])->save();
-        $this->sell($line, [])->assertSessionHasNoErrors();
-        $this->assertSame('0.00', Order::query()->latest('id')->firstOrFail()->tax_total);
-        $this->assertSame(0, OrderTaxLine::query()->count());
-
-        // Switched on: VAT 12% included in prices: 112 × 12 ÷ 112 = 12.00; the total does not change.
-        config(['brevon.features.tax_rules' => true]);
-        $this->sell($line, [])->assertSessionHasNoErrors();
-        $order = Order::query()->latest('id')->firstOrFail();
-        $this->assertSame(['12.00', '112.00'], [$order->tax_total, $order->grand_total]);
-        $this->assertSame(['VAT', '12.0000', true, '112.00', '12.00'], [
-            $order->taxLines()->sole()->tax_name_snapshot, $order->taxLines()->sole()->tax_rate_snapshot, $order->taxLines()->sole()->inclusive_snapshot,
-            $order->taxLines()->sole()->taxable_amount, $order->taxLines()->sole()->tax_amount,
-        ]);
-        $this->assertSame('12.00', $order->items()->sole()->tax_amount);
-
-        // A 5% tax added on top, after a ₱12 discount: (112 − 12) × 5% = 5.00 added; VAT on 100 = 10.71.
-        $vat->forceFill(['is_active' => true])->save();
-        $levy = new TaxRule;
-        $levy->forceFill(['name' => 'Levy', 'rate' => '5.0000', 'inclusive' => false, 'effective_from' => now()->subDay()->toDateString(), 'is_active' => true])->save();
         $twelve = $this->discount(['discount_type' => DiscountType::Fixed, 'value' => '12.00']);
-        $this->sell($line, ['id' => $twelve->id])->assertSessionHasNoErrors();
-        $order = Order::query()->latest('id')->firstOrFail();
-        $this->assertSame(['112.00', '12.00', '15.71', '105.00'], [$order->subtotal, $order->discount_total, $order->tax_total, $order->grand_total]);
-
-        // Rules outside their dates or switched off are not charged.
-        $levy->forceFill(['effective_from' => now()->addDays(2)->toDateString()])->save();
-        $vat->forceFill(['is_active' => false])->save();
-        $this->sell($line, [])->assertSessionHasNoErrors();
-        $this->assertSame('0.00', Order::query()->latest('id')->firstOrFail()->tax_total);
+        $this->sell([['product_id' => $doughnut->id, 'quantity' => 1]], ['id' => $twelve->id])->assertSessionHasNoErrors();
+        $order = Order::query()->sole();
+        $this->assertSame(['112.00', '12.00', '100.00', '100.00'], [$order->subtotal, $order->discount_total, $order->grand_total, $order->amount_paid]);
     }
 
     public function test_allocation_always_adds_up(): void
@@ -355,7 +322,7 @@ class DiscountTest extends TestCase
         $this->assertSame(1, OrderDiscount::query()->count());
     }
 
-    public function test_presets_and_tax_rules_are_managed_in_settings(): void
+    public function test_presets_are_managed_in_settings(): void
     {
         $this->actingAs($this->manager)->get('/admin/discounts')->assertForbidden();
         $this->actingAs($this->owner)->get('/admin/discounts')->assertOk();
@@ -380,38 +347,28 @@ class DiscountTest extends TestCase
         $staff->delete();
     }
 
-    public function test_tax_rules_are_a_later_feature_hidden_while_off(): void
+    public function test_the_tax_rules_screen_is_gone(): void
     {
-        $this->assertFalse(config('brevon.features.tax_rules'), 'off by default (D-164)');
         $this->actingAs($this->owner)->get('/admin/tax-rules')->assertNotFound();
-        $this->actingAs($this->owner)->post('/admin/tax-rules', ['name' => 'VAT', 'rate' => '12', 'effective_from' => '2026-01-01'])->assertNotFound();
-        $this->assertSame(0, TaxRule::query()->count());
-        $this->actingAs($this->owner)->get('/admin/discounts')->assertInertia(fn (AssertableInertia $page) => $page->where('features.tax_rules', false));
+        $this->actingAs($this->owner)->post('/admin/tax-rules', ['name' => 'VAT', 'rate' => '12'])->assertNotFound();
     }
 
-    public function test_tax_rules_screen_validates_and_audits(): void
-    {
-        config(['brevon.features.tax_rules' => true]);
-        $this->actingAs($this->manager)->get('/admin/tax-rules')->assertForbidden();
-        $this->actingAs($this->owner)->post('/admin/tax-rules', ['name' => 'VAT', 'rate' => '0', 'effective_from' => ''])->assertSessionHasErrors(['rate', 'effective_from']);
-        $this->actingAs($this->owner)->post('/admin/tax-rules', ['name' => 'VAT', 'rate' => '12', 'inclusive' => true, 'effective_from' => '2026-01-01', 'effective_until' => '2025-12-31'])->assertSessionHasErrors('effective_until');
-        $this->actingAs($this->owner)->post('/admin/tax-rules', ['name' => 'VAT', 'rate' => '12', 'inclusive' => true, 'effective_from' => '2026-01-01'])->assertSessionHasNoErrors();
-        $rule = TaxRule::query()->sole();
-        $this->assertSame(['12.0000', true, false], [$rule->rate, $rule->inclusive, $rule->is_active], 'saved switched off unless ticked');
-        $this->assertDatabaseHas('audit_logs', ['event' => 'tax_rule.created', 'auditable_id' => $rule->id]);
-        $this->actingAs($this->owner)->get('/admin/tax-rules')->assertInertia(fn (AssertableInertia $page) => $page->where('rules.0.in_effect', false));
-    }
-
-    public function test_the_pos_offers_discounts_that_are_on_and_the_seeded_sc_pwd_starts_off(): void
+    public function test_the_pos_offers_discounts_that_are_on_and_the_seeded_sc_pwd_starts_on(): void
     {
         $this->seed(DiscountSeeder::class);
         $this->seed(DiscountSeeder::class);
         $scpwd = Discount::query()->where('kind', DiscountKind::SeniorPwd)->sole();
-        $this->assertSame(['12.00', false], [$scpwd->value, $scpwd->is_active]);
+        $this->assertSame(['12.00', true], [$scpwd->value, $scpwd->is_active], 'seeded once, switched on (D-175)');
+
+        // Re-seeding keeps the owner's choice.
+        $scpwd->forceFill(['is_active' => false])->save();
+        $this->seed(DiscountSeeder::class);
+        $this->assertFalse($scpwd->refresh()->is_active);
+        $scpwd->forceFill(['is_active' => true])->save();
 
         $this->discount(['name' => 'Later', 'starts_at' => now()->addDay()]);
         $this->discount(['name' => 'Now']);
         $this->actingAs($this->cashier)->get('/pos')->assertInertia(fn (AssertableInertia $page) => $page
-            ->has('discounts', 1)->where('discounts.0.name', 'Now')->where('canApproveDiscount', false));
+            ->has('discounts', 2)->where('canApproveDiscount', false));
     }
 }

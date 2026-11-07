@@ -202,15 +202,6 @@ const statusTone: Record<
                         </td>
                         <td class="px-4 py-3">
                             {{ order.payment_method }}
-                            <StatusBadge
-                                v-if="
-                                    order.payment_status ===
-                                    'pending_verification'
-                                "
-                                tone="warning"
-                                class="ml-1"
-                                >To verify</StatusBadge
-                            >
                         </td>
                         <td
                             class="px-4 py-3 text-right font-semibold whitespace-nowrap"

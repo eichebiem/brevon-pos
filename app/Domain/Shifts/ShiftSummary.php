@@ -110,29 +110,24 @@ class ShiftSummary
     }
 
     /**
-     * Non-cash takings by method (FR-081): verified totals, plus what is
-     * still waiting to be checked.
+     * Non-cash takings by method (FR-081). GCash is confirmed by the cashier
+     * at the sale (D-168), so every payment taken counts.
      *
-     * @return list<array{method: string, verified: string, pending: string, pending_count: int}>
+     * @return list<array{method: string, verified: string}>
      */
     private function nonCash(CashierShift $shift): array
     {
         $payments = Payment::query()
-            ->whereIn('status', [...PaymentStatus::taken(), PaymentStatus::Pending])
+            ->whereIn('status', PaymentStatus::taken())
             ->whereHas('method', fn ($q) => $q->where('type', '!=', PaymentMethodType::Cash))
             ->whereHas('order', fn ($q) => $q->where('cashier_shift_id', $shift->id)->where('status', '!=', OrderStatus::Cancelled))
             ->with('method:id,name')
             ->get(['id', 'payment_method_id', 'amount', 'status']);
 
         return array_values($payments->groupBy(fn (Payment $p) => $p->method->name)->map(function ($rows, $method) {
-            $verified = $rows->whereIn('status', PaymentStatus::taken());
-            $pending = $rows->where('status', PaymentStatus::Pending);
-
             return [
                 'method' => (string) $method,
-                'verified' => Money::sum($verified->map(fn (Payment $p) => Money::fromDecimal($p->amount)))->toDecimal(),
-                'pending' => Money::sum($pending->map(fn (Payment $p) => Money::fromDecimal($p->amount)))->toDecimal(),
-                'pending_count' => $pending->count(),
+                'verified' => Money::sum($rows->map(fn (Payment $p) => Money::fromDecimal($p->amount)))->toDecimal(),
             ];
         })->all());
     }
