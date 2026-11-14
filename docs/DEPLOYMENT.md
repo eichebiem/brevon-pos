@@ -278,3 +278,74 @@ Tick each item before the first real sale.
 - [ ] One real sale and one refund done end to end, receipt printed
 - [ ] Shift closed and reviewed by a manager
 - [ ] The next morning: the backup ran and the System logs page shows no errors
+
+---
+
+## 10. Chosen host: Oracle Cloud "Always Free" (decided 2026-11-15)
+
+To keep costs at ₱0, Brevon runs on one free Oracle Cloud Arm server. Brevon's IT looks after it. Everything in
+sections 1–9 applies unchanged; these are the Oracle-specific steps. Oracle's limits change from time to time,
+so check its [Always Free resources page](https://docs.oracle.com/en-us/iaas/Content/FreeTier/resourceref.htm)
+when setting up.
+
+### 10.1 Account and server
+
+1. Sign up at Oracle Cloud. Choose the **home region** carefully: it cannot be changed, and Always Free servers
+   only run there. Singapore is closest to the Philippines; take the nearest Asian region if Singapore is full.
+2. Turn on two-step sign-in for the Oracle account and keep its password in a password manager.
+3. Set a **budget alert** (Billing → Budgets) at a very small amount, so any accidental paid resource is noticed.
+4. Create the server: **Compute → Instances → Create**
+    - Image: **Ubuntu 24.04** (aarch64).
+    - Shape: **VM.Standard.A1.Flex**, **2 OCPU, 4 GB memory** (see 10.4 for why not more).
+    - Boot volume: 50 GB (within the free 200 GB).
+    - Add your SSH public key. Note the public IP address.
+5. Open the web ports in **two** places (Oracle blocks them by default):
+    - Networking → the instance's VCN → Security List → add ingress rules for TCP **80** and **443** from `0.0.0.0/0`.
+    - On the server, Ubuntu's firewall rules from Oracle's image:
+
+        ```bash
+        sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 80 -j ACCEPT
+        sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 443 -j ACCEPT
+        sudo netfilter-persistent save
+        ```
+
+    Never open the MySQL port (3306) to the internet.
+
+### 10.2 Software
+
+- **PHP 8.4** with the extensions in section 1 (Ubuntu 24.04 ships 8.3; use the `ondrej/php` PPA for 8.4, or run
+  8.3, which is supported).
+- **MySQL 8.4** from MySQL's own APT repository (Ubuntu's own package is 8.0, which the app was not tested on).
+- **Nginx**, **Certbot** (Let's Encrypt), **Composer**, **Node.js 20+** (only for `npm run build`).
+- Then follow sections 2–5. Point a DNS **A record** (for example `pos.<brevon domain>`) at the server's public IP
+  and run `sudo certbot --nginx -d pos.<brevon domain>` for HTTPS. Without a domain, a free DuckDNS name works.
+
+### 10.3 Backups on Oracle
+
+| Layer                               | How                                                                                                                                  | Who                    |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ---------------------- |
+| Daily database backup on the server | `brevon:backup` at 02:00, 14 days kept (section 5)                                                                                   | Automatic              |
+| Weekly copy of the whole disk       | Block Storage → Boot volume → **Backup policy** (custom, weekly; Always Free includes five volume backups)                           | Automatic, set up once |
+| Copy off Oracle                     | Download the newest `*.sql.gz` (e.g. `scp` or WinSCP) to Google Drive or a PC, at least weekly; can be automated later with `rclone` | Brevon IT              |
+
+The off-Oracle copy is the one that matters if the Oracle account is ever suspended. Practise a restore from it
+(section 6) before go-live.
+
+### 10.4 Keeping the free server from being reclaimed
+
+Oracle may reclaim an Always Free server it considers **idle**: over 7 days, CPU (95th percentile), network **and**
+memory all under 20%. A quiet shop server can look idle, so:
+
+- Use a small memory size (4 GB) so the app's normal use stays above 20%.
+- Give MySQL a large cache, in `/etc/mysql/mysql.conf.d/brevon.cnf` (or the file your MySQL install reads):
+
+    ```ini
+    [mysqld]
+    innodb_buffer_pool_size = 1G
+    ```
+
+- After the first week, check the instance's **Metrics → Memory utilization** in the console. If it is under
+  20%, raise `innodb_buffer_pool_size` or lower the memory size.
+- Oracle e-mails a warning before reclaiming. Treat that e-mail as urgent.
+- If the free server becomes unreliable, move to a paid server: install as in sections 1–5 and restore the newest
+  backup (section 6).
