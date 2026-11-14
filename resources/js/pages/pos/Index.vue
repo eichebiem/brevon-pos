@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { uuid } from '@/lib/uuid';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import {
     BadgePercent,
@@ -362,7 +363,7 @@ const paymentErrors = ref<Record<string, string | undefined>>({});
 
 // One key per distinct sale attempt: a retry of the same request reuses it
 // (the server returns the same order), any change gets a fresh key (D-105).
-let idempotencyKey = crypto.randomUUID();
+let idempotencyKey = uuid();
 let lastAttempt = '';
 
 let changeTimer: ReturnType<typeof setTimeout> | undefined;
@@ -425,7 +426,7 @@ function submit(payment: { reference: string }): void {
             : null,
     });
     if (attempt !== lastAttempt) {
-        idempotencyKey = crypto.randomUUID();
+        idempotencyKey = uuid();
         lastAttempt = attempt;
     }
 
@@ -554,6 +555,8 @@ watch(
 
 <template>
     <Head title="POS" />
+    <!-- Screen readers: every page has one main heading (NFR-014). -->
+    <h1 class="sr-only">Point of sale</h1>
 
     <!-- No shift: offer to open one (BR-017, D-103). -->
     <div

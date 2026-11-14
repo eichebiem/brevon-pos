@@ -4,7 +4,7 @@ Point of Sale and Store Management System for **Brevon Doughnuts & Coffee**.
 Requirements: [`docs/BREVON-SRS-v1.1.md`](docs/BREVON-SRS-v1.1.md) (SRS v1.1, prepared by Harris).
 Progress: [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md).
 
-> **Status:** Phase 11a (feature removals: tax, add-ons, lots, GCash check and preparation are gone; three roles: Owner, Manager, Cashier). Staff sign-in, users, roles, audit log, catalog and prices, store
+> **Status:** Phase 11b (hardening and release readiness) done, awaiting approval: HTTPS and security headers, friendly error pages, System logs, daily backups. Tax, add-ons, lots, the GCash check and preparation were removed in 11a; three roles: Owner, Manager, Cashier. Staff sign-in, users, roles, audit log, catalog and prices, store
 > settings, payment methods, pop-up locations, terminals, opening stock, stock on hand/movements and cashier shifts
 > work. Cashiers sell from the POS screen and print 80 mm order receipts; every sale is completed at the counter,
 > and a GCash sale needs its reference and the cashier's tick that the transfer arrived.
@@ -130,5 +130,9 @@ npm run check:fix # fix JS/Vue lint + formatting
 
 ## Deployment
 
-Documented in Phase 11. Production requires HTTPS, `APP_ENV=production`, `APP_DEBUG=false`, PHP 8.4, daily database
-backups with a tested restore, and a database user without access to other schemas.
+See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md): server requirements, `.env` for production, build, scheduler,
+HTTPS, backups and restore (`php artisan brevon:backup`), and the go-live checklist. Also
+[`docs/KNOWN_LIMITATIONS.md`](docs/KNOWN_LIMITATIONS.md) and the client sign-off sheet
+[`docs/UAT_CHECKLIST.md`](docs/UAT_CHECKLIST.md).
+
+Never run `migrate:fresh` on the shop's database: it deletes everything. From go-live, schema changes are new migrations.

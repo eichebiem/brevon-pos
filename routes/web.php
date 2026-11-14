@@ -23,6 +23,7 @@ use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\ShiftReviewController;
 use App\Http\Controllers\Admin\StoreSettingsController;
+use App\Http\Controllers\Admin\SystemLogController;
 use App\Http\Controllers\Admin\TerminalController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\HomeController;
@@ -265,6 +266,10 @@ Route::middleware(['auth'])->group(function () {
             Route::get('audit-logs', [AuditLogController::class, 'index'])->name('audit.index');
             Route::get('audit-logs/logins', [AuditLogController::class, 'logins'])->name('audit.logins');
         });
+
+        // FR-102, D-184: health and recent logs for technical administrators.
+        Route::get('system/logs', [SystemLogController::class, 'index'])
+            ->middleware('permission:system.logs')->name('system.logs');
     });
 });
 

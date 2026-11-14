@@ -12,6 +12,9 @@ void createInertiaApp({
     title: (title) => (title ? `${title} - ${appName}` : appName),
     layout: (name) => {
         switch (true) {
+            // Error pages draw their own simple card (no sidebar, works signed out).
+            case name.startsWith('errors/'):
+                return null;
             case name.startsWith('auth/'):
                 return AuthLayout;
             // The printable receipt is the page itself: no header or navigation.

@@ -180,3 +180,16 @@ The client does not need a preparation screen: every sale is finished at the cou
 6. **Tests and docs:** remove the preparation-board and cancel tests (Phase 5, parts of 9b) and the "Pickup at" cases. Update `RouteAuthorizationTest` and the role landing test. Update D-044, D-045, D-108, D-123 and D-125 (replaced), D-150, D-154, the Preparation staff role description and README.
 
 **Order in Phase 11:** regression baseline green, then remove tax (D-165), options (D-166), lots (D-167), the GCash check (D-168) and preparation (D-169), each followed by a full `composer check`. The user's `brevon_pos` gets each removal's migration and data checks (pending GCash, orders in progress, option and lot data) only after those checks are done.
+
+### Phase 11b plan: hardening and release readiness (started 2026-11-09)
+
+SRS: NFR-001, NFR-005, NFR-008–NFR-012, NFR-014, NFR-018–NFR-020, FR-102. 11a was approved on 2026-11-09.
+
+1. **Regression baseline:** `composer check` green, then a browser smoke test on the scratch database (sale, refund, shift close and review, stock, production, reports).
+2. **Security hardening (NFR-001, NFR-005, NFR-018, NFR-020):** HTTPS forced in production (redirect, secure cookies, HSTS), security headers on every response, friendly error pages (403, 404, 419, 429, 500, 503) without stack traces, and a code review of raw SQL, `v-html`, uploads, exports and shared props.
+3. **Operational logs (FR-102):** a read-only System logs page for a new `system.logs` permission (Owner by default) showing recent log lines with secrets masked.
+4. **Backups (NFR-011, NFR-012):** a `brevon:backup` command (compressed `mysqldump`, retention), scheduled daily; restore steps documented and a restore tested into `brevon_pos_test` only.
+5. **Performance (NFR-008, NFR-009):** a large sample dataset on the scratch database; time checkout and reports; fix slow queries or add indexes.
+6. **Accessibility and tablet pass (NFR-014):** key screens at tablet size, keyboard use, labels and contrast.
+7. **Release documents:** `docs/DEPLOYMENT.md` (server, environment, build, queue, scheduler, HTTPS, backups, go-live checklist), `docs/KNOWN_LIMITATIONS.md` and `docs/UAT_CHECKLIST.md` for the client's sign-off.
+8. **Final report:** includes every held client question and reminder.

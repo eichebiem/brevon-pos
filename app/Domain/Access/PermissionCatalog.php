@@ -36,7 +36,7 @@ final class PermissionCatalog
             'Purchasing' => ['suppliers.manage', 'purchase-orders.create', 'purchase-orders.approve', 'purchase-orders.receive'],
             'Shifts and cash' => ['shifts.open', 'shifts.close', 'shifts.review', 'cash-movements.create'],
             'Reports' => ['reports.sales', 'reports.inventory', 'reports.financial', 'reports.export'],
-            'Administration' => ['users.manage', 'roles.manage', 'settings.manage', 'locations.manage', 'audit.view'],
+            'Administration' => ['users.manage', 'roles.manage', 'settings.manage', 'locations.manage', 'audit.view', 'system.logs'],
         ];
     }
 

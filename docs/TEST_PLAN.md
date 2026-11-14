@@ -177,6 +177,16 @@ ID format `T-<area>-<n>`; each maps to SRS requirements.
 - T-RPT-3 report permissions; export permission (FR-096)
 - T-RPT-4 sales, shift, inventory-movement reports filter by location including a **deactivated** pop-up, whose history is still returned unchanged (FR-105, FR-108)
 
+### Hardening and release (Phase 11b)
+
+- T-SEC-1 every response has the security headers; HTTPS is forced when configured, `/up` exempt, HSTS on secure requests; a trusted proxy's `X-Forwarded-Proto` is honoured (NFR-001, NFR-018) — `HardeningTest`
+- T-SEC-2 production defaults: HTTPS forced and secure cookies when `APP_ENV=production`; Inertia devtools off outside local — `HardeningTest`
+- T-SEC-3 friendly 403/404/500 pages without stack traces; an expired form returns with a toast; passwords, the approval password and SC/PWD details are never flashed to the session (NFR-005, NFR-020) — `HardeningTest`
+- T-LOG-1 System logs only for `system.logs`; secrets masked; health and last backup shown (FR-102) — `SystemLogTest`
+- T-BAK-1 `brevon:backup` writes a gzip dump with private permissions, prunes old backups and leaves no partial file on failure (NFR-011) — `BackupDatabaseCommandTest`; restore tested manually into `brevon_pos_test` (NFR-012)
+- T-AUTH-9 after sign-in, only return to a remembered page the user may open, on this site (D-186) — `LoginRedirectTest`
+- Manual: performance with ~22k orders (NFR-008, NFR-009); tablet, keyboard, label and contrast pass (NFR-014); UAT with the client using `UAT_CHECKLIST.md`
+
 ## 3. Concurrency testing approach
 
 Concurrency tests (T-INV-3, T-POS-6, T-POS-7, T-PRD-B3) cannot rely on `RefreshDatabase` transactions. They use `DatabaseMigrations`/truncation on `brevon_pos_test` and spawn parallel PHP processes (or `pcntl_fork`, available locally) each with its own connection, then assert final DB state. Grouped as `@group concurrency`.

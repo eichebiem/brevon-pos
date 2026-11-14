@@ -33,6 +33,7 @@ use App\Support\Database\DestructiveCommandGuard;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Events\CommandStarting;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Http\Middleware\TrustProxies;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
@@ -59,6 +60,12 @@ class AppServiceProvider extends ServiceProvider
         $this->configureDefaults();
 
         Event::listen(CommandStarting::class, [DestructiveCommandGuard::class, 'handle']);
+
+        // So HTTPS and client IPs are detected behind a load balancer (D-183).
+        $proxies = trim((string) config('brevon.trusted_proxies'));
+        if ($proxies !== '') {
+            TrustProxies::at($proxies === '*' ? '*' : array_map('trim', explode(',', $proxies)));
+        }
     }
 
     /**

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
 import {
+    Activity,
     ArrowLeftRight,
     ChartColumn,
     Coins,
@@ -54,6 +55,7 @@ import { movements, stock, valuation } from '@/routes/admin/inventory';
 import { index as adjustmentsIndex } from '@/routes/admin/inventory/adjustments';
 import { index as dispatchesIndex } from '@/routes/admin/inventory/dispatches';
 import { index as itemsIndex } from '@/routes/admin/inventory/items';
+import { logs as systemLogs } from '@/routes/admin/system';
 import { index as locationsIndex } from '@/routes/admin/locations';
 import { index as paymentMethodsIndex } from '@/routes/admin/payment-methods';
 import { index as productionIndex } from '@/routes/admin/production';
@@ -302,6 +304,12 @@ const administration = computed(() =>
             href: auditIndex(),
             icon: ScrollText,
             permission: 'audit.view',
+        },
+        {
+            title: 'System logs',
+            href: systemLogs(),
+            icon: Activity,
+            permission: 'system.logs',
         },
     ]),
 );

@@ -19,6 +19,23 @@ return [
 
     'currency_symbol' => '₱',
 
+    // NFR-001, D-183: redirect HTTP to HTTPS and send HSTS. On by default in
+    // production; set BREVON_FORCE_HTTPS=false only for a closed local network.
+    'force_https' => (bool) env('BREVON_FORCE_HTTPS', env('APP_ENV') === 'production'),
+
+    // D-183: behind a hosting load balancer or proxy, its address(es),
+    // comma-separated, or '*'. Empty = no proxy trusted.
+    'trusted_proxies' => env('TRUSTED_PROXIES', ''),
+
+    // NFR-011, D-185: `php artisan brevon:backup` (scheduled daily). Copy the
+    // backup folder off the server too: a backup on the same disk is not enough.
+    'backup' => [
+        'path' => env('BREVON_BACKUP_PATH', storage_path('app/private/backups')),
+        'keep_days' => (int) env('BREVON_BACKUP_KEEP_DAYS', 14),
+        'mysqldump' => env('BREVON_MYSQLDUMP_PATH', 'mysqldump'),
+        'daily_at' => env('BREVON_BACKUP_TIME', '02:00'),
+    ],
+
     // FR-062 / BR-013 / D-047: negative stock is blocked by default.
     'allow_negative_stock' => (bool) env('BREVON_ALLOW_NEGATIVE_STOCK', false),
 

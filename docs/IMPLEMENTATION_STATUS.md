@@ -1,6 +1,6 @@
 # Brevon POS — Implementation Status
 
-Last updated: 2026-11-07 · Baseline: SRS **v1.1** (`docs/BREVON-SRS-v1.1.md`) · Prompt: `CLAUDE_CODE_PROMPT_BREVON_POS_v1.1.md` (v1.3)
+Last updated: 2026-11-15 · Baseline: SRS **v1.1** (`docs/BREVON-SRS-v1.1.md`) · Prompt: `CLAUDE_CODE_PROMPT_BREVON_POS_v1.1.md` (v1.3)
 
 | Phase                                         | Status                                          | Notes                                                                  |
 | --------------------------------------------- | ----------------------------------------------- | ---------------------------------------------------------------------- |
@@ -20,8 +20,8 @@ Last updated: 2026-11-07 · Baseline: SRS **v1.1** (`docs/BREVON-SRS-v1.1.md`) �
 | 9b — Refunds and voids                        | ✅ Passed                                       | Approved 2026-11-06; refund approval limit ₱0.00 TBC                   |
 | 10a — Dashboard and sales reports             | ✅ Passed                                       | Approved 2026-11-06; definitions TBC (held for Phase 11)               |
 | 10b — Operational reports                     | ✅ Passed                                       | Approved 2026-11-06                                                    |
-| 11a — Feature removals                        | ✅ Built — awaiting approval                    | Tax, options, lots, GCash check, preparation removed                   |
-| 11b — Hardening and release readiness         | ⏳ Not started                                  | Security, a11y, performance, backup, deploy                            |
+| 11a — Feature removals                        | ✅ Passed                                       | Approved 2026-11-09; plus D-174–D-182 changes                          |
+| 11b — Hardening and release readiness         | ✅ Passed                                       | Approved 2026-11-15; held questions parked again (user)                |
 
 ## Phase 0 log
 
@@ -664,3 +664,39 @@ Still to confirm: boxes/combo at pop-ups (D-089), hot vs iced coffee prices. Pha
 **Known issues / deferred:** none new. Held client questions are raised in the 11b report.
 
 **Next step:** approval of 11a, then 11b (hardening and release readiness).
+
+## Phase 11b log — Hardening and release readiness (2026-11-09)
+
+**Objective:** make the system safe and ready to hand over (NFR-001, NFR-005, NFR-008–NFR-012, NFR-014, NFR-018–NFR-020, FR-102), following the eight-step plan in `IMPLEMENTATION_PLAN.md`.
+**Approved to start:** "we can now move to next phase" (2026-11-09).
+
+**Implemented**
+
+- **Security (D-183):** `app/Http/Middleware/SecurityHeaders.php` (HTTPS redirect except `/up`, HSTS, security headers); `config/brevon.php` `force_https`, `trusted_proxies`; `config/session.php` secure cookies in production; `AppServiceProvider` applies trusted proxies; `bootstrap/app.php` friendly error pages, the 419 toast and `dontFlash` for passwords, the approval password and SC/PWD details; `resources/js/pages/errors/Show.vue`; `resources/js/lib/uuid.ts` (POS works on plain-HTTP LAN addresses); tests log to `null` (`phpunit.xml`).
+- **System logs (D-184):** permission `system.logs`; `app/Domain/System/LogReader.php`; `Admin/SystemLogController`; `admin/system/Logs.vue`; sidebar link.
+- **Backups (D-185):** `app/Console/Commands/BackupDatabaseCommand.php` (`brevon:backup`), daily schedule in `routes/console.php`, `config/brevon.php` `backup`.
+- **Sign-in redirect (D-186):** `app/Http/Responses/LoginResponse.php`, bound in `FortifyServiceProvider` for normal and two-factor sign-in.
+- **Accessibility:** the POS screen has a (screen-reader) page heading.
+- **Release documents:** `docs/DEPLOYMENT.md`, `docs/KNOWN_LIMITATIONS.md`, `docs/UAT_CHECKLIST.md`; README deployment section.
+
+**Verification (all run 2026-11-09)**
+
+| Command / check                                                                                       | Result                                                                                                                                                                                                                                                                                                                          |
+| ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `composer check` → build, `vp check`, `vue-tsc`, Pint, Larastan L7                                    | all pass, 0 errors                                                                                                                                                                                                                                                                                                              |
+| → `php artisan test` (MySQL)                                                                          | **347 passed** (330 at the end of 11a; new: `HardeningTest`, `SystemLogTest`, `BackupDatabaseCommandTest`, `LoginRedirectTest`)                                                                                                                                                                                                 |
+| Smoke test (scratch DB)                                                                               | every admin, POS, settings and report page 200; XLSX export works                                                                                                                                                                                                                                                               |
+| Backup and restore (scratch DB only)                                                                  | `brevon:backup` then `gunzip -c … \| mysql` into `brevon_pos_test`: 52 tables equal by CHECKSUM                                                                                                                                                                                                                                 |
+| Performance (scratch DB, 21,931 orders / 54,980 lines over 180 days, single-threaded `artisan serve`) | quote ~45 ms, checkout ~150 ms, POS page 170–300 ms, order history ~200 ms, dashboard ~294 ms; sales report 1 day 521 ms, 30 days 628 ms, 90 days by week 949 ms, 180 days by month 1,412 ms; operational reports 85–523 ms. NFR-008/NFR-009 met; no index changes needed                                                       |
+| Accessibility (scratch DB, every GET page, 768×1024 and 1024×768)                                     | every field labelled, every button and link named, one `h1` per page (POS added), no sideways scrolling, touch targets 40–56 px, visible focus outline, `/` focuses product search; WCAG AA text contrast passes in light and dark mode on the POS, dashboard, users, shifts, sales report, stock, orders, shift and logs pages |
+| Dark mode                                                                                             | checked on the same pages; no contrast failures                                                                                                                                                                                                                                                                                 |
+
+**Found and fixed during 11b:** approval password and SC/PWD details flashed into the stored session after a validation error (D-183); POS crash on plain-HTTP LAN addresses (`crypto.randomUUID`); proxy setting read with `env()` outside config; tests writing into the real `laravel.log`; a cashier sent to a 403 page after an Owner's session expired on the same tablet (D-186); POS screen without a page heading.
+
+**Not done / limits:** not tested with a real screen reader user; HTTPS and the scheduler are configured on the server at deployment, not in this repository. See `KNOWN_LIMITATIONS.md`.
+
+**The user's `brevon_pos` was not written to.**
+
+**Approved:** 2026-11-15 ("I'll approve this for now"). The user parked the held client questions again, including the offer of a "value at selling price" column on the Waste & rejects report, until the client answers.
+
+**Next step:** the go-live checklist in `DEPLOYMENT.md` §9 and the UAT with the client.
