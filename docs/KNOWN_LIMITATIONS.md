@@ -27,10 +27,11 @@ None of these is a defect. Each can be added later through a change request.
 | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Tax (VAT and other taxes)                  | Removed; the business is non-VAT (D-165). Prices are final.                                                                                             |
 | Options and add-ons (extra shot, oat milk) | Removed (D-166). Sizes and variants stay.                                                                                                               |
-| Lots and expiry dates                      | Removed (D-167). Perishable items can still be refused on receiving and written off as waste.                                                           |
+| Lots and expiry dates                      | Removed (D-167). Perishable items can still be written off as waste.                                                                                    |
 | Preparation board and order steps          | Removed (D-169). Every order is completed at checkout; corrections are refunds.                                                                         |
 | Separate GCash check after the sale        | Removed (D-168).                                                                                                                                        |
 | Walk-in and Bulk order types               | Removed (D-181). Order types are Dine-in, Takeout and Advance Order.                                                                                    |
+| Purchasing (suppliers, orders, deliveries) | Removed for now; a future feature (D-188, FE-02).                                                                                                       |
 | Pop-up receive confirmation                | Not built (FE-01, OI-018). A dispatch to a pop-up posts at once; unsold doughnuts stay in the pop-up's stock and are handled with waste or adjustments. |
 
 ## 3. Selling and payments
@@ -38,7 +39,7 @@ None of these is a defect. Each can be added later through a change request.
 - **One payment per order.** No split payment, e.g. part cash, part GCash (D-040).
 - **Paid in full at order time**, including Advance Orders. No deposits or balance on pickup (D-043). An Advance
   Order has no pickup date or time field; write it in the order note.
-- **Pop-ups sell doughnuts only.** Drinks made to a recipe cannot be offered at a pop-up (D-063).
+- **Pop-ups sell doughnuts only.** Drinks cannot be offered at a pop-up (D-063).
 - **One discount per order** (D-146).
 - **One SC/PWD beneficiary per order.** A group of seniors pays in separate orders (D-148).
 - **Refunds, not edits.** A finished sale is never changed. Mistakes are fixed with a refund (D-150, D-169).
@@ -46,16 +47,18 @@ None of these is a defect. Each can be added later through a change request.
   printer without the dialog is not built yet (OI-009, see §6).
 - **No cash drawer** is opened by the system.
 
-## 4. Stock, recipes and costs
+## 4. Stock and costs
 
 - **Stock cannot go below zero**, and there is no override (D-047, D-139).
-- **No unit conversions.** A recipe line uses the same unit as the stock item, e.g. grams with grams (D-049).
 - **Weighted average cost** is the only costing method (D-048, TBC OI-014).
-- **Doughnut cost is ingredients only.** Labour and overheads are not included (D-144).
-- **Add-ons take no ingredients**, and drinks without a recipe take nothing from stock (D-141).
-- **Items without a cost show ₱0.00** in stock value and on the waste report until a delivery with a unit cost is
-  received or opening stock is posted with a cost (D-139).
-- Rejects from a production batch are recorded on the batch. There is no separate waste record for them (D-143).
+- **Only finished-stock products are counted** (doughnuts and retail items). Drinks, boxes and combos take nothing
+  from stock (D-189).
+- **Reorder levels are set on the product form** by the Owner (D-189).
+- **Average cost is not shown** anywhere; it is still kept for a later feature (D-191, FE-04).
+- **Waste is valued at the selling price** on the day it was written off, not at cost. Items without a selling price
+  count as ₱0.00 (D-191).
+- **Costs do not update after opening stock.** Restocks are entered as adjustments, which keep the existing average
+  cost (D-188, D-189).
 
 ## 5. Access and devices
 
@@ -78,8 +81,6 @@ These work today with the default shown and can be changed on screen, except whe
 | Costing method                                      | Weighted average (code change to switch)                                                                                    | Accountant                                      | D-048, OI-014        |
 | Sales report definitions                            | Net = gross − discounts − refunds, counted on the sale date                                                                 | Accountant                                      | D-156                |
 | Receipt wording                                     | "Order Receipt — not an official receipt/invoice"                                                                           | Accountant                                      | D-037, OI-008        |
-| Cash out needing approval                           | Over ₱500.00                                                                                                                | Owner                                           | Phase 6              |
-| Shift needing review                                | Any difference over ₱0.00                                                                                                   | Owner                                           | Phase 6              |
 | Discount needing a manager                          | Over ₱100.00                                                                                                                | Owner                                           | D-146                |
 | Refund needing a manager                            | Over ₱0.00 (every refund)                                                                                                   | Owner                                           | D-152, OI-011        |
 | GCash reference format                              | 6–40 letters and digits, used once only                                                                                     | Owner                                           | D-109, OI-005        |

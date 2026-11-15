@@ -9,7 +9,6 @@ use App\Domain\Discounts\DiscountRequest;
 use App\Domain\Inventory\InsufficientStock;
 use App\Domain\Inventory\InventoryLedger;
 use App\Domain\Inventory\StockChange;
-use App\Domain\Production\RecipeBook;
 use App\Domain\Shared\AuditLogger;
 use App\Domain\Shared\BusinessClock;
 use App\Domain\Shared\Money;
@@ -57,7 +56,6 @@ class CheckoutService
         private readonly NumberSequence $numbers,
         private readonly InventoryLedger $ledger,
         private readonly AuditLogger $audit,
-        private readonly RecipeBook $recipes,
         private readonly DiscountCalculator $discounts,
         private readonly DiscountApproval $approvals,
     ) {}
@@ -371,24 +369,14 @@ class CheckoutService
 
     /**
      * BR-009, D-046: finished-stock lines reduce their stock item now.
-     * Recipe-at-sale lines deduct their recipe's ingredients for the size
-     * sold (FR-072, D-141); a drink with no recipe yet deducts nothing.
-     * Untracked lines have no stock effect. Ingredients of finished goods
-     * were deducted at production, never again here (FR-071).
+     * Untracked lines (drinks, boxes, combos) have no stock effect; recipes
+     * were removed as a future feature (D-189).
      */
     private function deductStock(User $cashier, Branch $location, Order $order, PricedCart $cart): void
     {
         /** @var array<int, Quantity> $perItem */
         $perItem = [];
         foreach ($cart->lines as $line) {
-            if ($line->product->inventory_tracking_mode === InventoryTrackingMode::RecipeAtSale) {
-                $recipe = $this->recipes->active($line->product, $line->variant);
-                foreach ($recipe ? $this->recipes->ingredientsFor($recipe, $line->quantity) : [] as $itemId => $quantity) {
-                    $perItem[$itemId] = ($perItem[$itemId] ?? Quantity::zero())->add($quantity);
-                }
-
-                continue;
-            }
             if ($line->product->inventory_tracking_mode !== InventoryTrackingMode::FinishedStock) {
                 continue;
             }

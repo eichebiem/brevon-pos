@@ -15,6 +15,7 @@ type Method = {
     type: 'cash' | 'e_wallet' | 'card' | 'other';
     requires_reference: boolean;
     is_active: boolean;
+    is_default: boolean;
 };
 
 const props = defineProps<{ methods: Method[] }>();
@@ -89,12 +90,19 @@ function save(id: number): void {
                             {{ typeLabel[method.type] }}
                         </p>
                     </div>
-                    <StatusBadge
-                        :tone="savedActive[method.id] ? 'success' : 'neutral'"
-                        >{{
-                            savedActive[method.id] ? 'Active' : 'Off'
-                        }}</StatusBadge
-                    >
+                    <div class="flex flex-wrap gap-2">
+                        <StatusBadge v-if="method.is_default" tone="info"
+                            >Default</StatusBadge
+                        >
+                        <StatusBadge
+                            :tone="
+                                savedActive[method.id] ? 'success' : 'neutral'
+                            "
+                            >{{
+                                savedActive[method.id] ? 'Active' : 'Off'
+                            }}</StatusBadge
+                        >
+                    </div>
                 </div>
 
                 <div class="grid gap-2 sm:max-w-sm">
@@ -113,10 +121,24 @@ function save(id: number): void {
                         <input
                             v-model="form.is_active"
                             type="checkbox"
-                            class="size-4 accent-brevon-navy"
+                            class="size-4 accent-brevon-navy disabled:opacity-60"
+                            :disabled="method.is_default"
+                            :aria-describedby="
+                                method.is_default
+                                    ? `default-${method.id}`
+                                    : undefined
+                            "
                         />
                         Accept at the POS
                     </label>
+                    <p
+                        v-if="method.is_default"
+                        :id="`default-${method.id}`"
+                        class="w-full text-xs text-muted-foreground"
+                    >
+                        Cash is the default payment method and is always
+                        accepted.
+                    </p>
                     <label
                         v-if="method.type !== 'cash'"
                         class="flex items-center gap-2"

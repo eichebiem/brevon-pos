@@ -5,7 +5,7 @@ import StatusBadge from '@/components/StatusBadge.vue';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
-import { formatDateTime, formatQuantity, formatUnitCost } from '@/lib/format';
+import { formatDateTime, formatQuantity } from '@/lib/format';
 import { approve, index, reject } from '@/routes/admin/inventory/adjustments';
 
 type Line = {
@@ -16,7 +16,6 @@ type Line = {
     system_quantity: string;
     counted_quantity: string;
     variance_quantity: string;
-    unit_cost: string | null;
 };
 
 const props = defineProps<{
@@ -128,13 +127,6 @@ const signed = (value: string) =>
                         >
                             Change
                         </th>
-                        <th
-                            v-if="adjustment.status === 'posted'"
-                            scope="col"
-                            class="px-4 py-3 text-right font-semibold"
-                        >
-                            Unit cost
-                        </th>
                     </tr>
                 </thead>
                 <tbody>
@@ -166,12 +158,6 @@ const signed = (value: string) =>
                             "
                         >
                             {{ signed(line.variance_quantity) }}
-                        </td>
-                        <td
-                            v-if="adjustment.status === 'posted'"
-                            class="px-4 py-3 text-right tabular-nums"
-                        >
-                            {{ formatUnitCost(line.unit_cost) }}
                         </td>
                     </tr>
                 </tbody>

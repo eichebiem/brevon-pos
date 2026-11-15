@@ -6,11 +6,9 @@ use App\Domain\Shared\AuditLogger;
 use App\Domain\Shared\BusinessClock;
 use App\Domain\Shared\Money;
 use App\Domain\Shared\NumberSequence;
-use App\Enums\CashMovementStatus;
 use App\Enums\ShiftStatus;
 use App\Models\Branch;
 use App\Models\CashierShift;
-use App\Models\CashMovement;
 use App\Models\Terminal;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -126,11 +124,6 @@ class ShiftService
 
             if (! $shift->isOpen()) {
                 throw ValidationException::withMessages(['counted_cash' => __('This shift is already closed.')]);
-            }
-
-            // D-127: every cash movement must be decided before the drawer is counted.
-            if (CashMovement::query()->where('cashier_shift_id', $shift->id)->where('status', CashMovementStatus::Pending)->exists()) {
-                throw ValidationException::withMessages(['counted_cash' => __('A cash movement is still waiting for approval. Ask a manager to approve or reject it first.')]);
             }
 
             $expected = $this->expectedCash->for($shift);

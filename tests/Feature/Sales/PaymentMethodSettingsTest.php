@@ -40,15 +40,30 @@ class PaymentMethodSettingsTest extends TestCase
         $this->assertSame(['name' => 'GCash QR', 'is_active' => false], $audit->new_values);
     }
 
-    public function test_the_last_active_method_cannot_be_turned_off(): void
+    public function test_cash_is_always_accepted_and_cannot_be_turned_off(): void
     {
         $owner = $this->staff(PermissionCatalog::OWNER);
-        PaymentMethod::query()->where('code', 'GCASH')->update(['is_active' => false]);
         $cash = PaymentMethod::query()->where('code', 'CASH')->sole();
 
+        // Refused even while GCash is still on: cash is the default method (D-187).
         $this->actingAs($owner)->put("/admin/payment-methods/{$cash->id}", ['name' => 'Cash', 'is_active' => false, 'requires_reference' => false])
-            ->assertSessionHasErrors(['is_active' => 'Keep at least one payment method active.']);
+            ->assertSessionHasErrors(['is_active' => 'Cash is the default payment method and is always accepted.']);
         $this->assertTrue($cash->refresh()->is_active);
+        $this->assertDatabaseMissing('audit_logs', ['event' => 'payment_method.updated']);
+
+        // Renaming it still works.
+        $this->actingAs($owner)->put("/admin/payment-methods/{$cash->id}", ['name' => 'Cash payment', 'is_active' => true, 'requires_reference' => false])
+            ->assertSessionHasNoErrors();
+        $this->assertSame('Cash payment', $cash->refresh()->name);
+    }
+
+    public function test_the_page_marks_cash_as_the_default_that_stays_on(): void
+    {
+        $this->actingAs($this->staff(PermissionCatalog::OWNER))->get('/admin/payment-methods')
+            ->assertInertia(fn ($page) => $page->component('admin/payment-methods/Index')
+                ->where('methods.0.code', 'CASH')
+                ->where('methods.0.is_default', true)
+                ->where('methods.1.is_default', false));
     }
 
     public function test_cash_cannot_require_a_reference(): void

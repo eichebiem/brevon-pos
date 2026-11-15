@@ -8,11 +8,13 @@ docs/HANDOFF_ANDROID_APP.md, then continue the Android app."_
 
 - All phases (0–11b) are built and approved; 11b approved 2026-11-15. See `IMPLEMENTATION_STATUS.md`.
 - Quality gate: `composer check` (build, `vp check`, `vue-tsc`, Pint, Larastan, PHPUnit on MySQL `brevon_pos_test`).
-  347 tests pass.
+  324 tests pass.
 - Hosting decided: **Oracle Cloud Always Free**, one Arm VM with the app and MySQL 8.4 (`DEPLOYMENT.md` §10).
   Vercel was rejected (Hobby plan is non-commercial; no PHP/MySQL/persistent files).
 - A PWA was built and then **reverted** at the user's request (2026-11-15). Don't rebuild it unless asked.
-  D-187 is unused.
+- Client changes 2026-11-15: Cash is the default payment method and cannot be switched off (D-187); purchasing
+  (suppliers, purchase orders, deliveries) removed as a future feature (D-188, FE-02); recipes, production, stock
+  items and stock value removed (D-189, FE-03), reorder level now on the product form.
 
 ## Ground rules (from the user)
 

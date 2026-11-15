@@ -27,7 +27,7 @@ enum ProductType: string
     {
         return match ($this) {
             self::FinishedGood => [InventoryTrackingMode::FinishedStock],
-            self::MadeToOrder => [InventoryTrackingMode::RecipeAtSale, InventoryTrackingMode::None],
+            self::MadeToOrder => [InventoryTrackingMode::None],
             self::Retail => [InventoryTrackingMode::FinishedStock, InventoryTrackingMode::None],
         };
     }

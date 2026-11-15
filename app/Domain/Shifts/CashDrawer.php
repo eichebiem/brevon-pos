@@ -2,10 +2,8 @@
 
 namespace App\Domain\Shifts;
 
-use App\Domain\Settings\StoreSettings;
 use App\Domain\Shared\AuditLogger;
 use App\Domain\Shared\Money;
-use App\Enums\CashMovementStatus;
 use App\Enums\CashMovementType;
 use App\Models\CashierShift;
 use App\Models\CashMovement;
@@ -26,7 +24,6 @@ class CashDrawer
 
     public function __construct(
         private readonly ExpectedCash $expected,
-        private readonly StoreSettings $settings,
         private readonly AuditLogger $audit,
         private readonly ShiftSummary $summary,
     ) {}
@@ -34,8 +31,8 @@ class CashDrawer
     /**
      * Cash in, cash out or a paid-out on an open shift (FR-076). The
      * cashier records on their own shift; someone who reviews shifts may
-     * record on any shift at their location. Taking out more than a set
-     * amount waits for approval unless the person is a reviewer (D-127).
+     * record on any shift at their location. Every movement counts at once;
+     * approval of large cash out was removed (D-193, future feature FE-05).
      */
     public function record(User $actor, CashierShift $shift, CashMovementType $type, Money $amount, string $reason): CashMovement
     {
@@ -48,14 +45,12 @@ class CashDrawer
             throw ValidationException::withMessages(['amount' => __('You can only record cash on your own shift.')]);
         }
 
-        return DB::transaction(function () use ($actor, $shift, $type, $amount, $reason, $reviewer) {
+        return DB::transaction(function () use ($actor, $shift, $type, $amount, $reason) {
             $shift = $this->lockOpen($shift, 'amount');
 
             if ($type->isOutflow()) {
                 $this->assertDrawerCovers($shift, $amount);
             }
-
-            $needsApproval = $type->isOutflow() && ! $reviewer && $amount->greaterThan($this->settings->money('cash.approval_over'));
 
             $movement = new CashMovement;
             $movement->forceFill([
@@ -64,9 +59,6 @@ class CashDrawer
                 'movement_type' => $type,
                 'amount' => $amount->toDecimal(),
                 'reason' => $reason,
-                'status' => $needsApproval ? CashMovementStatus::Pending : CashMovementStatus::Approved,
-                'approved_by' => $needsApproval ? null : ($reviewer ? $actor->id : null),
-                'decided_at' => $needsApproval ? null : now(),
                 'created_by' => $actor->id,
                 'created_at' => now(),
             ])->save();
@@ -76,44 +68,6 @@ class CashDrawer
                 'type' => $type->value,
                 'amount' => $movement->amount,
                 'reason' => $reason,
-                'status' => $movement->status->value,
-            ], $shift->branch_id, $actor);
-
-            return $movement;
-        });
-    }
-
-    /** A manager approves or rejects a pending movement (D-127). */
-    public function decide(User $actor, CashMovement $movement, bool $approve, ?string $notes): CashMovement
-    {
-        if ($movement->created_by === $actor->id) {
-            throw ValidationException::withMessages(['movement' => __('Someone else must approve your own cash movement.')]);
-        }
-
-        return DB::transaction(function () use ($actor, $movement, $approve, $notes) {
-            /** @var CashierShift $shift */
-            $shift = $movement->shift()->firstOrFail();
-            $shift = $this->lockOpen($shift, 'movement');
-            $movement = CashMovement::query()->whereKey($movement->id)->lockForUpdate()->firstOrFail();
-
-            if ($movement->status !== CashMovementStatus::Pending) {
-                throw ValidationException::withMessages(['movement' => __('This cash movement was already decided.')]);
-            }
-            if ($approve && $movement->movement_type->isOutflow()) {
-                $this->assertDrawerCovers($shift, Money::fromDecimal($movement->amount), 'movement', excluding: $movement->id);
-            }
-
-            $movement->forceFill([
-                'status' => $approve ? CashMovementStatus::Approved : CashMovementStatus::Rejected,
-                'approved_by' => $actor->id,
-                'decided_at' => now(),
-                'decision_notes' => $notes,
-            ])->save();
-
-            $this->audit->record($approve ? 'cash_movement.approved' : 'cash_movement.rejected', $movement, ['status' => 'pending'], [
-                'status' => $movement->status->value,
-                'amount' => $movement->amount,
-                'notes' => $notes,
             ], $shift->branch_id, $actor);
 
             return $movement;
@@ -153,9 +107,7 @@ class CashDrawer
                 'amount' => $amount->toDecimal(),
                 'corrects' => $corrects,
                 'reason' => $reason,
-                'status' => CashMovementStatus::Approved,
                 'approved_by' => $actor->id,
-                'decided_at' => now(),
                 'created_by' => $actor->id,
                 'created_at' => now(),
             ])->save();
@@ -223,11 +175,9 @@ class CashDrawer
             'movement_type' => CashMovementType::Refund,
             'amount' => $amount->toDecimal(),
             'reason' => __('Refund :number', ['number' => $refund->refund_number]),
-            'status' => CashMovementStatus::Approved,
             'reference_type' => $refund->getMorphClass(),
             'reference_id' => $refund->id,
             'approved_by' => $refund->approved_by,
-            'decided_at' => now(),
             'created_by' => $actor->id,
             'created_at' => now(),
         ])->save();
@@ -252,19 +202,10 @@ class CashDrawer
         }
     }
 
-    /**
-     * Cash cannot leave a drawer that does not hold it: expected cash minus
-     * outflows still waiting for approval must cover the amount.
-     */
-    private function assertDrawerCovers(CashierShift $shift, Money $amount, string $field = 'amount', ?int $excluding = null): void
+    /** Cash cannot leave a drawer that does not hold it (expected cash must cover the amount). */
+    private function assertDrawerCovers(CashierShift $shift, Money $amount, string $field = 'amount'): void
     {
-        $pending = CashMovement::query()
-            ->where('cashier_shift_id', $shift->id)
-            ->where('status', CashMovementStatus::Pending)
-            ->whereIn('movement_type', array_map(fn (CashMovementType $t) => $t->value, array_filter(CashMovementType::cases(), fn ($t) => $t->isOutflow())))
-            ->when($excluding, fn ($q, $id) => $q->whereKeyNot($id))
-            ->pluck('amount');
-        $available = $this->expected->for($shift)->subtract(Money::sum($pending->map(fn (string $a) => Money::fromDecimal($a))));
+        $available = $this->expected->for($shift);
 
         if ($amount->greaterThan($available)) {
             throw ValidationException::withMessages([$field => __('The drawer should only hold :available, so :amount cannot come out of it.', ['available' => $available->format(), 'amount' => $amount->format()])]);

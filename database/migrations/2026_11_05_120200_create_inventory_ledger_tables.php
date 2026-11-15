@@ -44,7 +44,7 @@ return new class extends Migration
             $table->index(['reference_type', 'reference_id']);
         });
 
-        $types = "'opening','purchase_receipt','production_consumption','production_output','sale','waste','adjustment_in','adjustment_out','return_in','transfer_in','transfer_out'";
+        $types = "'opening','sale','waste','adjustment_in','adjustment_out','return_in','transfer_in','transfer_out'";
         DB::statement("ALTER TABLE inventory_movements ADD CONSTRAINT inventory_movements_type_check CHECK (movement_type IN ({$types}))");
         DB::statement('ALTER TABLE inventory_movements ADD CONSTRAINT inventory_movements_delta_check CHECK (quantity_delta <> 0)');
         DB::statement('ALTER TABLE inventory_movements ADD CONSTRAINT inventory_movements_cost_check CHECK (unit_cost IS NULL OR unit_cost >= 0)');

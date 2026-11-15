@@ -2,9 +2,7 @@
 
 namespace App\Domain\Shifts;
 
-use App\Domain\Settings\StoreSettings;
 use App\Domain\Shared\Money;
-use App\Enums\CashMovementStatus;
 use App\Enums\CashMovementType;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentMethodType;
@@ -24,7 +22,6 @@ class ShiftSummary
 {
     public function __construct(
         private readonly ExpectedCash $expected,
-        private readonly StoreSettings $settings,
     ) {}
 
     /**
@@ -54,11 +51,14 @@ class ShiftSummary
             ->subtract(Money::fromDecimal($shift->expected_cash)->add($c['expected']));
     }
 
-    /** Closed, not yet reviewed, and the corrected difference is over the set limit (D-128). */
+    /**
+     * Closed, not yet reviewed, and short or over by any amount after
+     * corrections (D-128; the limit setting was removed, D-193).
+     */
     public function needsReview(CashierShift $shift): bool
     {
         return ! $shift->isOpen() && $shift->reviewed_at === null
-            && $this->correctedVariance($shift)->absolute()->greaterThan($this->settings->money('shift.review_variance_over'));
+            && ! $this->correctedVariance($shift)->isZero();
     }
 
     /**
@@ -104,7 +104,6 @@ class ShiftSummary
             'non_cash' => $this->nonCash($shift),
             'order_count' => (clone $orders)->count(),
             'cancelled_count' => (clone $orders)->where('status', OrderStatus::Cancelled)->count(),
-            'pending_movements' => CashMovement::query()->where('cashier_shift_id', $shift->id)->where('status', CashMovementStatus::Pending)->count(),
             'needs_review' => $this->needsReview($shift),
         ];
     }
@@ -145,11 +144,9 @@ class ShiftSummary
                 'amount' => $m->amount,
                 'corrects' => $m->corrects,
                 'reason' => $m->reason,
-                'status' => $m->status->value,
                 'by' => $m->creator?->name,
                 'by_id' => $m->created_by,
                 'decided_by' => $m->approver?->name,
-                'decision_notes' => $m->decision_notes,
                 'at' => $m->created_at->toIso8601String(),
             ])->all());
     }

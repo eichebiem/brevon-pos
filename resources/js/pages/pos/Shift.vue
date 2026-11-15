@@ -48,10 +48,6 @@ const props = defineProps<{
     canRecordCash: boolean;
 }>();
 
-const pendingCount = computed(
-    () => props.movements.filter((m) => m.status === 'pending').length,
-);
-
 const { can } = usePermissions();
 
 const openForm = useForm({
@@ -186,16 +182,6 @@ const varianceTone = (value: string | null) =>
                     difference are shown after closing. If your count does not
                     match, you will be asked to count again or explain the
                     difference.
-                </p>
-                <p
-                    v-if="pendingCount"
-                    class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950"
-                    role="status"
-                >
-                    {{ pendingCount }} cash
-                    {{ pendingCount === 1 ? 'movement is' : 'movements are' }}
-                    waiting for a manager. The shift can close once they are
-                    approved or rejected.
                 </p>
                 <div class="grid max-w-56 gap-2">
                     <Label for="counted_cash">Counted cash (₱)</Label>

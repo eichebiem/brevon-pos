@@ -112,7 +112,6 @@ class StockAdjustmentController extends Controller
                     'system_quantity' => $line->system_quantity,
                     'counted_quantity' => $line->counted_quantity,
                     'variance_quantity' => $line->variance_quantity,
-                    'unit_cost' => $line->unit_cost,
                 ])->values(),
             ],
             'canDecide' => $adjustment->status === StockAdjustmentStatus::Pending

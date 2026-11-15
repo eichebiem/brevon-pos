@@ -44,6 +44,7 @@ class ProductRequest extends FormRequest
             'product_type' => ['required', Rule::enum(ProductType::class)],
             'inventory_tracking_mode' => ['required', Rule::enum(InventoryTrackingMode::class)],
             'base_unit' => ['nullable', 'string', 'max:30'],
+            'reorder_level' => ['nullable', 'string', 'max:20'],
             'is_available_for_pos' => ['sometimes', 'boolean'],
             'image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'remove_image' => ['sometimes', 'boolean'],

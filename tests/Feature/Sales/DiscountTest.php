@@ -278,8 +278,8 @@ class DiscountTest extends TestCase
         $personal = ['full_name', 'card_number', 'address', 'customer_name', 'customer_phone', 'customer_email', 'phone', 'email', 'birthdate'];
         $allowed = [
             'order_discount_beneficiaries' => ['full_name', 'card_number', 'address'],
-            // Staff accounts, suppliers and locations are business records, not customer data (D-067, D-135).
-            'users' => ['email'], 'password_reset_tokens' => ['email'], 'employees' => ['phone', 'email'], 'suppliers' => ['phone', 'email', 'address'],
+            // Staff accounts and locations are business records, not customer data (D-067).
+            'users' => ['email'], 'password_reset_tokens' => ['email'], 'employees' => ['phone', 'email'],
         ];
         foreach (Schema::getTableListing(schemaQualified: false) as $table) {
             $found = array_values(array_intersect($personal, Schema::getColumnListing($table)));

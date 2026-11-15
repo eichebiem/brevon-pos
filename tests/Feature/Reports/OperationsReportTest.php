@@ -3,6 +3,7 @@
 namespace Tests\Feature\Reports;
 
 use App\Domain\Access\PermissionCatalog;
+use App\Domain\Catalog\PriceService;
 use App\Domain\Inventory\InventoryLedger;
 use App\Domain\Inventory\StockChange;
 use App\Domain\Inventory\StockWaste;
@@ -14,15 +15,12 @@ use App\Domain\Shifts\ShiftService;
 use App\Enums\DiscountKind;
 use App\Enums\DiscountScope;
 use App\Enums\DiscountType;
-use App\Enums\InventoryItemType;
 use App\Enums\InventoryMovementType;
 use App\Models\AuditLog;
 use App\Models\Discount;
-use App\Models\InventoryItem;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
-use App\Models\UnitOfMeasure;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -153,50 +151,43 @@ class OperationsReportTest extends TestCase
             ->assertInertia(fn (AssertableInertia $page) => $page->has('tables.0.rows', 0));
     }
 
-    public function test_production_and_waste_reports(): void
+    /** D-191: waste is valued at the selling price on the day it was written off. */
+    public function test_waste_report(): void
     {
-        $doughnut = Product::factory()->finishedStock()->create(['name' => 'Choco Custard Batch']);
-        $flour = $this->ingredientItem('ING-FLOUR');
-        $pc = UnitOfMeasure::query()->firstOrCreate(['code' => 'pc'], ['name' => 'Piece', 'precision' => 0]);
-        $egg = InventoryItem::query()->create(['sku' => 'ING-EGG', 'name' => 'Egg', 'item_type' => InventoryItemType::Ingredient, 'unit_of_measure_id' => $pc->id]);
+        $flour = $this->weighedItem('ING-FLOUR');
         $main = $this->mainLocation();
         app(InventoryLedger::class)->post($this->owner, [
             new StockChange($main->id, $flour->id, InventoryMovementType::Opening, Quantity::fromString('5000'), '0.0500'),
-            new StockChange($main->id, $egg->id, InventoryMovementType::Opening, Quantity::fromString('30'), '9.0000'),
         ]);
-        $this->actingAs($this->owner)->post("/admin/recipes/{$doughnut->id}", [
-            'output_quantity' => '12',
-            'lines' => [['inventory_item_id' => $flour->id, 'quantity' => '1000', 'wastage_percent' => '5'], ['inventory_item_id' => $egg->id, 'quantity' => '4', 'wastage_percent' => '']],
-        ])->assertSessionHasNoErrors();
-        $this->actingAs($this->manager)->post('/admin/production', ['product_id' => $doughnut->id, 'planned' => '12', 'actual' => '10', 'rejected' => '2', 'reject_reason' => 'Burnt', 'post' => true])->assertSessionHasNoErrors();
-
-        // Flour 1050 g × ₱0.05 + 4 eggs × ₱9 = ₱88.50 for 10 good pieces.
-        $this->actingAs($this->manager)->get('/admin/reports/production')->assertOk()
-            ->assertInertia(fn (AssertableInertia $page) => $page
-                ->where('cards.0.value', '1')
-                ->where('cards.1.value', '10.000')
-                ->where('cards.2.value', '2.000')
-                ->where('cards.2.note', '16.66% of pieces made')
-                ->where('tables.0.rows.0.product', 'Choco Custard Batch')
-                ->where('tables.0.rows.0.cost', '88.50')
-                ->where('tables.0.rows.0.per_piece', '8.85')
-                ->where('tables.1.rows.0.reject_reason', 'Burnt'));
-
+        app(StockWaste::class)->record($this->manager, $main, 'Dropped', [['inventory_item_id' => $this->choco->inventory_item_id, 'quantity' => '2']]);
         app(StockWaste::class)->record($this->manager, $main, 'Spilled', [['inventory_item_id' => $flour->id, 'quantity' => '200']]);
-        $this->actingAs($this->manager)->get('/admin/reports/waste')->assertOk()
+
+        // A later price change does not change the value of waste already written off.
+        $this->travel(1)->days();
+        app(PriceService::class)->set($this->owner, $this->choco, '50.00');
+        $from = now('Asia/Manila')->subDay()->toDateString();
+        $to = now('Asia/Manila')->toDateString();
+
+        $this->actingAs($this->manager)->get("/admin/reports/waste?from={$from}&to={$to}")->assertOk()
             ->assertInertia(fn (AssertableInertia $page) => $page
-                ->where('cards.0.value', '1')
-                ->where('cards.1.value', '10.00') // 200 g × ₱0.05
-                ->where('cards.2.value', '2.000')
-                ->where('tables.0.rows.0.quantity', '200.000')
-                ->where('tables.1.rows.0.reason', 'Spilled'));
+                ->where('cards.0.value', '2')
+                ->where('cards.1.label', 'Value at selling price')
+                ->where('cards.1.value', '88.00') // 2 × ₱44.00; flour has no selling price
+                ->has('cards', 2)
+                ->where('tables.0.rows.0.item', $this->choco->inventoryItem?->name)
+                ->where('tables.0.rows.0.value', '88.00')
+                ->where('tables.0.rows.1.value', '0.00')
+                ->where('tables.1.rows.0.price', '44.00')
+                ->where('tables.1.rows.0.reason', 'Dropped')
+                ->where('tables.1.rows.1.price', null)
+                ->where('tables.1.rows.1.quantity', '200.000'));
     }
 
     public function test_permissions_and_exports(): void
     {
         $this->fixture();
         $prep = $this->staff($this->bakerRole());
-        foreach (['refunds', 'discounts', 'cash-variance', 'stock-movements', 'production', 'waste'] as $report) {
+        foreach (['refunds', 'discounts', 'cash-variance', 'stock-movements', 'waste'] as $report) {
             $this->actingAs($this->cashier)->get("/admin/reports/{$report}")->assertForbidden();
             $this->actingAs($prep)->get("/admin/reports/{$report}")->assertForbidden();
             $this->actingAs($this->manager)->get("/admin/reports/{$report}")->assertOk();

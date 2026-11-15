@@ -38,12 +38,12 @@ trait InteractsWithStaff
     }
 
     /**
-     * A custom role an owner might make for bakers: production drafts and
-     * read-only stock, like the removed Preparation Staff role (D-176).
+     * A custom role an owner might make for bakers: read-only orders,
+     * products and stock (production was removed, D-189; D-176).
      */
     protected function bakerRole(): string
     {
-        return $this->customRole('Baker', ['orders.view', 'products.view', 'inventory.view', 'production.create']);
+        return $this->customRole('Baker', ['orders.view', 'products.view', 'inventory.view']);
     }
 
     /** A custom office role with everything but role management, like the removed Admin role (D-176). */

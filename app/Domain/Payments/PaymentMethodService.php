@@ -13,8 +13,8 @@ use Illuminate\Validation\ValidationException;
 /**
  * Payment method settings (FR-036, FR-101, D-097): rename, turn on/off and
  * whether a reference number is required. Codes and types are fixed because
- * checkout and the drawer count depend on them. At least one method stays
- * active so the POS can always take payment.
+ * checkout and the drawer count depend on them. Cash is the default payment
+ * method and is always accepted (D-187), so the POS can always take payment.
  */
 class PaymentMethodService
 {
@@ -29,9 +29,8 @@ class PaymentMethodService
             /** @var PaymentMethod $method */
             $method = PaymentMethod::query()->whereKey($method->id)->lockForUpdate()->firstOrFail();
 
-            if (! $data['is_active'] && $method->is_active
-                && ! PaymentMethod::query()->where('is_active', true)->whereKeyNot($method->id)->lockForUpdate()->exists()) {
-                throw ValidationException::withMessages(['is_active' => __('Keep at least one payment method active.')]);
+            if ($method->type === PaymentMethodType::Cash && ! $data['is_active']) {
+                throw ValidationException::withMessages(['is_active' => __('Cash is the default payment method and is always accepted.')]);
             }
 
             if ($method->type === PaymentMethodType::Cash && $data['requires_reference']) {

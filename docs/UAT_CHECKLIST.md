@@ -56,71 +56,54 @@ Tester(s): ____________________ Date: ____________ Device(s): __________________
 | #   | Step                                                            | Expected result                                      | ✅ / ❌ | Notes |
 | --- | --------------------------------------------------------------- | ---------------------------------------------------- | ------- | ----- |
 | D1  | Manager records a paid-out (e.g. ice ₱150)                      | Shows on the shift                                   |         |       |
-| D2  | Record a cash out over ₱500                                     | Needs a manager's approval                           |         |       |
+| D2  | Record a cash out of ₱600                                       | Counts at once; no approval step                     |         |       |
 | D3  | Cashier closes the shift with a blind count                     | The expected amount is **not** shown before counting |         |       |
 | D4  | Close with a count that is ₱20 short                            | Shift marked "Needs review"                          |         |       |
 | D5  | Another manager reviews the shift and adds a note or correction | Shift marked reviewed; closed figures unchanged      |         |       |
 
-## E. Stock (Manager)
+## E. Stock (Owner + Manager)
 
 | #   | Step                                                   | Expected result                                                                                          | ✅ / ❌ | Notes |
 | --- | ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------- | ------- | ----- |
-| E1  | Stock items: add an ingredient with a reorder level    | Appears in the list                                                                                      |         |       |
-| E2  | Opening stock: post quantities **with unit cost**      | Stock on hand and Stock value show them                                                                  |         |       |
+| E1  | Owner: set a doughnut's reorder level                  | Saved                                                                                                    |         |       |
+| E2  | Opening stock: post quantities                         | Stock on hand shows them (no average cost column)                                                        |         |       |
 | E3  | Counts & adjustments: count an item, save a difference | A Manager's adjustment posts at once; one entered by someone without approval rights waits for a manager |         |       |
-| E4  | Record waste for 2 doughnuts with a reason             | Stock drops; Waste & rejects report shows them with value                                                |         |       |
+| E4  | Record waste for 2 doughnuts with a reason             | Stock drops; Waste report values them at the selling price                                               |         |       |
 | E5  | Dispatches: send 20 doughnuts from main to a pop-up    | Main goes down 20; pop-up goes up 20                                                                     |         |       |
 | E6  | Lower an item below its reorder level                  | Low-stock count on the Dashboard                                                                         |         |       |
 | E7  | Stock movements: find each movement above              | Every change is listed with who and why                                                                  |         |       |
 
-## F. Purchasing (Manager)
-
-| #   | Step                               | Expected result                         | ✅ / ❌ | Notes |
-| --- | ---------------------------------- | --------------------------------------- | ------- | ----- |
-| F1  | Suppliers: add a supplier          | Saved                                   |         |       |
-| F2  | Purchase orders: order 2 items     | PO saved and numbered                   |         |       |
-| F3  | Deliveries: receive part of the PO | PO shows partly received; stock goes up |         |       |
-| F4  | Receive the rest                   | PO fully received; average cost updated |         |       |
-
-## G. Recipes and production (Owner + Manager)
-
-| #   | Step                                                | Expected result                                            | ✅ / ❌ | Notes |
-| --- | --------------------------------------------------- | ---------------------------------------------------------- | ------- | ----- |
-| G1  | Recipes: make a recipe for a doughnut               | Saved as version 1                                         |         |       |
-| G2  | Production: draft a batch (good pieces and rejects) | Saved as draft; stock unchanged                            |         |       |
-| G3  | Manager posts the batch                             | Ingredients go down; doughnuts go up; cost per piece shown |         |       |
-| G4  | Sell a drink that has a recipe                      | Its ingredients go down                                    |         |       |
-
-## H. Reports (Owner)
+## F. Reports (Owner)
 
 | #   | Step                                                             | Expected result                                                  | ✅ / ❌ | Notes |
 | --- | ---------------------------------------------------------------- | ---------------------------------------------------------------- | ------- | ----- |
-| H1  | Dashboard for today                                              | Gross, net, orders and average match the sales made today        |         |       |
-| H2  | Sales report: by day, product, category, cashier, payment method | Totals agree with each other and with the Dashboard              |         |       |
-| H3  | Refunds & voids, Discounts given, Cash differences               | Show the refunds, discounts and short shift from the tests above |         |       |
-| H4  | Stock in & out, Production report, Waste & rejects               | Show the stock tests above                                       |         |       |
-| H5  | Export one report to Excel and to CSV; print one                 | Files open correctly; print fits the page                        |         |       |
-| H6  | Filter a report to a pop-up                                      | Only that location's figures                                     |         |       |
+| F1  | Dashboard for today                                              | Gross, net, orders and average match the sales made today        |         |       |
+| F2  | Sales report: by day, product, category, cashier, payment method | Totals agree with each other and with the Dashboard              |         |       |
+| F3  | Refunds & voids, Discounts given, Cash differences               | Show the refunds, discounts and short shift from the tests above |         |       |
+| F4  | Stock in & out, Waste                                            | Show the stock tests above                                       |         |       |
+| F5  | Export one report to Excel and to CSV; print one                 | Files open correctly; print fits the page                        |         |       |
+| F6  | Filter a report to a pop-up                                      | Only that location's figures                                     |         |       |
 
-## I. Administration and safety (Owner)
+## G. Administration and safety (Owner)
 
 | #   | Step                                                                     | Expected result                                                    | ✅ / ❌ | Notes |
 | --- | ------------------------------------------------------------------------ | ------------------------------------------------------------------ | ------- | ----- |
-| I1  | Store settings: change the receipt footer                                | New footer prints on the next receipt                              |         |       |
-| I2  | Locations: add a pop-up and a terminal; assign a cashier                 | Cashier can open a shift there                                     |         |       |
-| I3  | Products: add a product with a photo; set its price; hide it at a pop-up | Shows at main only                                                 |         |       |
-| I4  | Audit log: find the changes made above                                   | Each shows who, what and when                                      |         |       |
-| I5  | System logs: page opens                                                  | Shows health, last backup and recent entries; no passwords visible |         |       |
-| I6  | As a Cashier, open an Administration address directly                    | "You don't have access" page, not an error                         |         |       |
-| I7  | Open the site with `http://`                                             | Moves to `https://`                                                |         |       |
+| G1  | Store settings: change the receipt footer                                | New footer prints on the next receipt                              |         |       |
+| G2  | Locations: add a pop-up and a terminal; assign a cashier                 | Cashier can open a shift there                                     |         |       |
+| G3  | Products: add a product with a photo; set its price; hide it at a pop-up | Shows at main only                                                 |         |       |
+| G4  | Payment methods: try to untick Cash                                      | Not possible; Cash shows Default and stays on                      |         |       |
+| G5  | Audit log: find the changes made above                                   | Each shows who, what and when                                      |         |       |
+| G6  | System logs: page opens                                                  | Shows health, last backup and recent entries; no passwords visible |         |       |
+| G7  | As a Cashier, open an Administration address directly                    | "You don't have access" page, not an error                         |         |       |
+| G8  | Open the site with `http://`                                             | Moves to `https://`                                                |         |       |
 
-## J. On the tablet
+## H. On the tablet
 
 | #   | Step                                  | Expected result                                                | ✅ / ❌ | Notes |
 | --- | ------------------------------------- | -------------------------------------------------------------- | ------- | ----- |
-| J1  | POS in portrait and landscape         | Products and the order are readable; nothing cut off           |         |       |
-| J2  | Buttons are easy to tap with a finger | No mis-taps on +, −, Remove, Cash, GCash                       |         |       |
-| J3  | Turn Wi-Fi off and try to sell        | Clear error; no sale is recorded; works again when back online |         |       |
+| H1  | POS in portrait and landscape         | Products and the order are readable; nothing cut off           |         |       |
+| H2  | Buttons are easy to tap with a finger | No mis-taps on +, −, Remove, Cash, GCash                       |         |       |
+| H3  | Turn Wi-Fi off and try to sell        | Clear error; no sale is recorded; works again when back online |         |       |
 
 ---
 

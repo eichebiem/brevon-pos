@@ -33,7 +33,7 @@ return new class extends Migration
         });
 
         DB::statement("ALTER TABLE products ADD CONSTRAINT products_type_check CHECK (product_type IN ('finished_good', 'made_to_order', 'retail'))");
-        DB::statement("ALTER TABLE products ADD CONSTRAINT products_tracking_check CHECK (inventory_tracking_mode IN ('finished_stock', 'recipe_at_sale', 'none'))");
+        DB::statement("ALTER TABLE products ADD CONSTRAINT products_tracking_check CHECK (inventory_tracking_mode IN ('finished_stock', 'none'))");
         DB::statement("ALTER TABLE products ADD CONSTRAINT products_stock_link_check CHECK (inventory_tracking_mode <> 'finished_stock' OR inventory_item_id IS NOT NULL)");
 
         Schema::create('product_variants', function (Blueprint $table) {

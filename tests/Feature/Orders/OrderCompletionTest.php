@@ -96,12 +96,12 @@ class OrderCompletionTest extends TestCase
                 ->has('workflow.history', 1));
     }
 
-    public function test_a_baker_role_lands_on_production(): void
+    public function test_a_view_only_role_lands_on_its_profile(): void
     {
         $baker = $this->staff($this->bakerRole(), $this->mainLocation());
 
-        $this->actingAs($baker)->get('/home')->assertRedirect('/admin/production');
-        $this->actingAs($baker)->get('/admin/production')->assertOk();
+        $this->actingAs($baker)->get('/home')->assertRedirect('/settings/profile');
+        $this->actingAs($baker)->get('/admin/production')->assertNotFound();
     }
 
     public function test_a_past_cancelled_order_still_reads_and_cannot_be_refunded(): void

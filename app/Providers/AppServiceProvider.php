@@ -9,7 +9,6 @@ use App\Models\CashMovement;
 use App\Models\Category;
 use App\Models\Discount;
 use App\Models\Employee;
-use App\Models\GoodsReceipt;
 use App\Models\InventoryItem;
 use App\Models\InventoryMovement;
 use App\Models\Order;
@@ -17,16 +16,12 @@ use App\Models\OrderDiscount;
 use App\Models\Payment;
 use App\Models\PaymentMethod;
 use App\Models\Product;
-use App\Models\ProductionBatch;
 use App\Models\ProductPrice;
 use App\Models\ProductVariant;
-use App\Models\PurchaseOrder;
-use App\Models\Recipe;
 use App\Models\Refund;
 use App\Models\Setting;
 use App\Models\StockAdjustment;
 use App\Models\StockTransfer;
-use App\Models\Supplier;
 use App\Models\Terminal;
 use App\Models\User;
 use App\Support\Database\DestructiveCommandGuard;
@@ -97,11 +92,6 @@ class AppServiceProvider extends ServiceProvider
             'cash_movement' => CashMovement::class,
             'stock_adjustment' => StockAdjustment::class,
             'stock_transfer' => StockTransfer::class,
-            'supplier' => Supplier::class,
-            'purchase_order' => PurchaseOrder::class,
-            'goods_receipt' => GoodsReceipt::class,
-            'recipe' => Recipe::class,
-            'production_batch' => ProductionBatch::class,
             'discount' => Discount::class,
             'order_discount' => OrderDiscount::class,
             'order' => Order::class,

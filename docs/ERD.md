@@ -193,7 +193,10 @@ Constraints (as built, D-094): UNIQUE `cashier_shifts(user_id, open_guard)` (at 
 
 `cash_movements` (Phase 6, D-126–D-129): CHECK type and status values; CHECK `(movement_type = 'correction' AND amount <> 0 AND corrects IN ('expected','counted')) OR (movement_type <> 'correction' AND amount > 0 AND corrects IS NULL)`; INDEX `(cashier_shift_id, status)`, `(branch_id, created_at)`, `(reference_type, reference_id)`. No `updated_at`: rows change only from pending to a decision, then never again; never deleted. Corrected shift figures are calculated, not stored.
 
-## 5. Inventory, purchasing
+## 5. Inventory
+
+Purchasing (suppliers, purchase orders, goods receipts) was removed on 2026-11-15 (D-188, future feature FE-02); its
+tables are gone from the create migrations.
 
 ```mermaid
 erDiagram
@@ -206,11 +209,6 @@ erDiagram
     branches ||--o{ stock_transfers : "from (main)"
     branches ||--o{ stock_transfers : "to (pop-up)"
     stock_transfers ||--|{ stock_transfer_items : ""
-    suppliers ||--o{ purchase_orders : ""
-    purchase_orders ||--|{ purchase_order_items : ""
-    purchase_orders |o--o{ goods_receipts : ""
-    goods_receipts ||--|{ goods_receipt_items : ""
-    purchase_order_items |o--o{ goods_receipt_items : ""
 
     branch_inventory { bigint branch_id FK
       bigint inventory_item_id FK
@@ -251,49 +249,18 @@ erDiagram
       bigint inventory_item_id FK
       decimal quantity
       decimal unit_cost }
-    suppliers { bigint id PK
-      varchar supplier_code UK "SUPnnn"
-      varchar name
-      boolean is_active }
-    purchase_orders { bigint id PK
-      bigint branch_id FK
-      bigint supplier_id FK
-      varchar po_number UK
-      varchar status
-      date expected_at
-      decimal subtotal
-      bigint approved_by FK
-      datetime cancelled_at "(+)"
-      bigint cancelled_by FK "(+)"
-      text cancel_reason "(+)" }
-    purchase_order_items { bigint purchase_order_id FK
-      bigint inventory_item_id FK
-      decimal quantity_ordered
-      decimal quantity_received
-      decimal unit_cost
-      decimal line_total }
-    goods_receipts { bigint id PK
-      bigint branch_id FK
-      bigint purchase_order_id FK "nullable"
-      bigint supplier_id FK "(+) nullable"
-      varchar receipt_number UK
-      bigint received_by FK
-      bigint over_receipt_approved_by FK "(+)" }
-    goods_receipt_items { bigint goods_receipt_id FK
-      bigint purchase_order_item_id FK
-      bigint inventory_item_id FK
-      decimal quantity_received
-      decimal unit_cost
-      varchar condition "accepted | damaged | expired" }
 ```
 
 Phase 7a constraints (D-131, D-133): CHECK `stock_adjustments.kind IN ('count','change')`, `status IN ('pending','posted','rejected')`; CHECK `variance_quantity = counted_quantity - system_quantity AND counted_quantity >= 0`; UNIQUE `(stock_adjustment_id, inventory_item_id)` and `(stock_transfer_id, inventory_item_id)`; CHECK `from_branch_id <> to_branch_id`, `quantity > 0`. Model guards: decided adjustments, their lines (except the cost stamped at posting) and every dispatch are never edited or deleted. `stock_transfers` is not in SRS §8.7 (schema addition from D-063).
 
-Phase 7b constraints (D-135–D-138, migration `2026_11_06_140000`): CHECK `purchase_orders.status IN ('draft','submitted','partially_received','received','cancelled')`, `subtotal >= 0`; CHECK order lines `quantity_ordered > 0`, `quantity_received >= 0`, costs/totals `>= 0`; UNIQUE `(purchase_order_id, inventory_item_id)`; CHECK `inventory_lots` `quantity_received > 0`, `0 <= quantity_remaining <= quantity_received`; CHECK receipt lines `quantity_received > 0` and `condition IN ('accepted','damaged','expired')`; INDEX `inventory_lots(branch_id, inventory_item_id, expires_at)` for first-expiring-first use. `inventory_movements.inventory_lot_id` (nullable FK) is set on receipt movements. Model guards: sent orders keep their lines (only `quantity_received` moves), received/cancelled orders and all receipts are immutable, a lot changes only its remaining quantity; nothing here is deleted. Morph aliases `supplier`, `purchase_order`, `goods_receipt`, `inventory_lot`.
+~~Removed by D-188~~ Phase 7b constraints (D-135–D-138, migration `2026_11_06_140000`): CHECK `purchase_orders.status IN ('draft','submitted','partially_received','received','cancelled')`, `subtotal >= 0`; CHECK order lines `quantity_ordered > 0`, `quantity_received >= 0`, costs/totals `>= 0`; UNIQUE `(purchase_order_id, inventory_item_id)`; CHECK `inventory_lots` `quantity_received > 0`, `0 <= quantity_remaining <= quantity_received`; CHECK receipt lines `quantity_received > 0` and `condition IN ('accepted','damaged','expired')`; INDEX `inventory_lots(branch_id, inventory_item_id, expires_at)` for first-expiring-first use. `inventory_movements.inventory_lot_id` (nullable FK) is set on receipt movements. Model guards: sent orders keep their lines (only `quantity_received` moves), received/cancelled orders and all receipts are immutable, a lot changes only its remaining quantity; nothing here is deleted. Morph aliases `supplier`, `purchase_order`, `goods_receipt`, `inventory_lot`.
 
 Invariant: for every (branch, item), `branch_inventory.quantity_on_hand = Σ inventory_movements.quantity_delta`. All writes go through one `InventoryLedger` service that locks the `branch_inventory` row (`FOR UPDATE`, rows locked in ascending item-id order to avoid deadlocks), checks negative stock, inserts the movement with `balance_after`, and updates the projection in the same transaction. Balances are per location, pop-ups included. `transfer_in`/`transfer_out` movement types are used only by the Phase 7 main → pop-up dispatch; rejected by the ledger before then (D-063). UNIQUE `branch_inventory(branch_id, inventory_item_id)`; INDEX `inventory_movements(branch_id, inventory_item_id, created_at)`, `purchase_orders(branch_id, status)`.
 
 ## 6. Recipes and production
+
+~~Removed 2026-11-15 (D-189, future feature FE-03).~~ These tables are gone from the create migrations; kept here as the
+design for later.
 
 ```mermaid
 erDiagram
@@ -330,7 +297,7 @@ UNIQUE `recipes(product_id, variant_key, version)`, where `variant_key` is gener
 4. number_sequences, branch_inventory, inventory_movements (no `inventory_lot_id` until Phase 7) — **Phase 4a (done)**, D-051/D-096
 5. payment_methods, cashier_shifts — **Phase 4a (done)**; orders, order_items, order_item_options, order_status_histories, payments — **Phase 4b (done)**
 6. cash_movements — **Phase 6 (done)**
-7. stock_adjustments(+items), stock_transfers(+items) — **Phase 7a (done)**; suppliers, purchase_orders(+items), inventory_lots, goods_receipts(+items), inventory_movements.inventory_lot_id — **Phase 7b (done)**
+7. stock_adjustments(+items), stock_transfers(+items) — **Phase 7a (done)**; suppliers, purchase_orders(+items), inventory_lots, goods_receipts(+items), inventory_movements.inventory_lot_id — **Phase 7b (done; lots removed by D-167, purchasing by D-188)**
 8. recipes, recipe_items, production_batches, production_batch_items, waste_records — Phase 8
 9. discounts, order_discounts, tax_rules, order_tax_lines, refunds, refund_items — Phase 9
 

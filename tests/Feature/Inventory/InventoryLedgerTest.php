@@ -47,7 +47,7 @@ class InventoryLedgerTest extends TestCase
         $this->postStock($this->actor, $main, $item, '24');
         $this->postStock($this->actor, $main, $item, '5', InventoryMovementType::Sale);
         $this->postStock($this->actor, $main, $item, '2', InventoryMovementType::Waste);
-        $this->postStock($this->actor, $main, $item, '12', InventoryMovementType::ProductionOutput);
+        $this->postStock($this->actor, $main, $item, '12', InventoryMovementType::AdjustmentIn);
 
         $this->assertSame('29.000', $this->onHand($main, $item));
         $movements = InventoryMovement::query()->where('inventory_item_id', $item->id)->orderBy('id')->get();
@@ -162,13 +162,13 @@ class InventoryLedgerTest extends TestCase
         $movement->delete();
     }
 
-    public function test_weighted_average_cost_is_kept_on_receipts(): void
+    public function test_weighted_average_cost_is_kept_when_stock_comes_in_at_a_new_cost(): void
     {
         $main = $this->mainLocation();
-        $flour = $this->ingredientItem();
+        $flour = $this->weighedItem();
 
         $this->ledger->post($this->actor, [new StockChange($main->id, $flour->id, InventoryMovementType::Opening, Quantity::fromString('1000'), '0.05')]);
-        $this->ledger->post($this->actor, [new StockChange($main->id, $flour->id, InventoryMovementType::PurchaseReceipt, Quantity::fromString('3000'), '0.07')]);
+        $this->ledger->post($this->actor, [new StockChange($main->id, $flour->id, InventoryMovementType::AdjustmentIn, Quantity::fromString('3000'), '0.07')]);
 
         // (1000 × 0.05 + 3000 × 0.07) / 4000 = 0.065
         $this->assertSame('0.0650', BranchInventory::query()->where('inventory_item_id', $flour->id)->value('average_unit_cost'));

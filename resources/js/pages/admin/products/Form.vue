@@ -38,6 +38,7 @@ const props = defineProps<{
         inventory_tracking_mode: string;
         image_url: string | null;
         stock_item: { sku: string; name: string; unit: string | null } | null;
+        reorder_level: string | null;
         variants: Variant[];
         location_ids: number[];
     } | null;
@@ -66,6 +67,7 @@ const form = useForm<{
     product_type: string;
     inventory_tracking_mode: string;
     base_unit: string;
+    reorder_level: string;
     is_available_for_pos: boolean;
     base_price: string;
     image: File | null;
@@ -81,6 +83,7 @@ const form = useForm<{
     inventory_tracking_mode:
         props.product?.inventory_tracking_mode ?? 'finished_stock',
     base_unit: props.product?.base_unit ?? 'piece',
+    reorder_level: props.product?.reorder_level ?? '0',
     is_available_for_pos: props.product?.is_available_for_pos ?? true,
     base_price: '',
     image: null,
@@ -343,6 +346,23 @@ const error = (key: string): string | undefined =>
                     </option>
                 </select>
                 <InputError :message="form.errors.inventory_tracking_mode" />
+            </div>
+            <div v-if="finishedStock" class="grid gap-2">
+                <Label for="reorder_level">Reorder level</Label>
+                <Input
+                    id="reorder_level"
+                    v-model="form.reorder_level"
+                    inputmode="numeric"
+                    aria-describedby="reorder_level-hint"
+                />
+                <p
+                    id="reorder_level-hint"
+                    class="text-sm text-muted-foreground"
+                >
+                    Shown as low stock at or below this quantity. 0 turns the
+                    alert off.
+                </p>
+                <InputError :message="form.errors.reorder_level" />
             </div>
             <p
                 v-if="finishedStock"

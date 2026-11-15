@@ -24,22 +24,18 @@ return new class extends Migration
             // For corrections only: which closing figure is corrected.
             $table->string('corrects', 20)->nullable();
             $table->text('reason');
-            $table->string('status', 20);
             $table->string('reference_type', 100)->nullable();
             $table->unsignedBigInteger('reference_id')->nullable();
             $table->foreignId('created_by')->constrained('users')->restrictOnDelete();
             $table->foreignId('approved_by')->nullable()->constrained('users')->restrictOnDelete();
-            $table->dateTime('decided_at')->nullable();
-            $table->text('decision_notes')->nullable();
             $table->timestamp('created_at')->nullable();
 
-            $table->index(['cashier_shift_id', 'status']);
+            $table->index('cashier_shift_id');
             $table->index(['branch_id', 'created_at']);
             $table->index(['reference_type', 'reference_id']);
         });
 
         DB::statement("ALTER TABLE cash_movements ADD CONSTRAINT cash_movements_type_check CHECK (movement_type IN ('cash_in','cash_out','cash_paid_out','cash_refund','correction'))");
-        DB::statement("ALTER TABLE cash_movements ADD CONSTRAINT cash_movements_status_check CHECK (status IN ('pending','approved','rejected'))");
         DB::statement("ALTER TABLE cash_movements ADD CONSTRAINT cash_movements_amount_check CHECK ((movement_type = 'correction' AND amount <> 0 AND corrects IN ('expected','counted')) OR (movement_type <> 'correction' AND amount > 0 AND corrects IS NULL))");
     }
 

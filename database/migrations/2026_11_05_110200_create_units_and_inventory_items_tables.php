@@ -29,7 +29,6 @@ return new class extends Migration
             $table->string('item_type', 30);
             $table->foreignId('unit_of_measure_id')->constrained('units_of_measure')->restrictOnDelete();
             $table->decimal('reorder_level', 14, 3)->default(0);
-            $table->boolean('is_perishable')->default(false);
             $table->boolean('is_active')->default(true);
             $table->timestamps();
             $table->softDeletes();
@@ -37,7 +36,7 @@ return new class extends Migration
             $table->index(['item_type', 'is_active']);
         });
 
-        DB::statement("ALTER TABLE inventory_items ADD CONSTRAINT inventory_items_type_check CHECK (item_type IN ('ingredient', 'packaging', 'finished_good', 'retail'))");
+        DB::statement("ALTER TABLE inventory_items ADD CONSTRAINT inventory_items_type_check CHECK (item_type IN ('finished_good', 'retail'))");
         DB::statement('ALTER TABLE inventory_items ADD CONSTRAINT inventory_items_reorder_check CHECK (reorder_level >= 0)');
         DB::statement('ALTER TABLE units_of_measure ADD CONSTRAINT units_precision_check CHECK (`precision` <= 3)');
     }

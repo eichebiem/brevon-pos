@@ -9,9 +9,6 @@ namespace App\Enums;
 enum InventoryMovementType: string
 {
     case Opening = 'opening';
-    case PurchaseReceipt = 'purchase_receipt';
-    case ProductionConsumption = 'production_consumption';
-    case ProductionOutput = 'production_output';
     case Sale = 'sale';
     case Waste = 'waste';
     case AdjustmentIn = 'adjustment_in';
@@ -23,7 +20,7 @@ enum InventoryMovementType: string
     public function isInbound(): bool
     {
         return in_array($this, [
-            self::Opening, self::PurchaseReceipt, self::ProductionOutput,
+            self::Opening,
             self::AdjustmentIn, self::ReturnIn, self::TransferIn,
         ], true);
     }
@@ -37,9 +34,6 @@ enum InventoryMovementType: string
     {
         return match ($this) {
             self::Opening => 'Opening stock',
-            self::PurchaseReceipt => 'Received',
-            self::ProductionConsumption => 'Used in production',
-            self::ProductionOutput => 'Produced',
             self::Sale => 'Sold',
             self::Waste => 'Waste',
             self::AdjustmentIn => 'Adjustment (in)',

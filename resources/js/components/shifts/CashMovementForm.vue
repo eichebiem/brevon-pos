@@ -11,8 +11,8 @@ import type { MovementType } from '@/types/shifts';
 
 const props = defineProps<{ shiftId: number; types: MovementType[] }>();
 
-// FR-076: every movement needs an amount and a reason; the server decides
-// whether it needs a manager's approval (D-127).
+// FR-076: every movement needs an amount and a reason and counts at once
+// (no approval step, D-193).
 const form = useForm({
     movement_type: props.types[0]?.value ?? '',
     amount: '',

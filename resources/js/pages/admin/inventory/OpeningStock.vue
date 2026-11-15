@@ -33,7 +33,6 @@ const form = useForm({
     lines: props.items.map((item) => ({
         inventory_item_id: item.id,
         quantity: '',
-        unit_cost: '',
     })),
 });
 
@@ -102,9 +101,6 @@ const error = (key: string): string | undefined =>
                         <th scope="col" class="px-4 py-3 font-semibold">
                             Quantity on hand
                         </th>
-                        <th scope="col" class="px-4 py-3 font-semibold">
-                            Unit cost (₱, optional)
-                        </th>
                     </tr>
                 </thead>
                 <tbody>
@@ -138,20 +134,6 @@ const error = (key: string): string | undefined =>
                             </div>
                             <InputError
                                 :message="error(`lines.${i}.quantity`)"
-                            />
-                        </td>
-                        <td class="px-4 py-3">
-                            <Input
-                                :id="`cost-${item.id}`"
-                                v-model="form.lines[i].unit_cost"
-                                class="w-28"
-                                inputmode="decimal"
-                                autocomplete="off"
-                                :aria-label="`Unit cost of ${item.name}`"
-                                placeholder="0.00"
-                            />
-                            <InputError
-                                :message="error(`lines.${i}.unit_cost`)"
                             />
                         </td>
                     </tr>

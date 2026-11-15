@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Enums\CashMovementStatus;
 use App\Enums\CashMovementType;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
@@ -21,13 +20,10 @@ use LogicException;
  * @property string $amount
  * @property string|null $corrects
  * @property string $reason
- * @property CashMovementStatus $status
  * @property string|null $reference_type
  * @property int|null $reference_id
  * @property int $created_by
  * @property int|null $approved_by
- * @property CarbonImmutable|null $decided_at
- * @property string|null $decision_notes
  * @property CarbonImmutable $created_at
  */
 class CashMovement extends Model
@@ -40,20 +36,12 @@ class CashMovement extends Model
     {
         return [
             'movement_type' => CashMovementType::class,
-            'status' => CashMovementStatus::class,
-            'decided_at' => 'datetime',
         ];
     }
 
     protected static function booted(): void
     {
-        static::updating(function (CashMovement $movement) {
-            $allowed = ['status', 'approved_by', 'decided_at', 'decision_notes'];
-            if ($movement->getOriginal('status') !== CashMovementStatus::Pending
-                || array_diff(array_keys($movement->getDirty()), $allowed) !== []) {
-                throw new LogicException('Cash movements cannot be changed once decided.');
-            }
-        });
+        static::updating(fn () => throw new LogicException('Cash movements are never changed.'));
         static::deleting(fn () => throw new LogicException('Cash movements are never deleted.'));
     }
 

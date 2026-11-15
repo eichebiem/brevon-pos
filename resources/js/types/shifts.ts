@@ -5,11 +5,9 @@ export type CashMovementRow = {
     amount: string;
     corrects: 'expected' | 'counted' | null;
     reason: string;
-    status: 'pending' | 'approved' | 'rejected';
     by: string | null;
     by_id: number;
     decided_by: string | null;
-    decision_notes: string | null;
     at: string;
 };
 
@@ -54,6 +52,5 @@ export type ShiftSummary = {
     }[];
     order_count: number;
     cancelled_count: number;
-    pending_movements: number;
     needs_review: boolean;
 };

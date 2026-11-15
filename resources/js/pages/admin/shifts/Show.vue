@@ -42,9 +42,7 @@ const props = defineProps<{
         close: boolean;
         review: boolean;
         correct: boolean;
-        decide: boolean;
     };
-    me: number;
 }>();
 
 defineOptions({
@@ -329,11 +327,7 @@ const textareaClass =
                 :types="movementTypes"
             />
             <div class="rounded-lg border border-border">
-                <CashMovementList
-                    :movements="movements"
-                    :can-decide="can.decide"
-                    :me="me"
-                />
+                <CashMovementList :movements="movements" />
             </div>
         </section>
 

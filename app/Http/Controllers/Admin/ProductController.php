@@ -100,6 +100,7 @@ class ProductController extends Controller
                     'name' => $product->inventoryItem->name,
                     'unit' => $product->inventoryItem->unit?->code,
                 ] : null,
+                'reorder_level' => $product->inventoryItem ? (rtrim(rtrim($product->inventoryItem->reorder_level, '0'), '.') ?: '0') : null,
                 'variants' => $product->variants->map(fn (ProductVariant $v) => $v->only(['id', 'name', 'sku', 'is_default', 'is_active'])),
                 'location_ids' => $product->locations->filter(fn (Branch $b) => (bool) $b->getRelationValue('pivot')?->getAttribute('is_available'))->pluck('id')->values(),
             ],

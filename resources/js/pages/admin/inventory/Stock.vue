@@ -13,7 +13,7 @@ import StatusBadge from '@/components/StatusBadge.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { usePermissions } from '@/composables/usePermissions';
-import { formatDateTime, formatQuantity, formatUnitCost } from '@/lib/format';
+import { formatDateTime, formatQuantity } from '@/lib/format';
 import { movements, opening, stock, waste } from '@/routes/admin/inventory';
 import { create as newAdjustment } from '@/routes/admin/inventory/adjustments';
 import { create as newDispatch } from '@/routes/admin/inventory/dispatches';
@@ -25,7 +25,6 @@ type Row = {
     unit: string | null;
     on_hand: string;
     reorder_level: string;
-    average_unit_cost: string | null;
     updated_at: string | null;
     low: boolean;
 };
@@ -136,7 +135,7 @@ function showLow(): void {
             {{ awaitingOpening }}
             {{ awaitingOpening === 1 ? 'item has' : 'items have' }} no stock
             recorded here yet. Enter the opening count once; later changes come
-            from production, sales and adjustments.
+            from dispatches, sales, waste and adjustments.
         </p>
 
         <p
@@ -197,12 +196,6 @@ function showLow(): void {
                         >
                             On hand
                         </th>
-                        <th
-                            scope="col"
-                            class="px-4 py-3 text-right font-semibold"
-                        >
-                            Average cost
-                        </th>
                         <th scope="col" class="px-4 py-3 font-semibold">
                             Last change
                         </th>
@@ -211,7 +204,7 @@ function showLow(): void {
                 <tbody>
                     <tr v-if="rows.length === 0">
                         <td
-                            colspan="4"
+                            colspan="3"
                             class="px-4 py-10 text-center text-muted-foreground"
                         >
                             <template v-if="lowOnly"
@@ -252,9 +245,6 @@ function showLow(): void {
                                 >reorder at
                                 {{ formatQuantity(row.reorder_level) }}</span
                             >
-                        </td>
-                        <td class="px-4 py-3 text-right tabular-nums">
-                            {{ formatUnitCost(row.average_unit_cost) }}
                         </td>
                         <td class="px-4 py-3">
                             {{ formatDateTime(row.updated_at) }}

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Domain\Payments\PaymentMethodService;
+use App\Enums\PaymentMethodType;
 use App\Http\Controllers\Controller;
 use App\Models\PaymentMethod;
 use App\Models\User;
@@ -17,14 +18,18 @@ class PaymentMethodController extends Controller
     public function index(): Response
     {
         return Inertia::render('admin/payment-methods/Index', [
-            'methods' => PaymentMethod::query()->orderBy('id')->get()->map(fn (PaymentMethod $m) => [
-                'id' => $m->id,
-                'code' => $m->code,
-                'name' => $m->name,
-                'type' => $m->type->value,
-                'requires_reference' => $m->requires_reference,
-                'is_active' => $m->is_active,
-            ]),
+            // Cash first: it is the default method and always on (D-187).
+            'methods' => PaymentMethod::query()
+                ->orderByRaw('CASE WHEN type = ? THEN 0 ELSE 1 END', [PaymentMethodType::Cash->value])
+                ->orderBy('id')->get()->map(fn (PaymentMethod $m) => [
+                    'id' => $m->id,
+                    'code' => $m->code,
+                    'name' => $m->name,
+                    'type' => $m->type->value,
+                    'requires_reference' => $m->requires_reference,
+                    'is_active' => $m->is_active,
+                    'is_default' => $m->type === PaymentMethodType::Cash,
+                ]),
         ]);
     }
 

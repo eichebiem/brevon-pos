@@ -2,6 +2,7 @@
 
 namespace App\Domain\Catalog;
 
+use App\Domain\Inventory\QuantityInput;
 use App\Domain\Shared\AuditDiff;
 use App\Domain\Shared\AuditLogger;
 use App\Enums\InventoryItemType;
@@ -25,7 +26,8 @@ use Illuminate\Validation\ValidationException;
  * (FR-016–FR-018, FR-020, FR-021; D-025, D-063, D-064, D-085, D-086).
  *
  * Expected $data keys: category_id, sku, name, description, product_type,
- * inventory_tracking_mode, base_unit, is_available_for_pos,
+ * inventory_tracking_mode, base_unit, is_available_for_pos, reorder_level
+ * (finished-stock products only; D-189),
  * variants (list of {id?, name, sku?, is_default, is_active}),
  * location_ids (list), and on create base_price.
  */
@@ -56,6 +58,7 @@ class ProductService
                 ]);
                 $this->linkStockItem($product);
                 $product->save();
+                $this->setReorderLevel($product, $data['reorder_level'] ?? null);
 
                 $this->syncVariants($product, $data['variants'] ?? []);
                 $this->syncLocations($product, $data['location_ids'] ?? []);
@@ -90,6 +93,7 @@ class ProductService
                 $product->image_path = $stored ?? ($removeImage ? null : $oldImage);
                 $this->linkStockItem($product);
                 $product->save();
+                $this->setReorderLevel($product, $data['reorder_level'] ?? null);
 
                 $this->syncVariants($product, $data['variants'] ?? []);
                 $this->syncLocations($product, $data['location_ids'] ?? []);
@@ -228,8 +232,27 @@ class ProductService
             'name' => $product->name,
             'item_type' => $product->product_type === ProductType::Retail ? InventoryItemType::Retail : InventoryItemType::FinishedGood,
             'unit_of_measure_id' => $unit->id,
-            'is_perishable' => $product->product_type === ProductType::FinishedGood,
         ])->id;
+    }
+
+    /**
+     * Reorder level of the product's stock item, which drives the low-stock
+     * alerts (D-189; moved here from the removed Stock items screen). Blank
+     * keeps the current level (0 for a new item).
+     */
+    private function setReorderLevel(Product $product, mixed $level): void
+    {
+        if ($product->inventory_tracking_mode !== InventoryTrackingMode::FinishedStock || $level === null || trim((string) $level) === '') {
+            return;
+        }
+        $item = InventoryItem::query()->with('unit')->findOrFail($product->inventory_item_id);
+        $precision = (int) ($item->unit->precision ?? 0);
+        $parsed = QuantityInput::parse(trim((string) $level), $precision, allowZero: true);
+        if ($parsed === null) {
+            throw ValidationException::withMessages(['reorder_level' => QuantityInput::message($precision, allowZero: true)]);
+        }
+        $item->reorder_level = $parsed->toString();
+        $item->save();
     }
 
     /**
@@ -301,12 +324,13 @@ class ProductService
      */
     private function snapshot(Product $product): array
     {
-        $product->load(['variants', 'locations']);
+        $product->load(['variants', 'locations', 'inventoryItem']);
 
         return [
             ...$product->only(['sku', 'name', 'description', 'category_id', 'base_unit', 'image_path', 'is_available_for_pos', 'inventory_item_id']),
             'product_type' => $product->product_type->value,
             'inventory_tracking_mode' => $product->inventory_tracking_mode->value,
+            'reorder_level' => $product->inventoryItem?->reorder_level,
             'variants' => $product->variants->map(fn (ProductVariant $v) => $v->name.($v->is_default ? ' (default)' : '').($v->is_active ? '' : ' (inactive)'))->all(),
             'locations' => $product->locations->filter(fn (Branch $b) => (bool) $b->getRelationValue('pivot')?->getAttribute('is_available'))->pluck('code')->values()->all(),
         ];

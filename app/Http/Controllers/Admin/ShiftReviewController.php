@@ -93,9 +93,7 @@ class ShiftReviewController extends Controller
                 'close' => $shift->isOpen(),
                 'review' => ! $shift->isOpen() && $shift->reviewed_at === null && $shift->user_id !== $user->id,
                 'correct' => ! $shift->isOpen() && $shift->user_id !== $user->id,
-                'decide' => $shift->isOpen(),
             ],
-            'me' => $user->id,
         ]);
     }
 

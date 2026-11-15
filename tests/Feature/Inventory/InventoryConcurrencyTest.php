@@ -72,7 +72,7 @@ class InventoryConcurrencyTest extends TestCase
 
         // No balance row exists yet: every process races to create it.
         $codes = $this->race(4, fn () => app(InventoryLedger::class)->post($actor, [
-            new StockChange($main->id, $item->id, InventoryMovementType::ProductionOutput, Quantity::fromString('6')),
+            new StockChange($main->id, $item->id, InventoryMovementType::AdjustmentIn, Quantity::fromString('6')),
         ]));
 
         $this->assertSame([0, 0, 0, 0], $codes);

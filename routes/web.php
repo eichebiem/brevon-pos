@@ -5,20 +5,13 @@ use App\Http\Controllers\Admin\AuditLogController;
 use App\Http\Controllers\Admin\CategoryController;
 use App\Http\Controllers\Admin\DiscountController;
 use App\Http\Controllers\Admin\Inventory\DispatchController;
-use App\Http\Controllers\Admin\Inventory\InventoryItemController;
 use App\Http\Controllers\Admin\Inventory\StockAdjustmentController;
 use App\Http\Controllers\Admin\Inventory\StockController;
-use App\Http\Controllers\Admin\Inventory\StockValueController;
 use App\Http\Controllers\Admin\Inventory\WasteController;
 use App\Http\Controllers\Admin\LocationController;
 use App\Http\Controllers\Admin\PaymentMethodController;
 use App\Http\Controllers\Admin\ProductController;
-use App\Http\Controllers\Admin\Production\ProductionBatchController;
-use App\Http\Controllers\Admin\Production\RecipeController;
 use App\Http\Controllers\Admin\ProductPriceController;
-use App\Http\Controllers\Admin\Purchasing\GoodsReceiptController;
-use App\Http\Controllers\Admin\Purchasing\PurchaseOrderController;
-use App\Http\Controllers\Admin\Purchasing\SupplierController;
 use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\ShiftReviewController;
@@ -85,10 +78,7 @@ Route::middleware(['auth'])->group(function () {
     // Drawer cash outside sales, and its approval (FR-076, D-127).
     Route::post('shifts/{shift}/cash-movements', [CashMovementController::class, 'store'])
         ->middleware('permission:cash-movements.create')->name('cash-movements.store');
-    Route::middleware('permission:shifts.review')->group(function () {
-        Route::post('cash-movements/{movement}/approve', [CashMovementController::class, 'approve'])->name('cash-movements.approve');
-        Route::post('cash-movements/{movement}/reject', [CashMovementController::class, 'reject'])->name('cash-movements.reject');
-    });
+    Route::middleware('permission:shifts.review')->group(function () {});
     // Refunds of completed sales (FR-042–FR-045, D-150–D-155).
     Route::post('orders/{order}/refunds', [RefundController::class, 'store'])
         ->middleware(['permission:refunds.request', 'throttle:30,1'])->name('orders.refunds.store');
@@ -171,17 +161,12 @@ Route::middleware(['auth'])->group(function () {
         Route::middleware('permission:inventory.view')->group(function () {
             Route::get('inventory/stock', [StockController::class, 'index'])->name('inventory.stock');
             Route::get('inventory/movements', [StockController::class, 'movements'])->name('inventory.movements');
-            Route::get('inventory/items', [InventoryItemController::class, 'index'])->name('inventory.items.index');
             Route::get('inventory/dispatches', [DispatchController::class, 'index'])->name('inventory.dispatches.index');
         });
         Route::middleware('permission:inventory.adjust')->group(function () {
             Route::get('inventory/opening-stock', [StockController::class, 'openingForm'])->name('inventory.opening');
             Route::post('inventory/opening-stock', [StockController::class, 'storeOpening'])->name('inventory.opening.store');
-            // Stock items, waste and dispatch (D-132–D-134).
-            Route::get('inventory/items/create', [InventoryItemController::class, 'create'])->name('inventory.items.create');
-            Route::post('inventory/items', [InventoryItemController::class, 'store'])->name('inventory.items.store');
-            Route::get('inventory/items/{item}/edit', [InventoryItemController::class, 'edit'])->name('inventory.items.edit');
-            Route::put('inventory/items/{item}', [InventoryItemController::class, 'update'])->name('inventory.items.update');
+            // Waste and dispatch (D-132, D-133).
             Route::get('inventory/waste', [WasteController::class, 'create'])->name('inventory.waste');
             Route::post('inventory/waste', [WasteController::class, 'store'])->name('inventory.waste.store');
             Route::get('inventory/dispatches/create', [DispatchController::class, 'create'])->name('inventory.dispatches.create');
@@ -201,58 +186,6 @@ Route::middleware(['auth'])->group(function () {
             Route::post('inventory/adjustments/{adjustment}/approve', [StockAdjustmentController::class, 'approve'])->name('inventory.adjustments.approve');
             Route::post('inventory/adjustments/{adjustment}/reject', [StockAdjustmentController::class, 'reject'])->name('inventory.adjustments.reject');
         });
-
-        // Stock value (FR-063; D-139).
-        Route::get('inventory/valuation', [StockValueController::class, 'valuation'])->middleware('permission:reports.inventory')->name('inventory.valuation');
-
-        // Purchasing (FR-058, FR-059, UC-006; D-135–D-137).
-        Route::middleware('permission:suppliers.manage')->group(function () {
-            Route::get('suppliers', [SupplierController::class, 'index'])->name('suppliers.index');
-            Route::get('suppliers/create', [SupplierController::class, 'create'])->name('suppliers.create');
-            Route::post('suppliers', [SupplierController::class, 'store'])->name('suppliers.store');
-            Route::get('suppliers/{supplier}/edit', [SupplierController::class, 'edit'])->name('suppliers.edit');
-            Route::put('suppliers/{supplier}', [SupplierController::class, 'update'])->name('suppliers.update');
-        });
-        Route::middleware('permission:purchase-orders.create')->group(function () {
-            Route::get('purchase-orders/create', [PurchaseOrderController::class, 'create'])->name('purchase-orders.create');
-            Route::post('purchase-orders', [PurchaseOrderController::class, 'store'])->name('purchase-orders.store');
-            Route::get('purchase-orders/{order}/edit', [PurchaseOrderController::class, 'edit'])->name('purchase-orders.edit');
-            Route::put('purchase-orders/{order}', [PurchaseOrderController::class, 'update'])->name('purchase-orders.update');
-        });
-        Route::middleware('permission:purchase-orders.create|purchase-orders.approve|purchase-orders.receive')->group(function () {
-            Route::get('purchase-orders', [PurchaseOrderController::class, 'index'])->name('purchase-orders.index');
-            Route::get('purchase-orders/{order}', [PurchaseOrderController::class, 'show'])->name('purchase-orders.show');
-        });
-        // Cancelling a sent order also needs purchase-orders.approve (checked by PurchaseOrders::cancel).
-        Route::post('purchase-orders/{order}/cancel', [PurchaseOrderController::class, 'cancel'])->middleware('permission:purchase-orders.create|purchase-orders.approve')->name('purchase-orders.cancel');
-        Route::post('purchase-orders/{order}/submit', [PurchaseOrderController::class, 'submit'])->middleware('permission:purchase-orders.approve')->name('purchase-orders.submit');
-        // Against an order: purchase-orders.receive; without one: inventory.receive (checked in the controller).
-        Route::middleware('permission:purchase-orders.receive|inventory.receive')->group(function () {
-            Route::get('receipts', [GoodsReceiptController::class, 'index'])->name('receipts.index');
-            Route::get('receipts/create', [GoodsReceiptController::class, 'create'])->name('receipts.create');
-            Route::post('receipts', [GoodsReceiptController::class, 'store'])->name('receipts.store');
-            Route::get('receipts/{receipt}', [GoodsReceiptController::class, 'show'])->name('receipts.show');
-        });
-
-        // Recipes and production (FR-064–FR-072; D-140–D-143).
-        Route::middleware('permission:recipes.manage')->group(function () {
-            Route::get('recipes', [RecipeController::class, 'index'])->name('recipes.index');
-            Route::get('recipes/{product}', [RecipeController::class, 'show'])->name('recipes.show');
-            Route::get('recipes/{product}/new-version', [RecipeController::class, 'create'])->name('recipes.create');
-            Route::post('recipes/{product}', [RecipeController::class, 'store'])->name('recipes.store');
-        });
-        Route::middleware('permission:production.create')->group(function () {
-            Route::get('production/create', [ProductionBatchController::class, 'create'])->name('production.create');
-            Route::post('production', [ProductionBatchController::class, 'store'])->name('production.store');
-            Route::get('production/{batch}/edit', [ProductionBatchController::class, 'edit'])->name('production.edit');
-            Route::put('production/{batch}', [ProductionBatchController::class, 'update'])->name('production.update');
-            Route::post('production/{batch}/cancel', [ProductionBatchController::class, 'cancel'])->name('production.cancel');
-        });
-        Route::middleware('permission:production.create|production.post')->group(function () {
-            Route::get('production', [ProductionBatchController::class, 'index'])->name('production.index');
-            Route::get('production/{batch}', [ProductionBatchController::class, 'show'])->name('production.show');
-        });
-        Route::post('production/{batch}/post', [ProductionBatchController::class, 'post'])->middleware('permission:production.post')->name('production.post');
 
         // Shift review and corrections (FR-080–FR-082, D-128–D-130).
         Route::middleware('permission:shifts.review')->group(function () {

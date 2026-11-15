@@ -60,7 +60,7 @@ const varianceTone = (value: string | null) =>
             <p class="text-sm text-muted-foreground">
                 <template v-if="site"
                     >{{ site.code }} · {{ site.name }}. Open a shift to see its
-                    cash, approve movements, review or correct it.</template
+                    cash, record movements, review or correct it.</template
                 >
                 <template v-else>No operating location is selected.</template>
             </p>

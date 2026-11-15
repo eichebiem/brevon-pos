@@ -20,7 +20,8 @@ use Inertia\Response;
 
 /**
  * Stock on hand and the movement ledger for the selected location
- * (FR-054, FR-055), plus opening-stock entry (D-051, D-093).
+ * (FR-054, FR-055), plus opening-stock entry (D-051, D-093). The average
+ * cost is kept by the ledger but not shown (D-191, future feature FE-04).
  */
 class StockController extends Controller
 {
@@ -46,7 +47,7 @@ class StockController extends Controller
             ->orderBy('inventory_items.name')
             ->get([
                 'inventory_items.id', 'inventory_items.sku', 'inventory_items.name', 'inventory_items.reorder_level',
-                'units_of_measure.code AS unit', 'branch_inventory.quantity_on_hand', 'branch_inventory.average_unit_cost',
+                'units_of_measure.code AS unit', 'branch_inventory.quantity_on_hand',
                 'branch_inventory.updated_at',
             ])
             ->map(fn (BranchInventory $row) => [
@@ -56,7 +57,6 @@ class StockController extends Controller
                 'unit' => $row->getAttribute('unit'),
                 'on_hand' => $row->quantity_on_hand,
                 'reorder_level' => $row->getAttribute('reorder_level'),
-                'average_unit_cost' => $row->average_unit_cost,
                 'low' => self::isLow($row->quantity_on_hand, (string) $row->getAttribute('reorder_level')),
                 'updated_at' => $row->updated_at?->toIso8601String(),
             ]);
@@ -142,7 +142,6 @@ class StockController extends Controller
             'lines' => ['required', 'array', 'max:500'],
             'lines.*.inventory_item_id' => ['required', 'integer'],
             'lines.*.quantity' => ['nullable', 'string', 'max:20'],
-            'lines.*.unit_cost' => ['nullable', 'string', 'max:20'],
         ]);
 
         $location = $this->location($request);
@@ -156,7 +155,8 @@ class StockController extends Controller
         $count = $this->opening->post($user, $location, array_values(array_map(fn (array $line) => [
             'inventory_item_id' => (int) $line['inventory_item_id'],
             'quantity' => $line['quantity'] ?? null,
-            'unit_cost' => $line['unit_cost'] ?? null,
+            // Costs are not entered on screen any more (D-192, future feature FE-04).
+            'unit_cost' => null,
         ], $data['lines'])));
 
         Inertia::flash('toast', ['type' => 'success', 'message' => trans_choice('Opening stock saved for :count item.|Opening stock saved for :count items.', $count, ['count' => $count])]);

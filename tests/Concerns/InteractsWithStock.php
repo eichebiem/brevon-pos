@@ -23,13 +23,13 @@ trait InteractsWithStock
         return Product::factory()->finishedStock()->create()->inventoryItem;
     }
 
-    /** An ingredient counted by weight, not linked to any product. */
-    protected function ingredientItem(string $sku = 'ING-FLOUR'): InventoryItem
+    /** A stock item counted by weight, not linked to any product. */
+    protected function weighedItem(string $sku = 'ING-FLOUR'): InventoryItem
     {
         $unit = UnitOfMeasure::query()->firstOrCreate(['code' => 'g'], ['name' => 'Gram', 'precision' => 3]);
 
         return InventoryItem::query()->create([
-            'sku' => $sku, 'name' => 'Flour', 'item_type' => InventoryItemType::Ingredient, 'unit_of_measure_id' => $unit->id,
+            'sku' => $sku, 'name' => 'Flour', 'item_type' => InventoryItemType::Retail, 'unit_of_measure_id' => $unit->id,
         ]);
     }
 

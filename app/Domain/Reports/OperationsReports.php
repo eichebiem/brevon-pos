@@ -2,6 +2,7 @@
 
 namespace App\Domain\Reports;
 
+use App\Domain\Catalog\PriceResolver;
 use App\Domain\Shared\Money;
 use App\Domain\Shared\Quantity;
 use App\Domain\Shifts\ShiftSummary;
@@ -9,17 +10,18 @@ use App\Enums\DiscountKind;
 use App\Enums\InventoryMovementType;
 use App\Enums\OrderPaymentStatus;
 use App\Enums\OrderStatus;
-use App\Enums\ProductionBatchStatus;
 use App\Enums\RefundKind;
 use App\Enums\ShiftStatus;
+use App\Models\Branch;
 use App\Models\CashierShift;
+use App\Models\Product;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 
 /**
  * Operational reports (FR-093, FR-094, FR-095; D-160–D-163): refunds and
- * voids, discounts, cash differences, stock movements, production and waste.
+ * voids, discounts, cash differences, stock movements and waste.
  * Each returns summary cards and tables in one shape, so screens and
  * exports share it. Reports only read.
  */
@@ -35,13 +37,13 @@ class OperationsReports
         'discounts' => ['title' => 'Discounts', 'permission' => 'reports.sales', 'filters' => ['cashier']],
         'cash-variance' => ['title' => 'Cash differences', 'permission' => 'reports.sales', 'filters' => ['cashier']],
         'stock-movements' => ['title' => 'Stock movements', 'permission' => 'reports.inventory', 'filters' => []],
-        'production' => ['title' => 'Production', 'permission' => 'reports.inventory', 'filters' => []],
-        'waste' => ['title' => 'Waste and rejects', 'permission' => 'reports.inventory', 'filters' => []],
+        'waste' => ['title' => 'Waste', 'permission' => 'reports.inventory', 'filters' => []],
     ];
 
     public function __construct(
         private readonly SalesReport $sales,
         private readonly ShiftSummary $shifts,
+        private readonly PriceResolver $prices,
     ) {}
 
     /**
@@ -54,7 +56,6 @@ class OperationsReports
             'discounts' => $this->discounts($f),
             'cash-variance' => $this->cashVariance($f),
             'stock-movements' => $this->stockMovements($f),
-            'production' => $this->production($f),
             default => $this->waste($f),
         };
     }
@@ -303,10 +304,8 @@ class OperationsReports
             ->get(['i.id', 'i.sku', 'i.name', 'u.code as unit']);
 
         $groups = [
-            'received' => [InventoryMovementType::Opening, InventoryMovementType::PurchaseReceipt],
-            'produced' => [InventoryMovementType::ProductionOutput],
+            'received' => [InventoryMovementType::Opening],
             'returned' => [InventoryMovementType::ReturnIn],
-            'used' => [InventoryMovementType::ProductionConsumption],
             'sold' => [InventoryMovementType::Sale],
             'waste' => [InventoryMovementType::Waste],
             'adjusted' => [InventoryMovementType::AdjustmentIn, InventoryMovementType::AdjustmentOut],
@@ -336,17 +335,15 @@ class OperationsReports
             ],
             'notes' => [
                 'Start and end are the balances at the start of the first day and the end of the last day (Manila time). In is positive, out is negative.',
-                'Received includes opening stock. Adjusted and transferred are net (in minus out).',
+                'Adjusted and transferred are net (in minus out).',
             ],
             'tables' => [new ReportTable('items', 'Stock in and out', [
                 ReportTable::col('item', 'Item'),
                 ReportTable::col('sku', 'SKU'),
                 ReportTable::col('unit', 'Unit'),
                 ReportTable::col('start', 'Start', 'quantity'),
-                ReportTable::col('received', 'Received', 'quantity'),
-                ReportTable::col('produced', 'Produced', 'quantity'),
+                ReportTable::col('received', 'Opening stock', 'quantity'),
                 ReportTable::col('returned', 'Returned', 'quantity'),
-                ReportTable::col('used', 'Used', 'quantity'),
                 ReportTable::col('sold', 'Sold', 'quantity'),
                 ReportTable::col('waste', 'Waste', 'quantity'),
                 ReportTable::col('adjusted', 'Adjusted', 'quantity'),
@@ -357,108 +354,9 @@ class OperationsReports
     }
 
     /**
-     * Posted batches made in range (FR-094): good pieces, rejects and the
-     * ingredient cost recorded when the batch was posted (D-142).
-     *
-     * @return array{cards: list<array{label: string, value: string, type: string, note?: string}>, notes: list<string>, tables: list<ReportTable>}
-     */
-    private function production(ReportFilters $f): array
-    {
-        [$start, $end] = $f->utcRange();
-        $cost = DB::table('production_batch_items')
-            ->groupBy('production_batch_id')
-            ->selectRaw('production_batch_id, SUM(quantity_consumed * COALESCE(unit_cost_snapshot, 0)) as cost, SUM(CASE WHEN unit_cost_snapshot IS NULL THEN 1 ELSE 0 END) as unknown');
-        $batches = DB::table('production_batches as pb')
-            ->join('products as p', 'p.id', '=', 'pb.product_id')
-            ->join('branches as b', 'b.id', '=', 'pb.branch_id')
-            ->leftJoin('users as u', 'u.id', '=', 'pb.posted_by')
-            ->leftJoinSub($cost, 'c', 'c.production_batch_id', '=', 'pb.id')
-            ->whereIn('pb.branch_id', $this->branches($f))
-            ->where('pb.status', ProductionBatchStatus::Posted->value)
-            ->where('pb.produced_at', '>=', $start)->where('pb.produced_at', '<', $end)
-            ->orderBy('pb.produced_at')->orderBy('pb.id')
-            ->get(['pb.batch_number', 'pb.produced_at', 'pb.product_id', 'p.name as product', 'b.code as location', 'pb.planned_quantity', 'pb.actual_quantity', 'pb.rejected_quantity', 'pb.reject_reason', 'u.name as posted_by', 'c.cost', 'c.unknown']);
-
-        $q = fn (mixed $v) => Quantity::fromString(bcadd(is_numeric($v) ? (string) $v : '0', '0', 3));
-        $money = fn (mixed $v) => Money::fromDecimal(bcadd(is_numeric($v) ? (string) $v : '0', '0.005', 2));
-
-        $products = [];
-        $good = Quantity::zero();
-        $rejected = Quantity::zero();
-        foreach ($batches as $b) {
-            $p = $products[$b->product_id] ?? ['product' => $b->product, 'batches' => 0, 'planned' => Quantity::zero(), 'good' => Quantity::zero(), 'rejected' => Quantity::zero(), 'cost' => Money::zero()];
-            $p['batches']++;
-            $p['planned'] = $p['planned']->add($q($b->planned_quantity));
-            $p['good'] = $p['good']->add($q($b->actual_quantity));
-            $p['rejected'] = $p['rejected']->add($q($b->rejected_quantity));
-            $p['cost'] = $p['cost']->add($money($b->cost));
-            $products[$b->product_id] = $p;
-            $good = $good->add($q($b->actual_quantity));
-            $rejected = $rejected->add($q($b->rejected_quantity));
-        }
-
-        $rate = fn (Quantity $bad, Quantity $ok) => $bad->add($ok)->isZero() ? '0.00' : bcdiv(bcmul($bad->toString(), '100', 4), $bad->add($ok)->toString(), 2);
-        $perPiece = fn (Money $cost, Quantity $ok) => $ok->isZero() ? null : bcdiv(bcadd(bcdiv((string) $cost->minor(), $ok->toString(), 6), '0.5', 6), '100', 2);
-
-        return [
-            'cards' => [
-                ['label' => 'Batches posted', 'value' => (string) $batches->count(), 'type' => 'int'],
-                ['label' => 'Good pieces', 'value' => $good->toString(), 'type' => 'quantity'],
-                ['label' => 'Rejected', 'value' => $rejected->toString(), 'type' => 'quantity', 'note' => $rate($rejected, $good).'% of pieces made'],
-            ],
-            'notes' => [
-                'Posted batches by the day they were made. Ingredient cost is the weighted average cost when the batch was posted; ingredients with no cost yet count as ₱0.00.',
-            ],
-            'tables' => [
-                new ReportTable('by-product', 'By product', [
-                    ReportTable::col('product', 'Product'),
-                    ReportTable::col('batches', 'Batches', 'int'),
-                    ReportTable::col('planned', 'Planned', 'quantity'),
-                    ReportTable::col('good', 'Good', 'quantity'),
-                    ReportTable::col('rejected', 'Rejected', 'quantity'),
-                    ReportTable::col('reject_rate', 'Reject %', 'percent'),
-                    ReportTable::col('cost', 'Ingredient cost', 'money'),
-                    ReportTable::col('per_piece', 'Cost per good piece', 'money'),
-                ], array_values(array_map(fn (array $p) => [
-                    'product' => $p['product'],
-                    'batches' => $p['batches'],
-                    'planned' => $p['planned']->toString(),
-                    'good' => $p['good']->toString(),
-                    'rejected' => $p['rejected']->toString(),
-                    'reject_rate' => $rate($p['rejected'], $p['good']),
-                    'cost' => $p['cost']->toDecimal(),
-                    'per_piece' => $perPiece($p['cost'], $p['good']),
-                ], $products)), null, 'No batches posted in these dates.'),
-                new ReportTable('batches', 'Batches', [
-                    ReportTable::col('produced_at', 'Made', 'datetime'),
-                    ReportTable::col('batch_number', 'Batch'),
-                    ReportTable::col('location', 'Location'),
-                    ReportTable::col('product', 'Product'),
-                    ReportTable::col('planned', 'Planned', 'quantity'),
-                    ReportTable::col('good', 'Good', 'quantity'),
-                    ReportTable::col('rejected', 'Rejected', 'quantity'),
-                    ReportTable::col('reject_reason', 'Reject reason'),
-                    ReportTable::col('cost', 'Ingredient cost', 'money'),
-                    ReportTable::col('posted_by', 'Posted by'),
-                ], array_values($batches->map(fn (object $b) => [
-                    'produced_at' => $this->iso($b->produced_at),
-                    'batch_number' => $b->batch_number,
-                    'location' => $b->location,
-                    'product' => $b->product,
-                    'planned' => $q($b->planned_quantity)->toString(),
-                    'good' => $q($b->actual_quantity)->toString(),
-                    'rejected' => $q($b->rejected_quantity)->toString(),
-                    'reject_reason' => $b->reject_reason,
-                    'cost' => $money($b->cost)->toDecimal(),
-                    'posted_by' => $b->posted_by,
-                ])->all()), null, 'No batches posted in these dates.'),
-            ],
-        ];
-    }
-
-    /**
-     * Stock written off as waste in range, valued at today's average cost
-     * (the cost is not stored on the waste entry), plus production rejects.
+     * Stock written off as waste in range, valued at the item's selling
+     * price at that location when it was written off (D-191). Items with no
+     * selling price (not linked to a product) count as zero.
      *
      * @return array{cards: list<array{label: string, value: string, type: string, note?: string}>, notes: list<string>, tables: list<ReportTable>}
      */
@@ -469,43 +367,45 @@ class OperationsReports
             ->join('inventory_items as i', 'i.id', '=', 'm.inventory_item_id')
             ->join('units_of_measure as u', 'u.id', '=', 'i.unit_of_measure_id')
             ->join('branches as b', 'b.id', '=', 'm.branch_id')
-            ->leftJoin('branch_inventory as bi', fn ($j) => $j->on('bi.branch_id', '=', 'm.branch_id')->on('bi.inventory_item_id', '=', 'm.inventory_item_id'))
+            ->leftJoin('products as p', 'p.inventory_item_id', '=', 'm.inventory_item_id')
             ->leftJoin('users as us', 'us.id', '=', 'm.created_by')
             ->whereIn('m.branch_id', $this->branches($f))
             ->where('m.movement_type', InventoryMovementType::Waste->value)
             ->where('m.created_at', '>=', $start)->where('m.created_at', '<', $end)
             ->orderBy('m.created_at')->orderBy('m.id')
-            ->get(['m.created_at', 'm.inventory_item_id', 'i.name as item', 'u.code as unit', 'b.code as location', 'm.quantity_delta', 'bi.average_unit_cost', 'm.reason', 'us.name as by']);
+            ->get(['m.created_at', 'm.inventory_item_id', 'i.name as item', 'u.code as unit', 'b.code as location', 'm.quantity_delta', 'm.branch_id', 'p.id as product_id', 'm.reason', 'us.name as by']);
 
         $q = fn (mixed $v) => Quantity::fromString(bcadd(is_numeric($v) ? (string) $v : '0', '0', 3));
-        $value = fn (\stdClass $e) => is_numeric($e->average_unit_cost)
-            ? Money::fromDecimal(bcadd(bcmul($q($e->quantity_delta)->negate()->toString(), (string) $e->average_unit_cost, 6), '0.005', 2))
-            : Money::zero();
+        $products = Product::query()->whereIn('id', $entries->pluck('product_id')->filter()->unique())->get()->keyBy('id');
+        $locations = Branch::query()->whereIn('id', $entries->pluck('branch_id')->unique())->get()->keyBy('id');
+        $price = function (\stdClass $e) use ($products, $locations): ?Money {
+            $product = $products->get($e->product_id);
+            $location = $locations->get($e->branch_id);
+
+            return $product && $location ? $this->prices->current($product, null, $location, CarbonImmutable::parse($e->created_at, 'UTC')) : null;
+        };
+        $priced = $entries->map(fn (\stdClass $e) => [$e, $price($e)]);
+        $value = fn (\stdClass $e, ?Money $unit) => $unit === null
+            ? Money::zero()
+            : $unit->multiply($q($e->quantity_delta)->negate());
 
         $items = [];
-        foreach ($entries as $e) {
+        foreach ($priced as [$e, $unit]) {
             $row = $items[$e->inventory_item_id] ?? ['item' => $e->item, 'unit' => $e->unit, 'entries' => 0, 'quantity' => Quantity::zero(), 'value' => Money::zero()];
             $row['entries']++;
             $row['quantity'] = $row['quantity']->add($q($e->quantity_delta)->negate());
-            $row['value'] = $row['value']->add($value($e));
+            $row['value'] = $row['value']->add($value($e, $unit));
             $items[$e->inventory_item_id] = $row;
         }
         $total = Money::sum(array_map(fn (array $r) => $r['value'], $items));
 
-        $rejects = DB::table('production_batches')
-            ->whereIn('branch_id', $this->branches($f))
-            ->where('status', ProductionBatchStatus::Posted->value)
-            ->where('produced_at', '>=', $start)->where('produced_at', '<', $end)
-            ->sum('rejected_quantity');
-
         return [
             'cards' => [
                 ['label' => 'Waste entries', 'value' => (string) $entries->count(), 'type' => 'int'],
-                ['label' => 'Estimated value', 'value' => $total->toDecimal(), 'type' => 'money', 'note' => "at today's average cost"],
-                ['label' => 'Production rejects', 'value' => $q($rejects)->toString(), 'type' => 'quantity', 'note' => 'pieces, see the Production report'],
+                ['label' => 'Value at selling price', 'value' => $total->toDecimal(), 'type' => 'money', 'note' => 'what it would have sold for'],
             ],
             'notes' => [
-                "Waste is valued at each item's average cost today, because the cost at the time is not stored on the waste entry. Production rejects never entered stock, so they are not in the waste lines.",
+                "Waste is valued at the item's selling price at that location on the day it was written off. Items without a selling price count as ₱0.00.",
             ],
             'tables' => [
                 new ReportTable('by-item', 'By item', [
@@ -513,7 +413,7 @@ class OperationsReports
                     ReportTable::col('unit', 'Unit'),
                     ReportTable::col('entries', 'Entries', 'int'),
                     ReportTable::col('quantity', 'Quantity', 'quantity'),
-                    ReportTable::col('value', 'Estimated value', 'money'),
+                    ReportTable::col('value', 'Value at selling price', 'money'),
                 ], array_values(array_map(fn (array $r) => [
                     'item' => $r['item'],
                     'unit' => $r['unit'],
@@ -527,16 +427,20 @@ class OperationsReports
                     ReportTable::col('item', 'Item'),
                     ReportTable::col('quantity', 'Quantity', 'quantity'),
                     ReportTable::col('unit', 'Unit'),
+                    ReportTable::col('price', 'Selling price', 'money'),
+                    ReportTable::col('value', 'Value', 'money'),
                     ReportTable::col('reason', 'Reason'),
                     ReportTable::col('by', 'By'),
-                ], array_values($entries->map(fn (object $e) => [
-                    'created_at' => $this->iso($e->created_at),
-                    'location' => $e->location,
-                    'item' => $e->item,
-                    'quantity' => $q($e->quantity_delta)->negate()->toString(),
-                    'unit' => $e->unit,
-                    'reason' => $e->reason,
-                    'by' => $e->by,
+                ], array_values($priced->map(fn (array $pair) => [
+                    'created_at' => $this->iso($pair[0]->created_at),
+                    'location' => $pair[0]->location,
+                    'item' => $pair[0]->item,
+                    'quantity' => $q($pair[0]->quantity_delta)->negate()->toString(),
+                    'unit' => $pair[0]->unit,
+                    'price' => $pair[1]?->toDecimal(),
+                    'value' => $value($pair[0], $pair[1])->toDecimal(),
+                    'reason' => $pair[0]->reason,
+                    'by' => $pair[0]->by,
                 ])->all()), null, 'No waste in these dates.'),
             ],
         ];

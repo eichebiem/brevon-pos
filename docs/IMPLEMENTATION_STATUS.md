@@ -700,3 +700,76 @@ Still to confirm: boxes/combo at pop-ups (D-089), hot vs iced coffee prices. Pha
 **Approved:** 2026-11-15 ("I'll approve this for now"). The user parked the held client questions again, including the offer of a "value at selling price" column on the Waste & rejects report, until the client answers.
 
 **Next step:** the go-live checklist in `DEPLOYMENT.md` §9 and the UAT with the client.
+
+## Client changes after 11b (2026-11-15)
+
+- **Cash always on (D-187):** `PaymentMethodService` refuses to switch Cash off; Payment methods lists Cash first with a
+  Default badge and a disabled, ticked "Accept at the POS" box. Tests in `PaymentMethodSettingsTest`.
+- **Purchasing removed (D-188, FE-02):** suppliers, purchase orders and deliveries deleted (screens, routes, sidebar
+  group, domain code, models, enum, tables, permissions incl. `inventory.receive`, the `purchase_receipt` movement
+  type, `PurchasingTest`). Stock in/out "received" now means opening stock.
+
+**Verification (2026-11-15):** `composer check` passes, **338 tests** (347 before; `PurchasingTest` removed, payment
+tests replaced). Browser check on the scratch DB (fresh `migrate:fresh --seed`): Cash first with Default badge and the
+box disabled; no Purchasing group in the sidebar; `/admin/suppliers`, `/admin/purchase-orders` and `/admin/receipts`
+return 404; no purchasing permissions on the role screen.
+
+**The user's `brevon_pos` was not written to.** It needs `php artisan migrate:fresh --seed` (D-182) to drop the
+purchasing tables. Not committed.
+
+### Second change set (2026-11-15): recipes, production, stock items and stock value removed (D-189, FE-03)
+
+- Removed: Recipes, Production, Stock items and Stock value screens; the Production report (Waste & rejects is now
+  Waste); their routes, sidebar links, domain code, models, enum, tables, permissions (`recipes.manage`,
+  `production.create`, `production.post`), the production movement types, the ingredient/packaging item types,
+  `is_perishable` and the `recipe_at_sale` tracking mode. `ProductionTest` deleted.
+- Kept low-stock alerts (user choice): **Reorder level** is now a field on the product form for finished-stock
+  products (Owner), tested in `StockControlTest::test_reorder_level_is_set_on_the_product`.
+
+**Verification (2026-11-15):** `composer check` passes, **324 tests** (338 before). Browser check on the scratch DB
+(fresh `migrate:fresh --seed`): sidebar has no Production group, Stock items, Stock value or Production report;
+`/admin/production`, `/admin/recipes`, `/admin/inventory/items`, `/admin/inventory/valuation` and
+`/admin/reports/production` return 404; no recipe or production permissions on the role screen; reorder level 12
+saved on Chocolate Sprinkles and audited. **The user's `brevon_pos` was not written to**; it needs
+`php artisan migrate:fresh --seed`. Not committed.
+
+### Local doughnut stock (2026-11-15, D-190)
+
+New `LocalStockSeeder` (local only, last in `DatabaseSeeder`): opening stock of a random 3–10 pieces of every doughnut
+at the main branch and SM Rosales. `LocalStockSeederTest` checks 14 doughnuts × 2 locations within 3–10 whole pieces,
+the audit entries, that re-seeding changes nothing, and that other environments get no stock. `composer check` passes,
+**326 tests**. Seeded on the scratch DB (`brevon_pos_test`): 14 doughnuts at each location. The user's `brevon_pos` was
+not written to. Not committed.
+
+### Average cost hidden; waste at selling price (2026-11-15, D-191, FE-04)
+
+- **Stock on hand:** the Average cost column is removed (`StockController`, `Stock.vue`); costs are still kept by the
+  ledger.
+- **Waste report:** valued at the selling price at that location on the day of the waste (`OperationsReports::waste`
+  via `PriceResolver`); cards "Waste entries" and "Value at selling price"; entries show Selling price and Value.
+- Tests: `OperationsReportTest::test_waste_report` (2 Choco at ₱44.00 = ₱88.00, a later price change ignored, an
+  unpriced item ₱0.00), `StockControlTest` (no average cost in rows). `composer check` passes, **326 tests**.
+- Browser check on the scratch DB: Stock on hand columns Item, On hand, Last change; Waste report ₱88.00 for 2 Choco
+  Custard at ₱44.00. The user's `brevon_pos` was not written to. Not committed.
+
+### Unit costs no longer entered (2026-11-15, D-192, FE-04)
+
+- **Opening stock:** the Unit cost column is removed; `StockController::storeOpening` posts no cost.
+- **Counts & adjustments:** a posted adjustment no longer shows Unit cost; the unused `formatUnitCost` helper is gone.
+- Tests: `OpeningStockTest` checks a cost sent from the screen is ignored. `composer check` passes, **326 tests**.
+- Browser check on the scratch DB: Opening stock shows only Item and Quantity on hand; 6 pieces posted with no cost.
+  The user's `brevon_pos` was not written to. Not committed.
+
+### Cash drawer settings removed (2026-11-15, D-193, FE-05)
+
+- Store settings no longer has the Cash drawer section (`cash.approval_over`, `shift.review_variance_over`).
+- **Cash-out approval removed:** every movement counts at once; approve/reject routes, controller actions,
+  `CashDrawer::decide`, the pending notices and the close-shift block are gone; `CashMovementStatus` deleted and the
+  `status`, `decided_at`, `decision_notes` columns dropped from the create migration. The movement list shows When,
+  Type and Amount (and "Approved by" for refunds and corrections).
+- **Shift review:** any difference after corrections marks a closed shift as needing review.
+- Tests: `ShiftCashTest` rewritten for the above (every movement counts at once, approve route 404, any difference
+  needs review, the settings are gone). `composer check` passes, **325 tests**.
+- Browser check on the scratch DB: Store settings shows only Business name, Logo, Receipt footer, Discounts, Refunds;
+  My shift and Shifts pages load. The user's `brevon_pos` was not written to; it needs `migrate:fresh --seed`. Not
+  committed.

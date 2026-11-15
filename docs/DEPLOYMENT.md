@@ -260,14 +260,14 @@ Tick each item before the first real sale.
 
 **Shop setup**
 
-- [ ] Store settings: business name and receipt footer, approval limits (cash out, shift difference, discount, refund)
+- [ ] Store settings: business name and receipt footer, approval limits (discount, refund)
 - [ ] Locations: the main branch's address (printed on receipts)
 - [ ] Menu, prices and categories checked against the real menu; photos added
 - [ ] Payment methods: Cash and GCash on
 - [ ] SC/PWD discount rate and on/off confirmed with the accountant
 - [ ] Pop-up locations and terminals created; staff assigned to them
-- [ ] Opening stock posted **with unit costs** at every location (otherwise stock value and waste show ₱0.00)
-- [ ] Ingredients and reorder levels entered under Inventory → Stock items
+- [ ] Opening stock posted at every location
+- [ ] Reorder levels entered on each doughnut's product form
 - [ ] Receipt printer chosen once on each counter tablet and a test receipt printed
 - [ ] Any test orders, shifts and stock from training removed by restoring a clean backup taken before training,
       or by a fresh install

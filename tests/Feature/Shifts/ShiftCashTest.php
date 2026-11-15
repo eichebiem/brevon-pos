@@ -5,7 +5,6 @@ namespace Tests\Feature\Shifts;
 use App\Domain\Access\PermissionCatalog;
 use App\Domain\Shifts\ExpectedCash;
 use App\Domain\Shifts\ShiftSummary;
-use App\Enums\CashMovementStatus;
 use App\Models\AuditLog;
 use App\Models\Branch;
 use App\Models\CashierShift;
@@ -15,6 +14,8 @@ use App\Models\Product;
 use App\Models\Terminal;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Testing\TestResponse;
 use LogicException;
 use Symfony\Component\HttpFoundation\Response;
@@ -146,65 +147,35 @@ class ShiftCashTest extends TestCase
 
         $this->record($this->manager, 'cash_in', '100.00')->assertSessionHasNoErrors();
         $movement = CashMovement::query()->sole();
-        $this->assertSame(CashMovementStatus::Approved, $movement->status);
-        $this->assertSame($this->manager->id, $movement->approved_by);
+        $this->assertNull($movement->approved_by, 'Nothing needs approving (D-193).');
         $this->assertDatabaseHas('audit_logs', ['event' => 'cash_movement.recorded', 'auditable_id' => $movement->id]);
 
         $this->close($this->cashier, '1100.00')->assertSessionHasNoErrors();
         $this->record($this->manager, 'cash_in', '100.00')->assertSessionHasErrors('amount');
     }
 
-    /** T-CSH-5: a large cash out by someone who does not review shifts waits for a manager. */
-    public function test_large_outflows_wait_for_approval_and_block_closing(): void
+    /** D-193: cash out of any size counts at once; there is no approval step any more. */
+    public function test_every_cash_movement_counts_at_once(): void
     {
         $this->cashier->givePermissionTo('cash-movements.create');
 
-        $this->record($this->cashier, 'cash_out', '500.00', 'Safe drop')->assertSessionHasNoErrors();
+        $this->record($this->cashier, 'cash_out', '600.00', 'Safe drop')->assertSessionHasNoErrors()
+            ->assertSessionHas('inertia.flash_data.toast.type', 'success');
         $this->record($this->manager, 'cash_in', '400.00', 'Change float')->assertSessionHasNoErrors();
-        $this->record($this->cashier, 'cash_paid_out', '500.01', 'Supplier delivery')->assertSessionHasNoErrors();
-        [$small, , $large] = CashMovement::query()->orderBy('id')->get()->all();
-        $this->assertSame(CashMovementStatus::Approved, $small->status, 'At the limit is not over it.');
-        $this->assertNull($small->approved_by);
-        $this->assertSame(CashMovementStatus::Pending, $large->status);
+        $this->record($this->cashier, 'cash_paid_out', '500.01', 'Ice')->assertSessionHasNoErrors();
+        $this->assertSame('299.99', app(ExpectedCash::class)->for($this->shift())->toDecimal());
 
-        // Pending outflows hold back cash: 1000 − 500 + 400 − 500.01 = 399.99 is left.
-        $this->record($this->cashier, 'cash_out', '400.00')->assertSessionHasErrors('amount');
+        // More than the drawer holds still cannot come out.
+        $this->record($this->cashier, 'cash_out', '300.00')->assertSessionHasErrors('amount');
 
-        // Pending cash does not count, and the shift cannot close until it is decided.
-        $this->assertSame('900.00', app(ExpectedCash::class)->for($this->shift())->toDecimal());
-        $this->close($this->cashier, '900.00')->assertSessionHasErrors('counted_cash');
+        $movement = CashMovement::query()->orderBy('id')->firstOrFail();
+        $this->post("/cash-movements/{$movement->id}/approve")->assertNotFound();
+        $this->assertNull(DB::table('cash_movements')->first()?->approved_by);
+        $this->assertFalse(Schema::hasColumn('cash_movements', 'status'));
 
-        // Cashiers cannot approve; nobody approves their own.
-        $this->actingAs($this->cashier)->post("/cash-movements/{$large->id}/approve")->assertForbidden();
-        $this->record($this->manager, 'cash_out', '10.00', 'Manager test')->assertSessionHasNoErrors();
-        $own = CashMovement::query()->latest('id')->firstOrFail();
-        $this->assertSame(CashMovementStatus::Approved, $own->status, 'Reviewers are never held for approval.');
+        $this->close($this->cashier, '299.99')->assertSessionHasNoErrors();
 
-        $this->actingAs($this->manager)->post("/cash-movements/{$large->id}/reject")->assertSessionHasErrors('notes');
-        $this->actingAs($this->manager)->post("/cash-movements/{$large->id}/approve", ['notes' => 'Receipt seen'])->assertSessionHasNoErrors();
-        $large->refresh();
-        $this->assertSame(CashMovementStatus::Approved, $large->status);
-        $this->assertSame($this->manager->id, $large->approved_by);
-        $this->assertDatabaseHas('audit_logs', ['event' => 'cash_movement.approved', 'auditable_id' => $large->id]);
-        $this->actingAs($this->manager)->post("/cash-movements/{$large->id}/approve")->assertSessionHasErrors('movement');
-
-        // 1000 − 500 + 400 − 10 − 500.01
-        $this->assertSame('389.99', app(ExpectedCash::class)->for($this->shift())->toDecimal());
-        $this->close($this->cashier, '389.99')->assertSessionHasNoErrors();
-    }
-
-    public function test_a_rejected_movement_stays_in_the_drawer(): void
-    {
-        $this->cashier->givePermissionTo('cash-movements.create');
-        $this->record($this->cashier, 'cash_out', '600.00', 'Owner draw')->assertSessionHasNoErrors();
-        $movement = CashMovement::query()->sole();
-
-        $this->actingAs($this->manager)->post("/cash-movements/{$movement->id}/reject", ['notes' => 'Not agreed'])->assertSessionHasNoErrors();
-        $this->assertSame(CashMovementStatus::Rejected, $movement->refresh()->status);
-        $this->assertSame('1000.00', app(ExpectedCash::class)->for($this->shift())->toDecimal());
-        $this->close($this->cashier, '1000.00')->assertSessionHasNoErrors();
-
-        // Decided movements are never edited or deleted.
+        // Movements are never edited or deleted.
         $this->expectException(LogicException::class);
         $movement->forceFill(['amount' => '1.00'])->save();
     }
@@ -293,28 +264,25 @@ class ShiftCashTest extends TestCase
                 ->where('can.correct', true));
     }
 
-    public function test_a_shift_within_the_review_limit_needs_no_review_and_open_shifts_cannot_be_reviewed(): void
+    /** D-193: the review limit setting is gone; any difference needs review. */
+    public function test_any_difference_needs_review_and_open_shifts_cannot_be_reviewed(): void
     {
         $this->actingAs($this->manager)->post("/admin/shifts/{$this->shift()->id}/review")->assertSessionHasErrors('review_notes');
 
-        $this->actingAs($this->owner)->put('/admin/settings', ['name' => 'Brevon', 'cash_approval_over' => '300', 'shift_review_variance_over' => '20.00'])->assertSessionHasNoErrors();
-        $this->close($this->cashier, '990.00', 'Short ten')->assertSessionHasNoErrors();
-        $this->assertFalse(app(ShiftSummary::class)->needsReview($this->shift()));
-
-        // Any difference still needs a note when it is reviewed.
+        $this->close($this->cashier, '999.99', 'Short a centavo')->assertSessionHasNoErrors();
+        $this->assertTrue(app(ShiftSummary::class)->needsReview($this->shift()));
         $this->actingAs($this->manager)->post("/admin/shifts/{$this->shift()->id}/review")->assertSessionHasErrors('review_notes');
     }
 
-    public function test_the_approval_limit_comes_from_store_settings(): void
+    /** D-193: the Cash drawer settings were removed (future feature FE-05). */
+    public function test_the_cash_drawer_settings_are_gone(): void
     {
-        $this->actingAs($this->owner)->put('/admin/settings', ['name' => 'Brevon', 'cash_approval_over' => '100.00', 'shift_review_variance_over' => '0'])->assertSessionHasNoErrors();
-        $this->actingAs($this->owner)->get('/admin/settings')->assertInertia(fn ($page) => $page->where('settings.cash_approval_over', '100.00'));
-
-        $this->cashier->givePermissionTo('cash-movements.create');
-        $this->record($this->cashier, 'cash_paid_out', '100.01', 'Ice')->assertSessionHasNoErrors();
-        $this->assertSame(CashMovementStatus::Pending, CashMovement::query()->sole()->status);
-
-        $this->actingAs($this->owner)->put('/admin/settings', ['name' => 'Brevon', 'cash_approval_over' => '-1'])->assertSessionHasErrors('cash_approval_over');
+        $this->actingAs($this->owner)->put('/admin/settings', ['name' => 'Brevon', 'cash_approval_over' => '100.00', 'shift_review_variance_over' => '20'])->assertSessionHasNoErrors();
+        $this->assertDatabaseMissing('settings', ['key' => 'cash.approval_over']);
+        $this->assertDatabaseMissing('settings', ['key' => 'shift.review_variance_over']);
+        $this->actingAs($this->owner)->get('/admin/settings')->assertInertia(fn ($page) => $page
+            ->missing('settings.cash_approval_over')
+            ->missing('settings.shift_review_variance_over'));
     }
 
     public function test_managers_close_forgotten_shifts_from_the_review_page(): void

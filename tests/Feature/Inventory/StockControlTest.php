@@ -64,7 +64,7 @@ class StockControlTest extends TestCase
     public function test_counts_wait_for_approval_and_post_the_difference(): void
     {
         $glazed = $this->doughnutItem();
-        $flour = $this->ingredientItem();
+        $flour = $this->weighedItem();
         $this->postStock($this->manager, $this->main, $glazed, '20');
         $this->postStock($this->manager, $this->main, $flour, '1000');
 
@@ -105,7 +105,7 @@ class StockControlTest extends TestCase
 
     public function test_an_approvers_own_adjustment_posts_at_once_and_others_cannot_self_approve(): void
     {
-        $flour = $this->ingredientItem();
+        $flour = $this->weighedItem();
         $this->postStock($this->manager, $this->main, $flour, '500');
 
         $this->actingAs($this->manager)->post('/admin/inventory/adjustments', $this->adjustment('change', [[$flour, '250.5']], 'Sack found in storage'))->assertSessionHasNoErrors();
@@ -172,7 +172,7 @@ class StockControlTest extends TestCase
         $popUp = Branch::factory()->popUp(now()->subDays(5)->toDateString(), now()->subDay()->toDateString())->create(['code' => 'POP07']);
         $this->manager->branches()->attach($popUp->id);
         $glazed = $this->doughnutItem();
-        $flour = $this->ingredientItem();
+        $flour = $this->weighedItem();
         $this->postStock($this->manager, $popUp, $glazed, '6');
 
         $this->actingAs($this->manager)->get("/admin/inventory/waste?location={$popUp->id}")->assertOk()
@@ -224,7 +224,7 @@ class StockControlTest extends TestCase
         $ended = Branch::factory()->popUp(null, now()->subDays(2)->toDateString())->create(['code' => 'POP03']);
         $this->manager->branches()->attach([$assigned->id, $ended->id]);
         $glazed = $this->doughnutItem();
-        $flour = $this->ingredientItem();
+        $flour = $this->weighedItem();
         $this->postStock($this->manager, $this->main, $glazed, '10');
         $this->postStock($this->manager, $this->main, $flour, '1000');
 
@@ -245,7 +245,7 @@ class StockControlTest extends TestCase
     public function test_low_stock_is_flagged_by_reorder_level(): void
     {
         $glazed = $this->doughnutItem();
-        $flour = $this->ingredientItem();
+        $flour = $this->weighedItem();
         $glazed->update(['reorder_level' => '12']);
         $this->postStock($this->manager, $this->main, $glazed, '12');
         $this->postStock($this->manager, $this->main, $flour, '5'); // reorder level 0: no alert
@@ -253,33 +253,34 @@ class StockControlTest extends TestCase
         $this->actingAs($this->manager)->get('/admin/inventory/stock')->assertOk()
             ->assertInertia(fn ($page) => $page->where('lowCount', 1)->has('rows', 2));
         $this->actingAs($this->manager)->get('/admin/inventory/stock?low=1')->assertOk()
-            ->assertInertia(fn ($page) => $page->has('rows', 1)->where('rows.0.id', $glazed->id)->where('rows.0.low', true));
+            ->assertInertia(fn ($page) => $page->has('rows', 1)->where('rows.0.id', $glazed->id)->where('rows.0.low', true)
+                ->missing('rows.0.average_unit_cost')); // D-191: not shown
     }
 
-    /** D-134: ingredients are added here; doughnut items only change their stock settings. */
-    public function test_stock_items_are_managed_with_linked_items_locked(): void
+    /** D-189: the reorder level is set on the product form (the Stock items screen was removed). */
+    public function test_reorder_level_is_set_on_the_product(): void
     {
-        $gram = $this->ingredientItem()->unit_of_measure_id;
-        $item = ['sku' => 'pkg-box6', 'name' => 'Box of 6', 'item_type' => 'packaging', 'unit_of_measure_id' => $gram, 'reorder_level' => '50', 'is_perishable' => false];
-
-        $this->actingAs($this->manager)->post('/admin/inventory/items', [...$item, 'item_type' => 'finished_good'])->assertSessionHasErrors('item_type');
-        $this->actingAs($this->manager)->post('/admin/inventory/items', [...$item, 'reorder_level' => '-1'])->assertSessionHasErrors('reorder_level');
-        $this->actingAs($this->manager)->post('/admin/inventory/items', $item)->assertSessionHasNoErrors();
-        $box = InventoryItem::query()->where('sku', 'PKG-BOX6')->sole();
-        $this->assertDatabaseHas('audit_logs', ['event' => 'inventory_item.created', 'auditable_id' => $box->id]);
-
         $glazed = $this->doughnutItem();
-        $name = $glazed->name;
-        $this->actingAs($this->manager)->put("/admin/inventory/items/{$glazed->id}", ['name' => 'Renamed', 'reorder_level' => '24', 'is_perishable' => true])->assertSessionHasNoErrors();
-        $glazed->refresh();
-        $this->assertSame($name, $glazed->name, 'Doughnut names come from the product.');
-        $this->assertSame('24.000', $glazed->reorder_level);
+        $product = $glazed->product;
+        $this->assertNotNull($product);
+        $owner = $this->staff(PermissionCatalog::OWNER, $this->main);
+        $data = fn (string $level) => [
+            'category_id' => $product->category_id, 'sku' => $product->sku, 'name' => $product->name,
+            'product_type' => $product->product_type->value, 'inventory_tracking_mode' => $product->inventory_tracking_mode->value,
+            'reorder_level' => $level, 'location_ids' => [$this->main->id],
+        ];
 
-        $this->postStock($this->manager, $this->main, $box, '10');
-        $pc = InventoryItem::query()->whereKey($glazed->id)->value('unit_of_measure_id');
-        $this->actingAs($this->manager)->put("/admin/inventory/items/{$box->id}", ['unit_of_measure_id' => $pc, 'reorder_level' => '5'])->assertSessionHasErrors('unit_of_measure_id');
+        $this->actingAs($owner)->put("/admin/products/{$product->id}", $data('-1'))->assertSessionHasErrors('reorder_level');
+        $this->actingAs($owner)->put("/admin/products/{$product->id}", $data('2.5'))->assertSessionHasErrors('reorder_level');
+        $this->actingAs($owner)->put("/admin/products/{$product->id}", $data('24'))->assertSessionHasNoErrors();
+        $this->assertSame('24.000', $glazed->refresh()->reorder_level);
+        $this->assertDatabaseHas('audit_logs', ['event' => 'product.updated', 'auditable_id' => $product->id]);
+        $this->actingAs($owner)->get("/admin/products/{$product->id}/edit")
+            ->assertInertia(fn ($page) => $page->where('product.reorder_level', '24'));
 
-        $this->actingAs($this->staff($this->bakerRole()))->post('/admin/inventory/items', [...$item, 'sku' => 'PKG-2'])->assertForbidden();
+        $this->actingAs($this->manager)->put("/admin/products/{$product->id}", $data('5'))->assertForbidden();
+        $this->actingAs($this->manager)->get('/admin/inventory/items')->assertNotFound();
+        $this->actingAs($this->manager)->get('/admin/inventory/valuation')->assertNotFound();
     }
 
     public function test_adjustment_pages_are_scoped_to_the_users_locations(): void

@@ -16,18 +16,16 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property InventoryItemType $item_type
  * @property int $unit_of_measure_id
  * @property string $reorder_level
- * @property bool $is_perishable
  * @property bool $is_active
  */
 class InventoryItem extends Model
 {
-    protected $fillable = ['sku', 'name', 'item_type', 'unit_of_measure_id', 'reorder_level', 'is_perishable', 'is_active'];
+    protected $fillable = ['sku', 'name', 'item_type', 'unit_of_measure_id', 'reorder_level', 'is_active'];
 
     protected function casts(): array
     {
         return [
             'item_type' => InventoryItemType::class,
-            'is_perishable' => 'boolean',
             'is_active' => 'boolean',
         ];
     }

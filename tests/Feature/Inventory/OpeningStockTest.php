@@ -35,7 +35,7 @@ class OpeningStockTest extends TestCase
     {
         $main = $this->mainLocation();
         $glazed = $this->doughnutItem();
-        $flour = $this->ingredientItem();
+        $flour = $this->weighedItem();
 
         $this->actingAs($this->manager)->post('/admin/inventory/opening-stock', ['lines' => [
             ['inventory_item_id' => $glazed->id, 'quantity' => '36', 'unit_cost' => '12.50'],
@@ -45,6 +45,8 @@ class OpeningStockTest extends TestCase
         $this->assertSame('36.000', $this->onHand($main, $glazed));
         $this->assertSame('2500.500', $this->onHand($main, $flour));
         $this->assertSame(2, InventoryMovement::query()->where('movement_type', InventoryMovementType::Opening)->count());
+        // D-192: a unit cost sent from the screen is ignored; costs are not entered any more.
+        $this->assertNull(InventoryMovement::query()->where('inventory_item_id', $glazed->id)->value('unit_cost'));
         $this->assertDatabaseHas('audit_logs', ['event' => 'inventory.opening_stock', 'auditable_id' => $main->id, 'user_id' => $this->manager->id]);
 
         // A second opening count for the same item is refused; corrections are adjustments.
@@ -70,10 +72,6 @@ class OpeningStockTest extends TestCase
             ]])->assertSessionHasErrors('lines.0.quantity');
         }
 
-        $this->actingAs($this->manager)->post('/admin/inventory/opening-stock', ['lines' => [
-            ['inventory_item_id' => $glazed->id, 'quantity' => '5', 'unit_cost' => '-1'],
-        ]])->assertSessionHasErrors('lines.0.unit_cost');
-
         // One bad line means nothing is saved.
         $this->actingAs($this->manager)->post('/admin/inventory/opening-stock', ['lines' => [
             ['inventory_item_id' => $glazed->id, 'quantity' => '5', 'unit_cost' => ''],
@@ -87,7 +85,7 @@ class OpeningStockTest extends TestCase
         $popUp = Branch::factory()->popUp()->create();
         $manager = $this->staff(PermissionCatalog::MANAGER, $popUp);
         $glazed = $this->doughnutItem();
-        $flour = $this->ingredientItem();
+        $flour = $this->weighedItem();
 
         $this->actingAs($manager)->get('/admin/inventory/opening-stock')
             ->assertInertia(fn ($page) => $page->component('admin/inventory/OpeningStock')

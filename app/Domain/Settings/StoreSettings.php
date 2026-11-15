@@ -22,12 +22,6 @@ class StoreSettings
         'store.name' => 'Brevon Doughnuts & Coffee',
         'store.logo_path' => null,
         'receipt.footer' => 'Thank you for choosing Brevon!',
-        // D-127 (TBC): cash out / paid out above this, by someone who cannot
-        // review shifts, waits for a manager's approval.
-        'cash.approval_over' => '500.00',
-        // D-128 (TBC): a closed shift whose difference is larger than this
-        // (either way) is listed as needing review. 0 = any difference.
-        'shift.review_variance_over' => '0.00',
         // D-146 (TBC): a discount larger than this needs a manager's approval.
         'discount.approval_over' => '100.00',
         // D-152 (TBC): a refund up to this amount goes through without a
@@ -75,8 +69,6 @@ class StoreSettings
             'name' => $this->get('store.name'),
             'logo_url' => $this->logoUrl(),
             'receipt_footer' => $this->get('receipt.footer'),
-            'cash_approval_over' => $this->get('cash.approval_over'),
-            'shift_review_variance_over' => $this->get('shift.review_variance_over'),
             'discount_approval_over' => $this->get('discount.approval_over'),
             'refund_approval_over' => $this->get('refund.approval_over'),
             'currency' => (string) config('brevon.currency'),
@@ -90,7 +82,7 @@ class StoreSettings
     }
 
     /**
-     * @param  array{name: string, receipt_footer: string|null, cash_approval_over?: string, shift_review_variance_over?: string, discount_approval_over?: string, refund_approval_over?: string}  $values
+     * @param  array{name: string, receipt_footer: string|null, discount_approval_over?: string, refund_approval_over?: string}  $values
      */
     public function update(User $actor, array $values, ?UploadedFile $logo = null, bool $removeLogo = false): void
     {
@@ -98,7 +90,7 @@ class StoreSettings
             'store.name' => $values['name'],
             'receipt.footer' => $values['receipt_footer'],
         ];
-        foreach (['cash_approval_over' => 'cash.approval_over', 'shift_review_variance_over' => 'shift.review_variance_over', 'discount_approval_over' => 'discount.approval_over', 'refund_approval_over' => 'refund.approval_over'] as $field => $key) {
+        foreach (['discount_approval_over' => 'discount.approval_over', 'refund_approval_over' => 'refund.approval_over'] as $field => $key) {
             if (isset($values[$field])) {
                 $changes[$key] = Money::fromDecimal($values[$field])->toDecimal();
             }
