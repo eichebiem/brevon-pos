@@ -2,6 +2,7 @@
 
 namespace App\Domain\Settings;
 
+use App\Domain\Printing\ReceiptLogo;
 use App\Domain\Shared\AuditLogger;
 use App\Domain\Shared\Money;
 use App\Models\Setting;
@@ -123,6 +124,10 @@ class StoreSettings
         $newLogo = $this->get('store.logo_path');
         if ($oldLogo !== null && $oldLogo !== $newLogo) {
             Storage::disk('public')->delete($oldLogo);
+            app(ReceiptLogo::class)->forget($oldLogo);
+        }
+        if ($newLogo !== $oldLogo) {
+            app(ReceiptLogo::class)->prepare($newLogo); // D-195: printer dots made once, on upload
         }
     }
 }

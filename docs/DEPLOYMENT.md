@@ -9,17 +9,17 @@ Written in Phase 11b (2026-11-09). Decisions referred to are in [`DECISIONS.md`]
 
 ## 1. What the server needs
 
-| Item        | Requirement                                                                                                                                         |
-| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| PHP         | 8.4 (8.3–8.5 work) with `bcmath`, `ctype`, `curl`, `dom`, `fileinfo`, `intl`, `mbstring`, `openssl`, `pdo_mysql`, `tokenizer`, `xml`, `zip`, `zlib` |
-| Database    | **MySQL 8.4** (not MariaDB, not SQLite: the CHECK constraints and locking are tested on MySQL 8.4)                                                  |
-| `mysqldump` | Same major version as the server, for backups                                                                                                       |
-| Web server  | Nginx or Apache pointing at `public/`, with PHP-FPM                                                                                                 |
-| HTTPS       | A valid certificate (Let's Encrypt or the host's). Required in production (NFR-001)                                                                 |
-| Node.js     | 20 or newer, **only to build** the front end (not needed at run time if you build elsewhere)                                                        |
-| Composer    | 2.x                                                                                                                                                 |
-| Cron        | One entry for the Laravel scheduler (§5)                                                                                                            |
-| Disk        | About 1 GB for the app plus backups (each compressed backup is small; 14 days are kept)                                                             |
+| Item        | Requirement                                                                                                                                               |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PHP         | 8.4 (8.3–8.5 work) with `bcmath`, `ctype`, `curl`, `dom`, `fileinfo`, `gd`, `intl`, `mbstring`, `openssl`, `pdo_mysql`, `tokenizer`, `xml`, `zip`, `zlib` |
+| Database    | **MySQL 8.4** (not MariaDB, not SQLite: the CHECK constraints and locking are tested on MySQL 8.4)                                                        |
+| `mysqldump` | Same major version as the server, for backups                                                                                                             |
+| Web server  | Nginx or Apache pointing at `public/`, with PHP-FPM                                                                                                       |
+| HTTPS       | A valid certificate (Let's Encrypt or the host's). Required in production (NFR-001)                                                                       |
+| Node.js     | 20 or newer, **only to build** the front end (not needed at run time if you build elsewhere)                                                              |
+| Composer    | 2.x                                                                                                                                                       |
+| Cron        | One entry for the Laravel scheduler (§5)                                                                                                                  |
+| Disk        | About 1 GB for the app plus backups (each compressed backup is small; 14 days are kept)                                                                   |
 
 No queue worker, Redis or mail server is required. The app has no background jobs. Mail is only used for
 "forgot password", and that needs a working mailer (§3).

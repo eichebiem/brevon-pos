@@ -8,7 +8,7 @@ docs/HANDOFF_ANDROID_APP.md, then continue the Android app."_
 
 - All phases (0–11b) are built and approved; 11b approved 2026-11-15. See `IMPLEMENTATION_STATUS.md`.
 - Quality gate: `composer check` (build, `vp check`, `vue-tsc`, Pint, Larastan, PHPUnit on MySQL `brevon_pos_test`).
-  324 tests pass.
+  `composer check` passes (see IMPLEMENTATION_STATUS.md for the latest count).
 - Hosting decided: **Oracle Cloud Always Free**, one Arm VM with the app and MySQL 8.4 (`DEPLOYMENT.md` §10).
   Vercel was rejected (Hobby plan is non-commercial; no PHP/MySQL/persistent files).
 - A PWA was built and then **reverted** at the user's request (2026-11-15). Don't rebuild it unless asked.
@@ -24,8 +24,7 @@ docs/HANDOFF_ANDROID_APP.md, then continue the Android app."_
 - Don't change the user's account credentials. Never write the production database password into any file except
   the server's `.env`.
 - Held client questions are **parked**; don't raise them unless the user does: menu (D-101), Phase 7/8 re-review,
-  SC/PWD rate and privacy, costing, report definitions, approval limits, the waste "value at selling price" column,
-  and the **receipt printer details**.
+  SC/PWD rate and privacy, costing, report definitions and approval limits. (Printer model now known: D-194.)
 - Never claim BIR compliance. No customer data except the encrypted SC/PWD row.
 
 ## The Android app — decided so far
@@ -34,14 +33,22 @@ docs/HANDOFF_ANDROID_APP.md, then continue the Android app."_
   no iPad app, no Apple fee.
 - Goal: the POS inside an Android app that prints receipts **straight to the paired Bluetooth printer, with no
   print dialog**. Browser printing stays for every other device and as the fallback.
-- Not started. Printer details are parked (brand/model, ESC/POS over Bluetooth, 58 or 80 mm, tablet's Android
-  version); the user chose to start without them.
+- **Printer confirmed (2026-11-16, D-194): Xprinter XP-58IID**, Bluetooth + USB, **58 mm** paper, ESC/POS,
+  384 dots a line = 32 characters. The counter tablet is Android (version unknown, so handle Android 12+
+  Bluetooth permissions and older ones). The client says the printer prints `₱`; we draw it ourselves anyway
+  (user-defined character), so it does not depend on the code page. Expect Bluetooth Classic (SPP).
+- **Step 1 (server ESC/POS) is DONE (2026-11-16).** Steps 2–5 are not started.
 
 ## Proposed design (agreed in outline, not yet built)
 
-1. **Server: receipts as ESC/POS** — a Laravel class that turns a receipt (same data as
-   `resources/js/components/pos/ReceiptView.vue`) into ESC/POS bytes, with 58 mm (32 columns) and 80 mm
-   (48 columns) layouts; an endpoint returning them (base64) for an order the user may reprint, audited like a
+1. **DONE — Server: receipts as ESC/POS** (`app/Domain/Printing/EscPosReceipt.php`;
+   `GET /pos/orders/{order}/receipt/escpos?paper=58|80` and `GET /pos/printer/test?paper=58|80` return
+   `{paper, columns, data}` with `data` = base64 bytes to write to the printer as they are; reprints are
+   still audited by `POST /pos/orders/{order}/reprint`, which the app must call first on a reprint;
+   tests in `tests/Unit/Domain/Printing` and `tests/Feature/Sales/EscPosReceiptEndpointTest.php`).
+   Original plan: a Laravel class that turns a receipt (same data as
+   `resources/js/components/pos/ReceiptView.vue`) into ESC/POS bytes, with the 58 mm (32 columns) layout for
+   the XP-58IID first and 80 mm (48 columns) optional; an endpoint returning them (base64) for an order the user may reprint, audited like a
    reprint. Full PHPUnit coverage. Keep the "not an official receipt" line. Check how `₱` prints; fall back to `P`
    or `PHP`.
 2. **POS: detect the app** — when running inside the app (Capacitor bridge present), after a sale and on reprint
@@ -56,7 +63,8 @@ docs/HANDOFF_ANDROID_APP.md, then continue the Android app."_
 5. **Distribution** — sideload the signed APK on the shop's tablets (free); Google Play is optional ($25 once).
    Keep the signing key safe and out of git.
 
-Waits for the real printer: the test print, the `₱` sign, the logo at the top, layout fine-tuning.
+Done since: the `₱` glyph was checked on the real printer (looks right), and the logo now prints at the top, 32 mm
+shaded (D-195). Still to check on the printer: the logo print and that 32 characters fit; layout fine-tuning.
 
 ## Setting up the Windows desktop
 

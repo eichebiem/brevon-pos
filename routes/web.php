@@ -24,6 +24,7 @@ use App\Http\Controllers\LocationSwitchController;
 use App\Http\Controllers\Orders\RefundController;
 use App\Http\Controllers\Pos\CheckoutController;
 use App\Http\Controllers\Pos\OrderController as PosOrderController;
+use App\Http\Controllers\Pos\PrinterController;
 use App\Http\Controllers\PosController;
 use App\Http\Controllers\Staff\CashMovementController;
 use App\Http\Controllers\Staff\ShiftController;
@@ -56,6 +57,8 @@ Route::middleware(['auth'])->group(function () {
         ->whereIn('report', array_keys(OperationsReports::REPORTS))->name('admin.reports.export');
     Route::get('pos', [PosController::class, 'index'])
         ->middleware('permission:pos.access')->name('pos.index');
+    Route::get('pos/printer/test', [PrinterController::class, 'test'])
+        ->middleware('permission:pos.access')->name('pos.printer.test');
     Route::post('pos/quote', [CheckoutController::class, 'quote'])
         ->middleware('permission:pos.create-sale')->name('pos.quote');
     Route::post('pos/checkout', [CheckoutController::class, 'store'])
@@ -64,6 +67,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('pos/orders', [PosOrderController::class, 'index'])->name('pos.orders.index');
         Route::get('pos/orders/{order}', [PosOrderController::class, 'show'])->name('pos.orders.show');
         Route::get('pos/orders/{order}/receipt', [PosOrderController::class, 'receipt'])->name('pos.orders.receipt');
+        Route::get('pos/orders/{order}/receipt/escpos', [PosOrderController::class, 'escpos'])->name('pos.orders.receipt.escpos');
         Route::post('pos/orders/{order}/reprint', [PosOrderController::class, 'reprint'])->name('pos.orders.reprint');
         Route::get('pos/orders/{order}/beneficiary', [PosOrderController::class, 'beneficiary'])->middleware('permission:discounts.view-beneficiary')->name('pos.orders.beneficiary');
     });

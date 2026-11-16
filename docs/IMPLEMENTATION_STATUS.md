@@ -773,3 +773,24 @@ not written to. Not committed.
 - Browser check on the scratch DB: Store settings shows only Business name, Logo, Receipt footer, Discounts, Refunds;
   My shift and Shifts pages load. The user's `brevon_pos` was not written to; it needs `migrate:fresh --seed`. Not
   committed.
+
+### ESC/POS receipt for the Android app (2026-11-16, D-194)
+
+- Client answered the printer question: Android counter tablet, **Xprinter XP-58IID** (58 mm, Bluetooth + USB).
+- Built step 1 of `HANDOFF_ANDROID_APP.md`: `App\Domain\Printing\EscPosReceipt` (58 mm / 32 columns, 80 mm / 48),
+  the same content as the browser receipt, ₱ drawn as a user-defined character; endpoints
+  `GET /pos/orders/{order}/receipt/escpos` and `GET /pos/printer/test` (base64 bytes, read-only).
+- Tests: `tests/Unit/Domain/Printing/EscPosReceiptTest.php`, `tests/Feature/Sales/EscPosReceiptEndpointTest.php`.
+- Not yet: the Android app itself (steps 2–5), the logo on printed receipts, a test print on the real printer.
+  `composer check` passes, **333 tests**. Not committed.
+
+### Logo on printed receipts (2026-11-16, D-195)
+
+- The client checked the ESC/POS test print: the `₱` sign looks right on the XP-58IID.
+- The user chose option A from the mock-up: the logo prints at the top, 32 mm wide, shaded (dithered).
+  `App\Domain\Printing\ReceiptLogo` converts each uploaded logo once (private `local` disk, `printing/`), Store
+  settings makes it on upload and deletes it with the old logo; `EscPosReceipt` sends it as centred `GS v 0` bands.
+  The real Brevon logo was run through it and matches the mock-up. PHP `gd` added to `DEPLOYMENT.md`.
+- Tests: `tests/Unit/Domain/Printing/ReceiptLogoTest.php`, plus logo cases in `EscPosReceiptEndpointTest` and
+  `StoreSettingsTest`.
+- `composer check` passes, **337 tests**. Not committed; needs a test print on the real printer.

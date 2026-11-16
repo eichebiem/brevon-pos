@@ -32,6 +32,7 @@ class StoreSettingsTest extends TestCase
     {
         $this->seedAccess();
         Storage::fake('public');
+        Storage::fake('local');
         $owner = $this->staff(PermissionCatalog::OWNER);
 
         $this->actingAs($owner)->put('/admin/settings', [
@@ -52,9 +53,11 @@ class StoreSettingsTest extends TestCase
 
         $this->assertSame(3, AuditLog::query()->where('event', 'setting.updated')->count());
         $this->assertCount(1, Storage::disk('public')->files('branding'));
+        $this->assertCount(1, Storage::disk('local')->files('printing'), 'D-195: printer dots made on upload');
 
         $this->actingAs($owner)->put('/admin/settings', ['name' => 'Brevon Rosales', 'receipt_footer' => 'Salamat po!', 'remove_logo' => true])->assertSessionHasNoErrors();
         $this->assertCount(0, Storage::disk('public')->files('branding'));
+        $this->assertCount(0, Storage::disk('local')->files('printing'));
     }
 
     public function test_non_images_and_unauthorised_users_are_refused(): void

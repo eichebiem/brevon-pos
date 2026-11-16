@@ -3,8 +3,11 @@
 namespace App\Http\Controllers\Pos;
 
 use App\Domain\Locations\LocationContext;
+use App\Domain\Printing\EscPosReceipt;
+use App\Domain\Printing\ReceiptLogo;
 use App\Domain\Refunds\RefundPanel;
 use App\Domain\Sales\OrderReceipt;
+use App\Domain\Settings\StoreSettings;
 use App\Domain\Shared\AuditLogger;
 use App\Domain\Shared\BusinessClock;
 use App\Domain\Shifts\ShiftService;
@@ -114,6 +117,23 @@ class OrderController extends Controller
             'receipt' => $receipt->for($order),
             'autoPrint' => $request->boolean('auto'),
         ]);
+    }
+
+    /**
+     * D-194: the same receipt as ESC/POS bytes (base64) for the Android app to
+     * send straight to the Bluetooth printer. Like the printable page it only
+     * reads; a reprint is audited by the reprint action, as for browser print.
+     */
+    public function escpos(Request $request, Order $order, OrderReceipt $receipt, EscPosReceipt $printer, ReceiptLogo $logo, StoreSettings $settings): JsonResponse
+    {
+        $this->authorizeView($request, $order);
+        $paper = (int) ($request->validate(['paper' => ['nullable', 'in:58,80']])['paper'] ?? 58);
+
+        return response()->json([
+            'paper' => $paper,
+            'columns' => EscPosReceipt::WIDTHS[$paper],
+            'data' => base64_encode($printer->render($receipt->for($order), $paper, $logo->bitmap($settings->get('store.logo_path')))),
+        ])->header('Cache-Control', 'no-store');
     }
 
     /**

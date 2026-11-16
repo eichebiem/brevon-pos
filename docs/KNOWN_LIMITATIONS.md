@@ -44,7 +44,8 @@ None of these is a defect. Each can be added later through a change request.
 - **One SC/PWD beneficiary per order.** A group of seniors pays in separate orders (D-148).
 - **Refunds, not edits.** A finished sale is never changed. Mistakes are fixed with a refund (D-150, D-169).
 - **Printing goes through the browser's print dialog**, on 80 mm paper (D-052). Printing straight to a Bluetooth
-  printer without the dialog is not built yet (OI-009, see §6).
+  printer without the dialog needs the Android app, which is not built yet; the server already produces the 58 mm
+  ESC/POS receipt, with the logo, for the counter's Xprinter XP-58IID (D-194, D-195).
 - **No cash drawer** is opened by the system.
 
 ## 4. Stock and costs
@@ -74,17 +75,17 @@ None of these is a defect. Each can be added later through a change request.
 
 These work today with the default shown and can be changed on screen, except where noted.
 
-| Item                                                | Default today                                                                                                               | Who confirms                                    | Ref                  |
-| --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- | -------------------- |
-| SC/PWD discount rate                                | 12% of the beneficiary's items, VAT disregarded, switched **on**. The law (RA 9994 / RA 10754) sets 20% plus VAT exemption. | Accountant                                      | D-068, D-175, OI-007 |
-| SC/PWD privacy notice and how long details are kept | Not written yet                                                                                                             | Owner                                           | OI-019               |
-| Costing method                                      | Weighted average (code change to switch)                                                                                    | Accountant                                      | D-048, OI-014        |
-| Sales report definitions                            | Net = gross − discounts − refunds, counted on the sale date                                                                 | Accountant                                      | D-156                |
-| Receipt wording                                     | "Order Receipt — not an official receipt/invoice"                                                                           | Accountant                                      | D-037, OI-008        |
-| Discount needing a manager                          | Over ₱100.00                                                                                                                | Owner                                           | D-146                |
-| Refund needing a manager                            | Over ₱0.00 (every refund)                                                                                                   | Owner                                           | D-152, OI-011        |
-| GCash reference format                              | 6–40 letters and digits, used once only                                                                                     | Owner                                           | D-109, OI-005        |
-| Receipt printer                                     | Browser print, 80 mm                                                                                                        | Owner (tablet type, printer model, paper width) | D-052, OI-009        |
+| Item                                                | Default today                                                                                                               | Who confirms | Ref                  |
+| --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ------------ | -------------------- |
+| SC/PWD discount rate                                | 12% of the beneficiary's items, VAT disregarded, switched **on**. The law (RA 9994 / RA 10754) sets 20% plus VAT exemption. | Accountant   | D-068, D-175, OI-007 |
+| SC/PWD privacy notice and how long details are kept | Not written yet                                                                                                             | Owner        | OI-019               |
+| Costing method                                      | Weighted average (code change to switch)                                                                                    | Accountant   | D-048, OI-014        |
+| Sales report definitions                            | Net = gross − discounts − refunds, counted on the sale date                                                                 | Accountant   | D-156                |
+| Receipt wording                                     | "Order Receipt — not an official receipt/invoice"                                                                           | Accountant   | D-037, OI-008        |
+| Discount needing a manager                          | Over ₱100.00                                                                                                                | Owner        | D-146                |
+| Refund needing a manager                            | Over ₱0.00 (every refund)                                                                                                   | Owner        | D-152, OI-011        |
+| GCash reference format                              | 6–40 letters and digits, used once only                                                                                     | Owner        | D-109, OI-005        |
+| Receipt printer                                     | Browser print, 80 mm; XP-58IID (58 mm) ESC/POS receipt ready on the server, Android app not built yet                       | -            | D-052, D-194, OI-009 |
 
 ## 7. Operations
 
